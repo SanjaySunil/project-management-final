@@ -1,0 +1,131 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/use-auth'
+import { toast } from 'sonner'
+
+interface Organization {
+  id?: string
+  name: string
+  website: string | null
+  email: string | null
+  billing_email: string | null
+  logo: string | null
+}
+
+interface OrganizationContextType {
+  organization: Organization
+  updateOrganization: (updates: Partial<Organization>) => Promise<void>
+  loading: boolean
+}
+
+const DEFAULT_ORG: Organization = {
+  name: "Acme Inc",
+  website: "https://acme.inc",
+  email: "contact@acme.inc",
+  billing_email: "billing@acme.inc",
+  logo: "",
+}
+
+const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
+
+export function OrganizationProvider({ children }: { children: React.ReactNode }) {
+  const { organizationId, loading: authLoading } = useAuth()
+  const [organization, setOrganization] = useState<Organization>(DEFAULT_ORG)
+  const [loading, setLoading] = useState(true)
+  const fetchedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function fetchOrganization() {
+      if (authLoading) return
+      if (!organizationId) {
+        setLoading(false)
+        return
+      }
+      
+      // Prevent duplicate fetches in StrictMode
+      if (fetchedRef.current === organizationId) return
+      fetchedRef.current = organizationId
+
+      console.log('OrganizationProvider: Fetching org', organizationId)
+      try {
+        const { data, error } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', organizationId)
+          .single()
+
+        if (!mounted) return
+
+        if (error) {
+          console.error('OrganizationProvider: Error fetching organization:', error)
+        } else if (data) {
+          console.log('OrganizationProvider: Org data received')
+          setOrganization(data)
+        }
+      } catch (err) {
+        console.error('OrganizationProvider: Unexpected error:', err)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchOrganization()
+
+    // Safety timeout for organization loading
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('OrganizationProvider: Loading timeout reached')
+        setLoading(false)
+      }
+    }, 3000)
+
+    return () => {
+      mounted = false
+      clearTimeout(timeout)
+    }
+  }, [organizationId, authLoading])
+
+  const updateOrganization = async (updates: Partial<Organization>) => {
+    if (!organizationId) {
+      toast.error("No organization associated with your profile")
+      return
+    }
+
+    try {
+      const { id, ...dataToUpdate } = updates
+      const { data, error } = await supabase
+        .from('organizations')
+        .update(dataToUpdate)
+        .eq('id', organizationId)
+        .select()
+        .single()
+
+      if (error) throw error
+      if (data) {
+        setOrganization(data)
+        toast.success("Organization updated successfully")
+      }
+    } catch (err: any) {
+      console.error('Error updating organization:', err)
+      toast.error(err.message || "Failed to update organization")
+    }
+  }
+
+  return (
+    <OrganizationContext.Provider value={{ organization, updateOrganization, loading }}>
+      {children}
+    </OrganizationContext.Provider>
+  )
+}
+
+export const useOrganization = () => {
+  const context = useContext(OrganizationContext)
+  if (context === undefined) {
+    throw new Error('useOrganization must be used within an OrganizationProvider')
+  }
+  return context
+}

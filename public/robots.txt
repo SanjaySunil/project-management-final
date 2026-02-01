@@ -1,0 +1,7 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow: /dashboard
+Allow: /login
+Allow: /
+
+Sitemap: https://arehsoft.com/sitemap.xml
