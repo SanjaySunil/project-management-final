@@ -227,7 +227,7 @@ export function ProjectsTable({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
-      onRowClick={onRowClick || onEdit}
+      onRowClick={onRowClick || onViewProposals}
     />
   )
 }

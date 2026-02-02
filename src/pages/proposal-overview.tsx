@@ -19,27 +19,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { KanbanBoard } from "@/components/projects/kanban-board"
+import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
 import { useAuth } from "@/hooks/use-auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Send, Hash, MessageSquare } from "lucide-react"
 
 type Proposal = Tables<"proposals">
-type Task = Tables<"tasks"> & {
-  proposals?: {
-    title: string
-    projects?: {
-      name: string
-    } | null
-  } | null
-  profiles?: {
-    full_name: string | null
-    avatar_url: string | null
-    email: string | null
-  } | null
-}
 
 interface Message {
   id: string
@@ -408,10 +396,39 @@ export default function ProposalOverviewPage() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading && !proposal) {
     return (
       <PageContainer>
-        <div className="flex flex-1 items-center justify-center p-4"><p>Loading proposal...</p></div>
+        <div className="flex flex-1 flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <Skeleton className="h-8 w-64" />
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right mr-4">
+                  <Skeleton className="h-4 w-24 mb-2" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-4 border-b pb-1">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-24" />
+          </div>
+          <div className="grid gap-6 md:grid-cols-3 mt-4">
+            <div className="md:col-span-2 space-y-6">
+              <Skeleton className="h-48 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+            <Skeleton className="h-48 w-full" />
+          </div>
+        </div>
       </PageContainer>
     )
   }
@@ -538,6 +555,7 @@ export default function ProposalOverviewPage() {
                 onTaskCreate={(status) => { setCreatingStatus(status); setIsCreateDialogOpen(true); }}
                 onTaskEdit={(task) => { setEditingTask(task); setIsEditDialogOpen(true); }}
                 onTaskDelete={handleTaskDelete}
+                isLoading={isLoading}
               />
             </div>
           </TabsContent>
@@ -624,7 +642,14 @@ export default function ProposalOverviewPage() {
           </DialogHeader>
           {editingTask && (
             <TaskForm 
-              onSubmit={handleTaskEdit} onCancel={() => setIsEditDialogOpen(false)} isLoading={isTaskSubmitting} members={members}
+              onSubmit={handleTaskEdit} 
+              onCancel={() => setIsEditDialogOpen(false)} 
+              onDelete={() => {
+                handleTaskDelete(editingTask.id)
+                setIsEditDialogOpen(false)
+              }}
+              isLoading={isTaskSubmitting} 
+              members={members}
               defaultValues={{ title: editingTask.title, description: editingTask.description || "", user_id: editingTask.user_id, proposal_id: editingTask.proposal_id }}
             />
           )}

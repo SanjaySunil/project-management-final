@@ -55,6 +55,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 
 import { ROLES, type RoleData, canManageRole } from "@/lib/rbac"
 
@@ -76,6 +77,7 @@ export function UsersTable({
   currentUserRole,
   availableRoles,
   isOnline,
+  isLoading = false,
 }: {
   data: Profile[]
   onChangeRole: (profile: Profile, newRole: string) => void
@@ -84,6 +86,7 @@ export function UsersTable({
   currentUserRole: string | null
   availableRoles?: Record<string, RoleData>
   isOnline?: (userId: string) => boolean
+  isLoading?: boolean
 }) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -317,7 +320,17 @@ export function UsersTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {columns.map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}

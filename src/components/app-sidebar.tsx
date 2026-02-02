@@ -13,8 +13,6 @@ import {
   MessageSquare,
   MessageCircle,
   ShieldCheck,
-  Building,
-  FileText,
   Settings2,
 } from "lucide-react"
 
@@ -31,8 +29,17 @@ import {
 import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
 
+interface SidebarItem {
+  title: string
+  url: string
+  icon?: any
+  permission?: { action: string; resource: string }
+  items?: SidebarItem[]
+  isActive?: boolean
+}
+
 // Sidebar data structure
-const sidebarGroups = {
+const sidebarGroups: Record<string, SidebarItem[]> = {
   platform: [
     {
       title: "Dashboard",
@@ -139,7 +146,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   // Helper to filter items by permission
-  const filterByPermission = (items: any[]) => {
+  const filterByPermission = (items: SidebarItem[]): SidebarItem[] => {
     return items.filter(item => {
       if (item.permission) {
         return checkPermission(item.permission.action, item.permission.resource)
@@ -160,7 +167,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const getOperationsNav = () => {
     const items = filterByPermission(sidebarGroups.operations)
     
-    return items.map(item => {
+    return items.map((item: SidebarItem) => {
       // Project contextual sub-menu
       if (item.title === "Projects" && projectId && !proposalId) {
         return {
@@ -204,7 +211,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Transform collaboration based on context
   const getCollaborationNav = () => {
     const items = filterByPermission(sidebarGroups.collaboration)
-    return items.map(item => {
+    return items.map((item: SidebarItem) => {
       if (item.title === "Team Chat") {
         // Active if in chat but NOT in DMs
         const isActive = (location.pathname.includes("/chat") && !location.pathname.includes("/chat/dms"))

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, RefreshCw, Plus } from "lucide-react"
@@ -260,33 +261,37 @@ export default function TeamPage() {
 
           <TabsContent value="members" className="mt-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(Object.entries(allRoles) as [string, RoleData][]).map(([key, roleInfo]) => (
-                <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant={key === 'admin' ? 'default' : key === 'manager' ? 'secondary' : 'outline'} className="capitalize">
-                      {roleInfo.label}
-                    </Badge>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                    <Skeleton className="h-5 w-20 mb-2" />
+                    <Skeleton className="h-4 w-full" />
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                (Object.entries(allRoles) as [string, RoleData][]).map(([key, roleInfo]) => (
+                  <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={key === 'admin' ? 'default' : key === 'manager' ? 'secondary' : 'outline'} className="capitalize">
+                        {roleInfo.label}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
+                  </div>
+                ))
+              )}
             </div>
 
-            {loading ? (
-              <div className="flex h-24 items-center justify-center">
-                <p className="text-muted-foreground">Loading team members...</p>
-              </div>
-            ) : (
-              <UsersTable 
-                data={profiles} 
-                onChangeRole={changeRole} 
-                onDelete={handleDelete}
-                onRowClick={handleUserClick}
-                currentUserRole={role}
-                availableRoles={allRoles}
-                isOnline={isOnline}
-              />
-            )}
+            <UsersTable 
+              data={profiles} 
+              onChangeRole={changeRole} 
+              onDelete={handleDelete}
+              onRowClick={handleUserClick}
+              currentUserRole={role}
+              availableRoles={allRoles}
+              isOnline={isOnline}
+              isLoading={loading}
+            />
           </TabsContent>
 
           {canManageRoles && (

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconTable, IconLayoutKanban, IconFilter, IconClipboardList } from "@tabler/icons-react"
+import { IconTable, IconLayoutKanban, IconFilter, IconClipboardList, IconUser, IconBriefcase } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
@@ -31,22 +31,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
-import { KanbanBoard } from "@/components/projects/kanban-board"
-
-type Task = Tables<"tasks"> & {
-  proposals?: {
-    id: string
-    title: string
-    projects?: {
-      name: string
-    } | null
-  } | null
-  profiles?: {
-    full_name: string | null
-    avatar_url: string | null
-    email: string | null
-  } | null
-}
+import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 
 interface AssignedTasksProps {
   userId?: string
@@ -65,8 +50,8 @@ export function AssignedTasks({
 }: AssignedTasksProps) {
   const { user: currentUser } = useAuth()
   const targetUserId = userId || currentUser?.id
+  const [mode, setMode] = React.useState<"project" | "personal">("project")
   const [tasks, setTasks] = React.useState<Task[]>([])
-  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [view, setView] = React.useState<"kanban" | "table">(defaultView || (hideHeader ? "table" : "kanban"))
@@ -83,8 +68,16 @@ export function AssignedTasks({
     try {
       setIsLoading(true)
       
-      const [tasksRes, proposalsRes, membersRes] = await Promise.all([
+      const [membersRes] = await Promise.all([
         supabase
+          .from("profiles")
+          .select("*")
+          .order("full_name", { ascending: true })
+      ])
+
+      let tasksRes
+      if (mode === "project") {
+        tasksRes = await supabase
           .from("tasks")
           .select(`
             *,
@@ -98,36 +91,31 @@ export function AssignedTasks({
             )
           `)
           .eq("user_id", targetUserId)
-          .order("order_index", { ascending: true }),
-        supabase
-          .from("proposals")
+          .order("order_index", { ascending: true })
+      } else {
+        tasksRes = await (supabase.from as any)("personal_tasks")
           .select("*")
-          .order("title", { ascending: true }),
-        supabase
-          .from("profiles")
-          .select("*")
-          .order("full_name", { ascending: true })
-      ])
+          .eq("user_id", targetUserId)
+          .order("order_index", { ascending: true })
+      }
 
       if (tasksRes.error) throw tasksRes.error
-      if (proposalsRes.error) throw proposalsRes.error
       if (membersRes.error) throw membersRes.error
 
       const fetchedMembers = membersRes.data || []
-      const fetchedTasks = (tasksRes.data || []).map(task => ({
+      const fetchedTasks = (tasksRes.data || []).map((task: any) => ({
         ...task,
         profiles: fetchedMembers.find(m => m.id === task.user_id) || null
       }))
 
       setTasks(fetchedTasks as Task[])
-      setProposals(proposalsRes.data || [])
       setMembers(fetchedMembers)
     } catch (error: unknown) {
       toast.error("Failed to fetch tasks: " + (error instanceof Error ? error.message : String(error)))
     } finally {
       setIsLoading(false)
     }
-  }, [targetUserId])
+  }, [targetUserId, mode])
 
   React.useEffect(() => {
     fetchTasks()
@@ -148,8 +136,8 @@ export function AssignedTasks({
         (updatedData as Record<string, unknown>).profiles = members.find(m => m.id === updates.user_id) || null
       }
 
-      const { error } = await supabase
-        .from("tasks")
+      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const { error } = await (supabase.from as any)(table)
         .update(updates)
         .eq("id", taskId)
 
@@ -171,17 +159,25 @@ export function AssignedTasks({
 
     try {
       setIsSubmitting(true)
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert([{
-          title: values.title,
-          description: values.description,
-          user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
-          proposal_id: values.proposal_id === "none" ? null : values.proposal_id,
-          status: creatingStatus,
-          order_index: tasks.filter(t => t.status === creatingStatus).length
-        }])
-        .select(`
+      const table = mode === "project" ? "tasks" : "personal_tasks"
+      
+      const payload: any = {
+        title: values.title,
+        description: values.description,
+        user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
+        status: creatingStatus,
+        order_index: tasks.filter(t => t.status === creatingStatus).length
+      }
+
+      if (mode === "project") {
+        payload.proposal_id = values.proposal_id === "none" ? null : values.proposal_id
+      }
+
+      const query = (supabase.from as any)(table).insert([payload])
+      
+      let res
+      if (mode === "project") {
+        res = await query.select(`
           *,
           proposals (
             id,
@@ -191,14 +187,16 @@ export function AssignedTasks({
               name
             )
           )
-        `)
-        .single()
+        `).single()
+      } else {
+        res = await query.select("*").single()
+      }
 
-      if (error) throw error
+      if (res.error) throw res.error
 
       const newTask = {
-        ...data,
-        profiles: members.find(m => m.id === data.user_id) || null
+        ...res.data,
+        profiles: members.find(m => m.id === res.data.user_id) || null
       }
 
       setTasks(prev => [...prev, newTask as Task])
@@ -216,15 +214,18 @@ export function AssignedTasks({
 
     try {
       setIsSubmitting(true)
-      const updates = {
+      const updates: any = {
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
-        proposal_id: values.proposal_id === "none" ? null : (values.proposal_id || null),
       }
 
-      const { error } = await supabase
-        .from("tasks")
+      if (mode === "project") {
+        updates.proposal_id = values.proposal_id === "none" ? null : (values.proposal_id || null)
+      }
+
+      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const { error } = await (supabase.from as any)(table)
         .update(updates)
         .eq("id", editingTask.id)
 
@@ -234,9 +235,6 @@ export function AssignedTasks({
         ...t, 
         ...updates,
         profiles: members.find(m => m.id === updates.user_id) || null,
-        proposals: updates.proposal_id 
-          ? (proposals.find(p => p.id === updates.proposal_id) as Task["proposals"]) 
-          : null
       } : t))
       
       setIsEditDialogOpen(false)
@@ -251,8 +249,8 @@ export function AssignedTasks({
 
   const handleTaskDelete = async (taskId: string) => {
     try {
-      const { error } = await supabase
-        .from("tasks")
+      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const { error } = await (supabase.from as any)(table)
         .delete()
         .eq("id", taskId)
 
@@ -270,9 +268,10 @@ export function AssignedTasks({
   }, [members, targetUserId])
 
   const title = React.useMemo(() => {
-    if (!targetUserId || targetUserId === currentUser?.id) return "Assigned to Me"
-    return targetUser?.full_name ? `Assigned to ${targetUser.full_name}` : "Assigned Tasks"
-  }, [targetUserId, currentUser?.id, targetUser])
+    const modePrefix = mode === "project" ? "Project Tasks" : "Personal Tasks"
+    if (!targetUserId || targetUserId === currentUser?.id) return modePrefix
+    return targetUser?.full_name ? `${modePrefix} - ${targetUser.full_name}` : modePrefix
+  }, [targetUserId, currentUser?.id, targetUser, mode])
 
   return (
     <div className="flex flex-col gap-6 h-full">
@@ -281,52 +280,80 @@ export function AssignedTasks({
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">
-              {targetUserId === currentUser?.id 
-                ? "Manage tasks that are specifically assigned to you."
-                : `Viewing tasks assigned to ${targetUser?.full_name || 'this user'}.`}
+              {mode === "project" 
+                ? "Manage tasks that are specifically assigned to you in projects."
+                : "Manage your private personal tasks and todos."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {!hideViewToggle && (
-              <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table")}>
-                <TabsList>
-                  <TabsTrigger value="kanban">
-                    <IconLayoutKanban className="mr-2 h-4 w-4" />
-                    Kanban
-                  </TabsTrigger>
-                  <TabsTrigger value="table">
-                    <IconTable className="mr-2 h-4 w-4" />
-                    Table
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
+          <div className="flex items-center gap-4">
+            <Tabs value={mode} onValueChange={(v) => setMode(v as "project" | "personal")}>
+              <TabsList>
+                <TabsTrigger value="project" className="flex items-center gap-2">
+                  <IconBriefcase className="size-4" />
+                  Project
+                </TabsTrigger>
+                <TabsTrigger value="personal" className="flex items-center gap-2">
+                  <IconUser className="size-4" />
+                  Personal
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <IconFilter className="mr-2 h-4 w-4" />
-                  {statusFilter === "all" ? "All Tasks" : statusFilter === "active" ? "Active" : "Complete"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setStatusFilter("all")}>
-                  All Tasks
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("active")}>
-                  Active Tasks
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("complete")}>
-                  Completed Tasks
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              {!hideViewToggle && (
+                <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table")}>
+                  <TabsList>
+                    <TabsTrigger value="kanban">
+                      <IconLayoutKanban className="mr-2 h-4 w-4" />
+                      Kanban
+                    </TabsTrigger>
+                    <TabsTrigger value="table">
+                      <IconTable className="mr-2 h-4 w-4" />
+                      Table
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <IconFilter className="mr-2 h-4 w-4" />
+                    {statusFilter === "all" ? "All Tasks" : statusFilter === "active" ? "Active" : "Complete"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setStatusFilter("all")}>
+                    All Tasks
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("active")}>
+                    Active Tasks
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("complete")}>
+                    Completed Tasks
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       )}
 
       {hideHeader && !hideViewToggle && (
-        <div className="flex items-center justify-end mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <Tabs value={mode} onValueChange={(v) => setMode(v as "project" | "personal")}>
+            <TabsList>
+              <TabsTrigger value="project" className="flex items-center gap-2">
+                <IconBriefcase className="size-4" />
+                Project
+              </TabsTrigger>
+              <TabsTrigger value="personal" className="flex items-center gap-2">
+                <IconUser className="size-4" />
+                Personal
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table")}>
             <TabsList>
               <TabsTrigger value="kanban">
@@ -355,7 +382,7 @@ export function AssignedTasks({
             <EmptyTitle>No tasks found</EmptyTitle>
             <EmptyDescription>
               {statusFilter === "active" 
-                ? (targetUserId === currentUser?.id ? "You don't have any active tasks assigned to you." : "This member doesn't have any active tasks.")
+                ? (targetUserId === currentUser?.id ? "You don't have any active tasks." : "This member doesn't have any active tasks.")
                 : statusFilter === "complete" 
                 ? (targetUserId === currentUser?.id ? "You haven't completed any tasks yet." : "This member hasn't completed any tasks yet.")
                 : statusFilter === "in progress"
@@ -363,9 +390,11 @@ export function AssignedTasks({
                 : `No tasks found with status "${statusFilter}".`}
             </EmptyDescription>
           </EmptyHeader>
-          <Button onClick={() => handleTaskCreateTrigger(statusFilter === "all" || statusFilter === "active" ? "todo" : statusFilter)} className="mt-4">
-            Add {statusFilter === "active" ? "an Active" : statusFilter === "in progress" ? "a Working" : "a"} Task
-          </Button>
+          {mode === "personal" && (
+            <Button onClick={() => handleTaskCreateTrigger(statusFilter === "all" || statusFilter === "active" ? "todo" : statusFilter)} className="mt-4">
+              Add {statusFilter === "active" ? "an Active" : statusFilter === "in progress" ? "a Working" : "a"} Personal Task
+            </Button>
+          )}
         </Empty>
       ) : (
         <div className="flex-1 overflow-hidden min-h-[500px]">
@@ -382,6 +411,7 @@ export function AssignedTasks({
             view={view}
             onViewChange={setView}
             hideControls
+            hideCreate={mode === "project"}
           />
         </div>
       )}
@@ -389,7 +419,7 @@ export function AssignedTasks({
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create New Task</DialogTitle>
+            <DialogTitle>Create New {mode === "personal" ? "Personal" : "Project"} Task</DialogTitle>
             <DialogDescription>
               Add a new task to the {creatingStatus} column.
             </DialogDescription>
@@ -399,7 +429,7 @@ export function AssignedTasks({
             onCancel={() => setIsCreateDialogOpen(false)}
             isLoading={isSubmitting}
             members={members}
-            proposals={proposals}
+            hideAssignee={mode === "personal"}
             defaultValues={{
               user_id: targetUserId
             }}
@@ -410,7 +440,7 @@ export function AssignedTasks({
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
+            <DialogTitle>Edit {mode === "personal" ? "Personal" : "Project"} Task</DialogTitle>
             <DialogDescription>
               Update the details of this task.
             </DialogDescription>
@@ -419,9 +449,13 @@ export function AssignedTasks({
             <TaskForm 
               onSubmit={handleTaskEdit}
               onCancel={() => setIsEditDialogOpen(false)}
+              onDelete={() => {
+                handleTaskDelete(editingTask.id)
+                setIsEditDialogOpen(false)
+              }}
               isLoading={isSubmitting}
               members={members}
-              proposals={proposals}
+              hideAssignee={mode === "personal"}
               defaultValues={{
                 title: editingTask.title,
                 description: editingTask.description || "",
@@ -435,4 +469,5 @@ export function AssignedTasks({
     </div>
   )
 }
+
 

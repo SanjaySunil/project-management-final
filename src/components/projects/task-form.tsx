@@ -32,19 +32,23 @@ export type TaskFormValues = z.infer<typeof taskSchema>
 interface TaskFormProps {
   onSubmit: (values: TaskFormValues) => void
   onCancel: () => void
+  onDelete?: () => void
   isLoading?: boolean
   members: Tables<"profiles">[]
   proposals?: Tables<"proposals">[]
   defaultValues?: Partial<TaskFormValues>
+  hideAssignee?: boolean
 }
 
 export function TaskForm({ 
   onSubmit, 
   onCancel, 
+  onDelete,
   isLoading, 
   members, 
   proposals,
-  defaultValues 
+  defaultValues,
+  hideAssignee = false
 }: TaskFormProps) {
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -94,34 +98,36 @@ export function TaskForm({
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="user_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Assign To</FormLabel>
-              <Select 
-                onValueChange={field.onChange} 
-                value={field.value || "unassigned"}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a member" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {members.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.full_name || member.email || member.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {!hideAssignee && (
+          <FormField
+            control={form.control}
+            name="user_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Assign To</FormLabel>
+                <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value || "unassigned"}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a member" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {members.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.full_name || member.email || member.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         {proposals && proposals.length > 0 && (
           <FormField
             control={form.control}
@@ -152,13 +158,27 @@ export function TaskForm({
             )}
           />
         )}
-        <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Task"}
-          </Button>
+        <div className="flex justify-between gap-2 pt-4">
+          <div>
+            {onDelete && (
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={onDelete}
+              >
+                Delete Task
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Saving..." : "Save Task"}
+            </Button>
+          </div>
         </div>
       </form>
     </Form>

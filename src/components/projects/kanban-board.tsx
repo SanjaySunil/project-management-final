@@ -3,6 +3,7 @@ import {
   DndContext,
   DragOverlay,
   closestCorners,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -11,6 +12,7 @@ import {
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -18,13 +20,20 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconPencil, IconTrash, IconLayoutKanban, IconTable } from "@tabler/icons-react"
+import { IconPlus, IconPencil, IconTrash, IconLayoutKanban, IconTable, IconX } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { Tables } from "@/lib/database.types"
 import { DataTable } from "@/components/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -38,10 +47,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 
-type Task = Tables<"tasks"> & {
+// Custom collision detection strategy for multi-container kanban
+const customCollisionDetection: CollisionDetection = (args) => {
+  // First, see if there are any collisions with items
+  const rectCollisions = rectIntersection(args)
+  
+  if (rectCollisions.length > 0) {
+    return rectCollisions
+  }
+
+  // Fallback to closestCorners
+  return closestCorners(args)
+}
+
+export type Task = {
+  id: string
+  created_at?: string | null
+  title: string
+  description?: string | null
+  status: string
+  order_index?: number | null
+  user_id?: string | null
+  deliverable_id?: string | null
+  proposal_id?: string | null
   proposals?: {
+    id: string
     title: string
     projects?: {
       name: string
@@ -57,13 +89,15 @@ type Task = Tables<"tasks"> & {
 interface KanbanBoardProps {
   tasks: Task[]
   members: Tables<"profiles">[]
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void
+  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onTaskCreate: (status: string) => void
-  onTaskEdit: (task: Task) => void
-  onTaskDelete: (taskId: string) => void
+  onTaskEdit: (task: Task) => void | Promise<void>
+  onTaskDelete: (taskId: string) => void | Promise<void>
   view?: "kanban" | "table"
   onViewChange?: (view: "kanban" | "table") => void
   hideControls?: boolean
+  hideCreate?: boolean
+  isLoading?: boolean
 }
 
 const COLUMNS = [
@@ -83,18 +117,30 @@ export function KanbanBoard({
   onTaskDelete,
   view: externalView,
   onViewChange,
-  hideControls = false
+  hideControls = false,
+  hideCreate = false,
+  isLoading = false
 }: KanbanBoardProps) {
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks)
   const [activeTask, setActiveTask] = React.useState<Task | null>(null)
   const [internalView, setInternalView] = React.useState<"kanban" | "table">("kanban")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState<string | null>(null)
+  
+  // Use a ref to always have the latest tasks in handlers without re-rendering
+  const tasksRef = React.useRef(tasks)
+  React.useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
 
   const view = externalView || internalView
   const setView = onViewChange || setInternalView
 
+  // Update local tasks when initialTasks changes, but only if not dragging
   React.useEffect(() => {
-    setTasks(initialTasks)
-  }, [initialTasks])
+    if (!activeTask) {
+      setTasks(initialTasks)
+    }
+  }, [initialTasks, activeTask])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -111,9 +157,11 @@ export function KanbanBoard({
     const groups: Record<string, Task[]> = {}
     COLUMNS.forEach((col) => (groups[col.id] = []))
     tasks.forEach((task) => {
-      if (groups[task.status]) {
-        groups[task.status].push(task)
+      const status = task.status
+      if (groups[status]) {
+        groups[status].push(task)
       } else {
+        // Fallback to backlog if status is unknown or missing
         groups["backlog"].push(task)
       }
     })
@@ -126,7 +174,7 @@ export function KanbanBoard({
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event
-    const task = tasks.find((t) => t.id === active.id)
+    const task = tasksRef.current.find((t) => t.id === active.id)
     if (task) setActiveTask(task)
   }
 
@@ -139,29 +187,43 @@ export function KanbanBoard({
 
     if (activeId === overId) return
 
-    const activeTask = tasks.find((t) => t.id === activeId)
-    const overTask = tasks.find((t) => t.id === overId)
+    const activeTaskObj = tasksRef.current.find((t) => t.id === activeId)
+    if (!activeTaskObj) return
 
-    // Find the column we're hovering over
-    const isOverAColumn = COLUMNS.some((col) => col.id === overId)
+    // Find the container (status) of the 'over' element
+    let overStatus: string | null = null
     
-    if (activeTask && (overTask || isOverAColumn)) {
-      const newStatus = isOverAColumn ? (overId as string) : overTask!.status
-      
-      if (activeTask.status !== newStatus) {
-        setTasks((prev) => {
-          const activeIndex = prev.findIndex((t) => t.id === activeId)
-          const newTasks = [...prev]
-          newTasks[activeIndex] = { ...newTasks[activeIndex], status: newStatus }
-          return newTasks
-        })
+    // Is over a column?
+    if (COLUMNS.some(col => col.id === overId)) {
+      overStatus = overId as string
+    } else {
+      // Is over a task?
+      const overTask = tasksRef.current.find(t => t.id === overId)
+      if (overTask) {
+        overStatus = overTask.status
       }
+    }
+
+    if (!overStatus) return
+
+    if (activeTaskObj.status !== overStatus) {
+      setTasks((prev) => {
+        const activeIndex = prev.findIndex((t) => t.id === activeId)
+        if (activeIndex === -1) return prev
+        
+        const updatedTasks = [...prev]
+        updatedTasks[activeIndex] = { 
+          ...updatedTasks[activeIndex], 
+          status: overStatus! 
+        }
+        return updatedTasks
+      })
     }
   }
 
-  function handleDragEnd(event: DragEndEvent) {
+  async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    const taskBeforeEnd = activeTask
+    const draggedTask = activeTask
     setActiveTask(null)
 
     if (!over) return
@@ -169,37 +231,64 @@ export function KanbanBoard({
     const activeId = active.id
     const overId = over.id
 
-    const activeTaskFinal = tasks.find((t) => t.id === activeId)
-    const overTask = tasks.find((t) => t.id === overId)
+    const activeTaskFinal = tasksRef.current.find((t) => t.id === activeId)
+    if (!activeTaskFinal || !draggedTask) return
 
-    if (!activeTaskFinal) return
-
-    // If status changed, sync with backend
-    if (taskBeforeEnd && activeTaskFinal.status !== taskBeforeEnd.status) {
-      onTaskUpdate(activeTaskFinal.id, { status: activeTaskFinal.status })
+    // Determine target status
+    let targetStatus: string = activeTaskFinal.status
+    if (COLUMNS.some(col => col.id === overId)) {
+      targetStatus = overId as string
+    } else {
+      const overTask = tasksRef.current.find(t => t.id === overId)
+      if (overTask) {
+        targetStatus = overTask.status
+      }
     }
 
-    if (overTask && activeTaskFinal.status === overTask.status) {
-      const columnTasks = tasksByStatus[activeTaskFinal.status]
+    const updates: Partial<Task> = {}
+    let finalOrderIndex = activeTaskFinal.order_index
+
+    // 1. Handle Status Change
+    if (targetStatus !== draggedTask.status) {
+      updates.status = targetStatus
+    }
+
+    // 2. Handle Reordering
+    const overTask = tasksRef.current.find(t => t.id === overId)
+    if (overTask && overTask.id !== activeId) {
+      // Get tasks in the target column AFTER they've been updated by dragOver
+      // We use tasksRef.current because it should have the latest status from handleDragOver
+      const columnTasks = [...tasksRef.current.filter(t => t.status === targetStatus)]
+      columnTasks.sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+      
       const oldIndex = columnTasks.findIndex((t) => t.id === activeId)
       const newIndex = columnTasks.findIndex((t) => t.id === overId)
 
-      if (oldIndex !== newIndex) {
-        const reorderedColumnTasks = arrayMove(columnTasks, oldIndex, newIndex)
-        
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        const reordered = arrayMove(columnTasks, oldIndex, newIndex)
+        finalOrderIndex = newIndex
+        updates.order_index = finalOrderIndex
+
         // Update local state for immediate feedback
-        setTasks((prev) => {
-          const otherTasks = prev.filter((t) => t.status !== activeTaskFinal.status)
-          const updatedColumnTasks = reorderedColumnTasks.map((t, idx) => ({
+        setTasks(prev => {
+          const otherTasks = prev.filter(t => t.status !== targetStatus)
+          const updatedColumnTasks = reordered.map((t, idx) => ({
             ...t,
-            order_index: idx,
+            order_index: idx
           }))
           return [...otherTasks, ...updatedColumnTasks]
         })
-
-        // Sync the moved task's index with backend
-        onTaskUpdate(activeTaskFinal.id, { order_index: newIndex })
       }
+    } else if (!overTask && COLUMNS.some(col => col.id === overId)) {
+      // Dropped on empty column or column header
+      const columnTasks = tasksRef.current.filter(t => t.status === targetStatus)
+      finalOrderIndex = columnTasks.length
+      updates.order_index = finalOrderIndex
+    }
+
+    // Sync with backend if anything changed
+    if (Object.keys(updates).length > 0) {
+      await onTaskUpdate(activeId as string, updates)
     }
   }
 
@@ -220,8 +309,8 @@ export function KanbanBoard({
             </TabsList>
           </Tabs>
           
-          {view !== "kanban" && (
-            <Button onClick={() => onTaskCreate("todo")} size="sm">
+          {view !== "kanban" && !hideCreate && (
+            <Button onClick={() => onTaskCreate("todo")} size="sm" disabled={isLoading}>
               <IconPlus className="size-4 mr-2" />
               Add Task
             </Button>
@@ -229,15 +318,56 @@ export function KanbanBoard({
         </div>
       )}
 
-      {view === "kanban" ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
+      {isLoading ? (
+        view === "kanban" ? (
           <div className="flex h-full gap-4 overflow-x-auto pb-4">
+            {COLUMNS.map((column) => (
+              <div key={column.id} className="flex h-full w-72 flex-col gap-3 rounded-lg bg-muted/50 p-3">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-8 rounded-full" />
+                  </div>
+                </div>
+                <div className="flex flex-1 flex-col gap-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Card key={i} className="p-3">
+                      <div className="space-y-3">
+                        <Skeleton className="h-4 w-3/4" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-3 w-full" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-6 w-6 rounded-full" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <TaskTableView
+            tasks={[]}
+            members={members}
+            onTaskEdit={onTaskEdit}
+            onTaskUpdate={onTaskUpdate}
+            onTaskDelete={onTaskDelete}
+            isLoading={true}
+          />
+        )
+      ) : view === "kanban" ? (
+        <div className="flex h-full gap-4 overflow-x-auto pb-4">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={customCollisionDetection}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
             {COLUMNS.map((column) => (
               <KanbanColumn
                 key={column.id}
@@ -245,40 +375,66 @@ export function KanbanBoard({
                 title={column.title}
                 tasks={tasksByStatus[column.id]}
                 members={members}
-                onAddTask={() => onTaskCreate(column.id)}
+                onAddTask={!hideCreate ? () => onTaskCreate(column.id) : undefined}
                 onTaskEdit={onTaskEdit}
                 onTaskUpdate={onTaskUpdate}
+                onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
               />
             ))}
-          </div>
 
-          <DragOverlay>
-            {activeTask ? (
-              <TaskCard 
-                task={activeTask} 
-                isOverlay 
-                members={members} 
-                onEdit={() => onTaskEdit(activeTask)}
-                onUpdate={(updates) => onTaskUpdate(activeTask.id, updates)}
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+            <DragOverlay>
+              {activeTask ? (
+                <TaskCard 
+                  task={activeTask} 
+                  isOverlay 
+                  members={members} 
+                  onEdit={() => onTaskEdit(activeTask)}
+                  onUpdate={(updates) => onTaskUpdate(activeTask.id, updates)}
+                  onDelete={() => setIsDeleteDialogOpen(activeTask.id)}
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </div>
       ) : (
         <TaskTableView
           tasks={tasks}
           members={members}
           onTaskEdit={onTaskEdit}
           onTaskUpdate={onTaskUpdate}
-          onTaskDelete={onTaskDelete}
+          onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
         />
       )}
+
+      <ConfirmDialog
+        open={!!isDeleteDialogOpen}
+        onOpenChange={(open) => !open && setIsDeleteDialogOpen(null)}
+        title="Delete Task"
+        description="Are you sure you want to delete this task? This action cannot be undone."
+        onConfirm={() => {
+          if (isDeleteDialogOpen) {
+            onTaskDelete(isDeleteDialogOpen)
+            setIsDeleteDialogOpen(null)
+          }
+        }}
+      />
     </div>
   )
 }
 
-function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete }: TaskViewProps) {
+function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete, isLoading }: TaskViewProps) {
+  const [statusFilter, setStatusFilter] = React.useState<string>("all")
+  const [assigneeFilter, setAssigneeFilter] = React.useState<string>("all")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState<string | null>(null)
+
+  const filteredTasks = React.useMemo(() => {
+    return tasks.filter(task => {
+      const matchesStatus = statusFilter === "all" || task.status === statusFilter
+      const matchesAssignee = assigneeFilter === "all" 
+        || (assigneeFilter === "unassigned" ? !task.user_id : task.user_id === assigneeFilter)
+      return matchesStatus && matchesAssignee
+    })
+  }, [tasks, statusFilter, assigneeFilter])
 
   const columns: ColumnDef<Task>[] = [
     {
@@ -412,9 +568,54 @@ function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete 
     <div className="flex-1 overflow-hidden">
       <DataTable 
         columns={columns} 
-        data={tasks} 
+        data={filteredTasks} 
+        isLoading={isLoading}
         disablePadding
         searchPlaceholder="Search tasks..."
+        toolbar={
+          <div className="flex items-center gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-[130px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {COLUMNS.map(col => (
+                  <SelectItem key={col.id} value={col.id}>{col.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+              <SelectTrigger className="h-8 w-[150px]">
+                <SelectValue placeholder="Assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {members.map(member => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.full_name || member.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(statusFilter !== "all" || assigneeFilter !== "all") && (
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setStatusFilter("all")
+                  setAssigneeFilter("all")
+                }}
+                className="h-8 px-2 lg:px-3"
+              >
+                Reset
+                <IconX className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        }
       />
       <ConfirmDialog
         open={!!isDeleteDialogOpen}
@@ -435,9 +636,10 @@ function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete 
 interface TaskViewProps {
   tasks: Task[]
   members: Tables<"profiles">[]
-  onTaskEdit: (task: Task) => void
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void
-  onTaskDelete: (taskId: string) => void
+  onTaskEdit: (task: Task) => void | Promise<void>
+  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onTaskDelete: (taskId: string) => void | Promise<void>
+  isLoading?: boolean
 }
 
 interface KanbanColumnProps {
@@ -445,12 +647,13 @@ interface KanbanColumnProps {
   title: string
   tasks: Task[]
   members: Tables<"profiles">[]
-  onAddTask: () => void
-  onTaskEdit: (task: Task) => void
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void
+  onAddTask?: () => void
+  onTaskEdit: (task: Task) => void | Promise<void>
+  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onTaskDelete: (taskId: string) => void | Promise<void>
 }
 
-function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTaskUpdate }: KanbanColumnProps) {
+function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTaskUpdate, onTaskDelete }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: id,
   })
@@ -467,14 +670,16 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTask
             {tasks.length}
           </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-muted-foreground hover:text-foreground"
-          onClick={onAddTask}
-        >
-          <IconPlus className="size-4" />
-        </Button>
+        {onAddTask && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground hover:text-foreground"
+            onClick={onAddTask}
+          >
+            <IconPlus className="size-4" />
+          </Button>
+        )}
       </div>
 
       <SortableContext
@@ -490,6 +695,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTask
               members={members}
               onEdit={onTaskEdit}
               onUpdate={onTaskUpdate}
+              onTaskDelete={onTaskDelete}
             />
           ))}
           {tasks.length === 0 && (
@@ -506,11 +712,12 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTask
 interface SortableTaskCardProps {
   task: Task
   members: Tables<"profiles">[]
-  onEdit: (task: Task) => void
-  onUpdate: (taskId: string, updates: Partial<Task>) => void
+  onEdit: (task: Task) => void | Promise<void>
+  onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onTaskDelete: (taskId: string) => void | Promise<void>
 }
 
-function SortableTaskCard({ task, members, onEdit, onUpdate }: SortableTaskCardProps) {
+function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -548,6 +755,7 @@ function SortableTaskCard({ task, members, onEdit, onUpdate }: SortableTaskCardP
         members={members} 
         onEdit={() => onEdit(task)}
         onUpdate={(updates) => onUpdate(task.id, updates)}
+        onDelete={() => onTaskDelete(task.id)}
       />
     </div>
   )
@@ -557,11 +765,12 @@ interface TaskCardProps {
   task: Task
   isOverlay?: boolean
   members: Tables<"profiles">[]
-  onEdit: () => void
-  onUpdate: (updates: Partial<Task>) => void
+  onEdit: () => void | Promise<void>
+  onUpdate: (updates: Partial<Task>) => void | Promise<void>
+  onDelete: () => void
 }
 
-function TaskCard({ task, isOverlay, members, onEdit, onUpdate }: TaskCardProps) {
+function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete }: TaskCardProps) {
   const userInitials = task.profiles?.full_name
     ? task.profiles.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
     : task.profiles?.email?.slice(0, 2).toUpperCase() || '?'
@@ -572,9 +781,24 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate }: TaskCardProps)
       onClick={onEdit}
     >
       <CardHeader className="p-3">
-        <CardTitle className="text-sm font-medium line-clamp-2">
-          {task.title}
-        </CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-sm font-medium line-clamp-2">
+            {task.title}
+          </CardTitle>
+          {!isOverlay && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+            >
+              <IconTrash className="size-3.5" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
 
       {(task.description || members.length > 0) && (

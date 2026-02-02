@@ -42,6 +42,7 @@ export function DirectMessage({ recipientId, recipientName }: DirectMessageProps
     if (!user || !recipientId) return
 
     async function getOrCreateChannel() {
+      if (!user) return
       setIsLoading(true)
       const dmName = [user.id, recipientId].sort().join("--")
       const fullName = `dm--${dmName}`
@@ -110,7 +111,7 @@ export function DirectMessage({ recipientId, recipientName }: DirectMessageProps
             email
           )
         `)
-        .eq("channel_id", channel.id)
+        .eq("channel_id", channel!.id)
         .order("created_at", { ascending: true })
 
       if (!error && data) {

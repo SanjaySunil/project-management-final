@@ -3,7 +3,6 @@ import {
   IconCopy, 
   IconEye, 
   IconEyeOff,
-  IconExternalLink,
   IconCalendar,
   IconTag,
   IconNotes,

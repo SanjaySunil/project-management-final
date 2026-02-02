@@ -29,7 +29,7 @@ const projectSchema = z.object({
   description: z.string().optional(),
   status: z.string().min(1, "Status is required"),
   client_id: z.string().min(1, "Please select a client"),
-  member_ids: z.array(z.string()).default([]),
+  member_ids: z.array(z.string()),
 })
 
 type ProjectFormValues = z.infer<typeof projectSchema>

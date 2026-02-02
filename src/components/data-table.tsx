@@ -75,6 +75,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 // Create a separate component for the drag handle
@@ -175,6 +176,8 @@ export interface DataTableProps<TData extends { id: string | number }> {
 
   onRowClick?: (row: TData) => void
 
+  toolbar?: React.ReactNode
+
 }
 
 
@@ -208,6 +211,8 @@ export function DataTable<TData extends { id: string | number }> ({
   disablePadding = true,
 
   onRowClick,
+
+  toolbar,
 
 }: DataTableProps<TData>) {
   const [data, setData] = React.useState(() => initialData)
@@ -326,14 +331,15 @@ export function DataTable<TData extends { id: string | number }> ({
               </TableHeader>
               <TableBody className="**:data-[slot=table-cell]:first:w-8">
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      Loading...
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {columns.map((_, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-6 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
                 ) : table.getRowModel().rows?.length ? (
                   <SortableContext
                     items={dataIds}
@@ -378,14 +384,15 @@ export function DataTable<TData extends { id: string | number }> ({
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    Loading...
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {columns.map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-6 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
               ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow
@@ -547,6 +554,7 @@ export function DataTable<TData extends { id: string | number }> ({
             onChange={(event) => table.setGlobalFilter(event.target.value)}
             className="h-8 w-full sm:w-[150px] lg:w-[250px]"
           />
+          {toolbar}
         </div>
       </div>
       <div className="flex items-center gap-2">

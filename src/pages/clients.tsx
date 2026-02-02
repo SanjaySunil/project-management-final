@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
 import { MoreVertical, Edit, Trash, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"

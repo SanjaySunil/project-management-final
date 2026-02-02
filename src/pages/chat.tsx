@@ -20,9 +20,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { usePresence } from "@/hooks/use-presence"
+import { useNotifications } from "@/hooks/use-notifications"
 
 interface Project {
   id: string
@@ -63,6 +65,7 @@ export default function ChatPage() {
   const location = useLocation()
   const { user, role } = useAuth()
   const { isOnline } = usePresence()
+  const { notifications, markAsRead } = useNotifications()
   
   const searchParams = new URLSearchParams(location.search)
   const dmUserId = searchParams.get("with")
@@ -162,7 +165,7 @@ export default function ChatPage() {
         name: fullName,
         project_id: null,
         created_by: user.id,
-        description: `Direct message between ${user.full_name || user.email} and ${otherUser.full_name || otherUser.email}`
+        description: `Direct message between ${user.user_metadata?.full_name || user.email} and ${otherUser.full_name || otherUser.email}`
       }).select().single()
 
       if (error) {
@@ -198,6 +201,17 @@ export default function ChatPage() {
   useEffect(() => {
     setCurrentProjectId(routeProjectId || null)
   }, [routeProjectId])
+
+  // Mark notifications for this channel as read
+  useEffect(() => {
+    if (selectedChannel && notifications.length > 0) {
+      const channelNotifications = notifications.filter(
+        n => !n.is_read && n.metadata?.channel_id === selectedChannel.id
+      )
+      
+      channelNotifications.forEach(n => markAsRead(n.id))
+    }
+  }, [selectedChannel, notifications, markAsRead])
 
   // Handle 'with' query param for starting DMs
   useEffect(() => {
@@ -251,63 +265,65 @@ export default function ChatPage() {
   // Fetch channels based on current project context
   useEffect(() => {
     async function fetchChannels() {
-      setIsLoading(true)
-      const query = supabase.from("channels").select("*")
+      // Only show loading if we don't have channels yet or project changed
+      if (channels.length === 0) setIsLoading(true)
       
-      const { data, error } = await query.order("name")
+      const { data, error } = await supabase
+        .from("channels")
+        .select("*")
+        .order("name")
       
       if (error) {
         toast.error("Failed to load channels")
       } else {
         const fetchedChannels = (data as Channel[]) || []
         setChannels(fetchedChannels)
-        
-        // Initial selection: prefer routeChannelId if present
-        let initialChannel: Channel | undefined
-        
-        if (routeChannelId) {
-          initialChannel = fetchedChannels.find(c => c.id === routeChannelId)
-        }
-        
-        if (!initialChannel) {
-          if (isDMMode) {
-            // Pick first DM channel
-            initialChannel = fetchedChannels.find(c => c.name.startsWith("dm--"))
-          } else {
-            // Fallback to project context if no channel in route
-            initialChannel = fetchedChannels.find(c => 
-              !c.name.startsWith("dm--") && 
-              (currentProjectId ? c.project_id === currentProjectId : !c.project_id)
-            ) || fetchedChannels.find(c => !c.name.startsWith("dm--"))
-          }
-        }
-        
-        if (initialChannel) {
-          setSelectedChannel(initialChannel)
-        } else if (fetchedChannels.length > 0) {
-          // Only auto-select if we have channels matching the current mode
-          const fallbackChannel = isDMMode 
-            ? fetchedChannels.find(c => c.name.startsWith("dm--"))
-            : fetchedChannels.find(c => !c.name.startsWith("dm--"))
-          
-          if (fallbackChannel) {
-            setSelectedChannel(fallbackChannel)
-          } else {
-            setSelectedChannel(null)
-          }
-        }
       }
       setIsLoading(false)
     }
 
     fetchChannels()
-  }, [currentProjectId, routeChannelId, isDMMode])
+  }, [currentProjectId, isDMMode])
+
+  // Sync selected channel with route
+  useEffect(() => {
+    if (channels.length === 0) return
+
+    let channelToSelect: Channel | undefined
+    
+    if (routeChannelId) {
+      channelToSelect = channels.find(c => c.id === routeChannelId)
+    }
+    
+    if (!channelToSelect) {
+      if (isDMMode) {
+        // Pick first DM channel
+        channelToSelect = channels.find(c => c.name.startsWith("dm--"))
+      } else {
+        // Fallback to project context if no channel in route
+        channelToSelect = channels.find(c => 
+          !c.name.startsWith("dm--") && 
+          (currentProjectId ? c.project_id === currentProjectId : !c.project_id)
+        ) || channels.find(c => !c.name.startsWith("dm--"))
+      }
+    }
+    
+    if (channelToSelect && channelToSelect.id !== selectedChannel?.id) {
+      setSelectedChannel(channelToSelect)
+    } else if (!channelToSelect && selectedChannel) {
+      setSelectedChannel(null)
+    }
+  }, [routeChannelId, channels, isDMMode, currentProjectId, selectedChannel?.id])
 
   // Fetch messages when selectedChannel changes
   useEffect(() => {
-    if (!selectedChannel) return
+    if (!selectedChannel) {
+      setMessages([])
+      return
+    }
 
     const channelId = selectedChannel.id
+    setMessages([]) // Clear messages when channel changes
 
     async function fetchMessages() {
       const { data, error } = await supabase
@@ -653,7 +669,13 @@ export default function ChatPage() {
                     </Dialog>
                   </div>
                   {isLoading ? (
-                    <div className="px-3 py-2 text-xs text-muted-foreground italic">Loading...</div>
+                    <div className="px-3 py-2 space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
                   ) : dmChannels.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-muted-foreground italic">No conversations</div>
                   ) : (

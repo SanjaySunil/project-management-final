@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
-import { ProjectProposalsModal } from "@/components/projects/project-proposals-modal"
+import { ProjectDetailsModal } from "@/components/projects/project-details-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 export default function ProjectsPage() {
@@ -25,8 +25,8 @@ export default function ProjectsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
   
-  const [proposalsModalOpen, setProposalsModalOpen] = React.useState(false)
-  const [selectedProjectForProposals, setSelectedProjectForProposals] = React.useState<ProjectWithClient | null>(null)
+  const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
+  const [selectedProject, setSelectedProject] = React.useState<ProjectWithClient | null>(null)
 
   const fetchProjects = React.useCallback(async () => {
     if (!user) return
@@ -54,10 +54,6 @@ export default function ProjectsPage() {
       // Filter by assigned projects if not admin or manager
       const isAdmin = role === "admin" || role === "manager"
       if (!isAdmin) {
-        // We use a join or an exists clause. 
-        // Since project_members is a related table, we can filter by it.
-        // However, Supabase's simple filter on related table might not be what we want if we want to SEE all members but only projects WE are in.
-        // Actually, if we use project_members!inner(user_id) it will only return projects where we are a member.
         query = query.filter("project_members.user_id", "eq", user.id)
       }
 
@@ -82,8 +78,8 @@ export default function ProjectsPage() {
   }
 
   const handleEditProject = (project: ProjectWithClient) => {
-    setEditingProject(project)
-    setIsDialogOpen(true)
+    setSelectedProject(project)
+    setDetailsModalOpen(true)
   }
 
   const handleDeleteProject = (id: string) => {
@@ -91,9 +87,9 @@ export default function ProjectsPage() {
     setDeleteConfirmOpen(true)
   }
 
-  const handleViewProposals = (project: ProjectWithClient) => {
-    setSelectedProjectForProposals(project)
-    setProposalsModalOpen(true)
+  const handleViewDetails = (project: ProjectWithClient) => {
+    setSelectedProject(project)
+    setDetailsModalOpen(true)
   }
 
   const confirmDeleteProject = async () => {
@@ -181,15 +177,17 @@ export default function ProjectsPage() {
             onEdit={handleEditProject}
             onDelete={handleDeleteProject}
             onAdd={handleAddProject}
-            onViewProposals={handleViewProposals}
+            onViewProposals={handleViewDetails}
+            onRowClick={handleViewDetails}
           />
         </div>
       </div>
 
-      <ProjectProposalsModal 
-        project={selectedProjectForProposals}
-        open={proposalsModalOpen}
-        onOpenChange={setProposalsModalOpen}
+      <ProjectDetailsModal 
+        project={selectedProject}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+        onProjectUpdated={fetchProjects}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

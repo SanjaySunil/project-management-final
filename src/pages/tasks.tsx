@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
-import { KanbanBoard } from "@/components/projects/kanban-board"
+import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 import {
   Dialog,
   DialogContent,
@@ -15,24 +15,8 @@ import {
 } from "@/components/ui/dialog"
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
 
-type Task = Tables<"tasks"> & {
-  proposals?: {
-    id: string
-    title: string
-    projects?: {
-      name: string
-    } | null
-  } | null
-  profiles?: {
-    full_name: string | null
-    avatar_url: string | null
-    email: string | null
-  } | null
-}
-
 export default function TasksPage() {
   const [tasks, setTasks] = React.useState<Task[]>([])
-  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
@@ -45,7 +29,7 @@ export default function TasksPage() {
     try {
       setIsLoading(true)
       
-      const [tasksRes, proposalsRes, membersRes] = await Promise.all([
+      const [tasksRes, membersRes] = await Promise.all([
         supabase
           .from("tasks")
           .select(`
@@ -61,17 +45,12 @@ export default function TasksPage() {
           `)
           .order("order_index", { ascending: true }),
         supabase
-          .from("proposals")
-          .select("*")
-          .order("title", { ascending: true }),
-        supabase
           .from("profiles")
           .select("*")
           .order("full_name", { ascending: true })
       ])
 
       if (tasksRes.error) throw tasksRes.error
-      if (proposalsRes.error) throw proposalsRes.error
       if (membersRes.error) throw membersRes.error
 
       const fetchedMembers = membersRes.data || []
@@ -81,7 +60,6 @@ export default function TasksPage() {
       }))
 
       setTasks(fetchedTasks as Task[])
-      setProposals(proposalsRes.data || [])
       setMembers(fetchedMembers)
     } catch (error: unknown) {
       toast.error("Failed to fetch data: " + (error instanceof Error ? error.message : String(error)))
@@ -193,10 +171,6 @@ export default function TasksPage() {
         ...t, 
         ...updates,
         profiles: members.find(m => m.id === updates.user_id) || null,
-        // We also need to update the proposals object if it changed
-        proposals: updates.proposal_id 
-          ? (proposals.find(p => p.id === updates.proposal_id) as Task["proposals"]) 
-          : null
       } : t))
       
       setIsEditDialogOpen(false)
@@ -242,20 +216,15 @@ export default function TasksPage() {
         </div>
 
         <div className="flex-1 min-h-[500px]">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <p>Loading tasks...</p>
-            </div>
-          ) : (
-            <KanbanBoard 
-              tasks={tasks} 
-              members={members}
-              onTaskUpdate={handleTaskUpdate}
-              onTaskCreate={handleTaskCreateTrigger}
-              onTaskEdit={handleTaskEditTrigger}
-              onTaskDelete={handleTaskDelete}
-            />
-          )}
+          <KanbanBoard 
+            tasks={tasks} 
+            members={members}
+            onTaskUpdate={handleTaskUpdate}
+            onTaskCreate={handleTaskCreateTrigger}
+            onTaskEdit={handleTaskEditTrigger}
+            onTaskDelete={handleTaskDelete}
+            isLoading={isLoading}
+          />
         </div>
       </div>
 
@@ -272,7 +241,6 @@ export default function TasksPage() {
             onCancel={() => setIsCreateDialogOpen(false)}
             isLoading={isSubmitting}
             members={members}
-            proposals={proposals}
           />
         </DialogContent>
       </Dialog>
@@ -289,9 +257,12 @@ export default function TasksPage() {
             <TaskForm 
               onSubmit={handleTaskEdit}
               onCancel={() => setIsEditDialogOpen(false)}
+              onDelete={() => {
+                handleTaskDelete(editingTask.id)
+                setIsEditDialogOpen(false)
+              }}
               isLoading={isSubmitting}
               members={members}
-              proposals={proposals}
               defaultValues={{
                 title: editingTask.title,
                 description: editingTask.description || "",
