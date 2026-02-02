@@ -48,6 +48,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 // Custom collision detection strategy for multi-container kanban
 const customCollisionDetection: CollisionDetection = (args) => {
@@ -408,7 +409,7 @@ export function KanbanBoard({
 
       <ConfirmDialog
         open={!!isDeleteDialogOpen}
-        onOpenChange={(open) => !open && setIsDeleteDialogOpen(null)}
+        onOpenChange={(open: boolean) => !open && setIsDeleteDialogOpen(null)}
         title="Delete Task"
         description="Are you sure you want to delete this task? This action cannot be undone."
         onConfirm={() => {
@@ -619,7 +620,7 @@ function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete,
       />
       <ConfirmDialog
         open={!!isDeleteDialogOpen}
-        onOpenChange={(open) => !open && setIsDeleteDialogOpen(null)}
+        onOpenChange={(open: boolean) => !open && setIsDeleteDialogOpen(null)}
         title="Delete Task"
         description="Are you sure you want to delete this task? This action cannot be undone."
         onConfirm={() => {

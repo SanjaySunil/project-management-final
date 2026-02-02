@@ -174,7 +174,7 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Project Proposals</DialogTitle>
             <DialogDescription>

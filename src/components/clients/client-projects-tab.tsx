@@ -190,7 +190,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>{editingProject ? "Edit Project" : "Add Project"}</DialogTitle>
             <DialogDescription>

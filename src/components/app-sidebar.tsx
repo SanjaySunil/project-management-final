@@ -25,6 +25,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
@@ -121,6 +122,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, checkPermission } = useAuth()
   const { organization } = useOrganization()
   const location = useLocation()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  // Close sidebar on mobile when location changes
+  React.useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [location.pathname, isMobile, setOpenMobile])
 
   const teams = [
     {

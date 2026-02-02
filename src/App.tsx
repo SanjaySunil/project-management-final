@@ -21,6 +21,7 @@ import AccountPage from "@/pages/account"
 import OrganizationPage from "@/pages/organization"
 import NotificationsPage from "@/pages/notifications"
 import { Toaster } from "@/components/ui/sonner"
+import ReloadPrompt from "@/components/reload-prompt"
 
 export function App() {
   return (
@@ -65,6 +66,7 @@ export function App() {
             <Route path="/" element={<Navigate to="/dashboard/overview" replace />} />
           </Routes>
           <Toaster />
+          <ReloadPrompt />
         </OrganizationProvider>
       </AuthProvider>
     </Router>

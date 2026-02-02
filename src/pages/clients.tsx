@@ -220,7 +220,7 @@ export default function ClientsPage() {
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>{editingClient ? "Edit Client" : "Add Client"}</DialogTitle>
             <DialogDescription>

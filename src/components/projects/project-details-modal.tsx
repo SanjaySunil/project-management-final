@@ -224,7 +224,7 @@ export function ProjectDetailsModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle>Project Details: {project?.name}</DialogTitle>
             <DialogDescription>
@@ -250,7 +250,7 @@ export function ProjectDetailsModal({
               </TabsList>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-6">
               <TabsContent value="overview" className="mt-0">
                 <ProjectForm
                   initialValues={initialProjectFormValues}

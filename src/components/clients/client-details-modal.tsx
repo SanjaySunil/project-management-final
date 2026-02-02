@@ -26,13 +26,13 @@ export function ClientDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle>
             {client.first_name} {client.last_name || ""}
           </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+        <div className="flex-1 overflow-y-auto overflow-x-auto p-6">
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="overview">Overview</TabsTrigger>
