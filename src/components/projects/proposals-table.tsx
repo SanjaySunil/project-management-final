@@ -5,7 +5,9 @@ import {
   IconLoader, 
   IconDotsVertical,
   IconFileText,
-  IconExternalLink
+  IconExternalLink,
+  IconSend,
+  IconX
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { DataTable } from "@/components/data-table"
@@ -19,6 +21,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { Tables } from "@/lib/database.types"
 
 type Proposal = Tables<"proposals">
@@ -28,10 +37,11 @@ interface ProposalsTableProps {
   projectId: string
   onEdit: (proposal: Proposal | null) => void
   onDelete: (id: string) => void
+  onStatusChange?: (id: string, status: string) => void
   isLoading?: boolean
 }
 
-export function ProposalsTable({ data, projectId, onEdit, onDelete, isLoading }: ProposalsTableProps) {
+export function ProposalsTable({ data, projectId, onEdit, onDelete, onStatusChange, isLoading }: ProposalsTableProps) {
 
   const columns: ColumnDef<Proposal>[] = [
     {
@@ -117,18 +127,39 @@ export function ProposalsTable({ data, projectId, onEdit, onDelete, isLoading }:
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.original.status
+        const status = row.original.status || "draft"
+        
         return (
-          <Badge variant="outline" className="text-muted-foreground px-1.5 capitalize">
-            {status === "active" ? (
-              <IconCircleCheckFilled className="size-4 fill-green-500 dark:fill-green-400 mr-1" />
-            ) : status === "complete" ? (
-              <IconCircleCheckFilled className="size-4 fill-blue-500 dark:fill-blue-400 mr-1" />
-            ) : status === "draft" ? (
-                <IconLoader className="size-4 animate-spin mr-1" />
-            ) : null}
-            {status}
-          </Badge>
+          <Select
+            value={status}
+            onValueChange={(value) => onStatusChange?.(row.original.id, value)}
+          >
+            <SelectTrigger className="h-8 w-[120px] capitalize">
+              <SelectValue>
+                <div className="flex items-center">
+                  {status === "active" ? (
+                    <IconCircleCheckFilled className="size-4 fill-green-500 dark:fill-green-400 mr-2" />
+                  ) : status === "complete" ? (
+                    <IconCircleCheckFilled className="size-4 fill-blue-500 dark:fill-blue-400 mr-2" />
+                  ) : status === "draft" ? (
+                    <IconLoader className="size-4 animate-spin mr-2" />
+                  ) : status === "sent" ? (
+                    <IconSend className="size-4 text-orange-500 mr-2" />
+                  ) : status === "rejected" ? (
+                    <IconX className="size-4 text-red-500 mr-2" />
+                  ) : null}
+                  {status}
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="draft" className="capitalize">Draft</SelectItem>
+              <SelectItem value="sent" className="capitalize">Sent</SelectItem>
+              <SelectItem value="active" className="capitalize">Active</SelectItem>
+              <SelectItem value="complete" className="capitalize">Complete</SelectItem>
+              <SelectItem value="rejected" className="capitalize">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
         )
       },
     },

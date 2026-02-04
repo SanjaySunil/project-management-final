@@ -92,6 +92,21 @@ export function ProjectDetailsModal({
     setIsFormDialogOpen(true)
   }
 
+  const handleStatusChange = async (id: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("proposals")
+        .update({ status })
+        .eq("id", id)
+
+      if (error) throw error
+      toast.success("Proposal status updated")
+      fetchProposals()
+    } catch (error: any) {
+      toast.error("Failed to update status: " + error.message)
+    }
+  }
+
   const handleDeleteProposal = (id: string) => {
     setProposalToDelete(id)
     setDeleteConfirmOpen(true)
@@ -257,6 +272,7 @@ export function ProjectDetailsModal({
                   projectId={project?.id || ""}
                   onEdit={handleEditProposal}
                   onDelete={handleDeleteProposal}
+                  onStatusChange={handleStatusChange}
                   isLoading={isLoading}
                 />
               </TabsContent>

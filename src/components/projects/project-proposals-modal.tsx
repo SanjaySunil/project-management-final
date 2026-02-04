@@ -84,6 +84,21 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
     setIsFormOpen(true)
   }
 
+  const handleStatusChange = async (id: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("proposals")
+        .update({ status })
+        .eq("id", id)
+
+      if (error) throw error
+      toast.success("Proposal status updated")
+      fetchProposals()
+    } catch (error: any) {
+      toast.error("Failed to update status: " + error.message)
+    }
+  }
+
   const handleDelete = (id: string) => {
     setProposalToDelete(id)
     setDeleteConfirmOpen(true)
@@ -188,6 +203,7 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
               projectId={project?.id || ""}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onStatusChange={handleStatusChange}
               isLoading={isLoading}
             />
           </div>
