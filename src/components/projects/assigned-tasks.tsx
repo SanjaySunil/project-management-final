@@ -1,6 +1,6 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconTable, IconLayoutKanban, IconFilter, IconClipboardList, IconUser, IconBriefcase } from "@tabler/icons-react"
+import { IconTable, IconLayoutKanban, IconFilter, IconClipboardList, IconUser, IconBriefcase, IconList, IconPlus } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
@@ -36,7 +36,7 @@ import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 interface AssignedTasksProps {
   userId?: string
   hideHeader?: boolean
-  defaultView?: "kanban" | "table"
+  defaultView?: "kanban" | "table" | "list"
   hideViewToggle?: boolean
   defaultStatusFilter?: string
 }
@@ -53,8 +53,9 @@ export function AssignedTasks({
   const [mode, setMode] = React.useState<"project" | "personal">("project")
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
+  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
-  const [view, setView] = React.useState<"kanban" | "table">(defaultView || (hideHeader ? "table" : "kanban"))
+  const [view, setView] = React.useState<"kanban" | "table" | "list">(defaultView || (hideHeader ? "table" : "kanban"))
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
@@ -68,11 +69,15 @@ export function AssignedTasks({
     try {
       setIsLoading(true)
       
-      const [membersRes] = await Promise.all([
+      const [membersRes, proposalsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("*")
-          .order("full_name", { ascending: true })
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("proposals")
+          .select("*")
+          .order("title", { ascending: true })
       ])
 
       let tasksRes
@@ -101,6 +106,7 @@ export function AssignedTasks({
 
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
+      if (proposalsRes.error) throw proposalsRes.error
 
       const fetchedMembers = membersRes.data || []
       const fetchedTasks = (tasksRes.data || []).map((task: any) => ({
@@ -110,6 +116,7 @@ export function AssignedTasks({
 
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
+      setProposals(proposalsRes.data || [])
     } catch (error: unknown) {
       toast.error("Failed to fetch tasks: " + (error instanceof Error ? error.message : String(error)))
     } finally {
@@ -300,12 +307,21 @@ export function AssignedTasks({
             </Tabs>
 
             <div className="flex items-center gap-2">
+              <Button onClick={() => handleTaskCreateTrigger("todo")} size="sm">
+                <IconPlus className="mr-2 h-4 w-4" />
+                Add Task
+              </Button>
+
               {!hideViewToggle && (
-                <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table")}>
+                <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table" | "list")}>
                   <TabsList>
                     <TabsTrigger value="kanban">
                       <IconLayoutKanban className="mr-2 h-4 w-4" />
                       Kanban
+                    </TabsTrigger>
+                    <TabsTrigger value="list">
+                      <IconList className="mr-2 h-4 w-4" />
+                      List
                     </TabsTrigger>
                     <TabsTrigger value="table">
                       <IconTable className="mr-2 h-4 w-4" />
@@ -354,11 +370,15 @@ export function AssignedTasks({
             </TabsList>
           </Tabs>
 
-          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table")}>
+          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table" | "list")}>
             <TabsList>
               <TabsTrigger value="kanban">
                 <IconLayoutKanban className="mr-2 h-4 w-4" />
                 Kanban
+              </TabsTrigger>
+              <TabsTrigger value="list">
+                <IconList className="mr-2 h-4 w-4" />
+                List
               </TabsTrigger>
               <TabsTrigger value="table">
                 <IconTable className="mr-2 h-4 w-4" />
@@ -411,7 +431,6 @@ export function AssignedTasks({
             view={view}
             onViewChange={setView}
             hideControls
-            hideCreate={mode === "project"}
           />
         </div>
       )}
@@ -429,6 +448,7 @@ export function AssignedTasks({
             onCancel={() => setIsCreateDialogOpen(false)}
             isLoading={isSubmitting}
             members={members}
+            proposals={proposals}
             hideAssignee={mode === "personal"}
             defaultValues={{
               user_id: targetUserId
@@ -455,6 +475,7 @@ export function AssignedTasks({
               }}
               isLoading={isSubmitting}
               members={members}
+              proposals={proposals}
               hideAssignee={mode === "personal"}
               defaultValues={{
                 title: editingTask.title,

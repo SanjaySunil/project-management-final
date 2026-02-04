@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Tables } from "@/lib/database.types"
+import { useAuth } from "@/hooks/use-auth"
 
 // Define a type for credentials with project info
 export type CredentialWithProject = Tables<"credentials"> & {
@@ -47,7 +48,12 @@ export function CredentialsTable({
   onAdd,
   onRowClick
 }: CredentialsTableProps) {
+  const { checkPermission } = useAuth()
   const [visibleValues, setVisibleValues] = React.useState<Record<string, boolean>>({})
+
+  const canCreate = checkPermission('create', 'credentials')
+  const canUpdate = checkPermission('update', 'credentials')
+  const canDelete = checkPermission('delete', 'credentials')
 
   const toggleVisibility = (id: string) => {
     setVisibleValues(prev => ({ ...prev, [id]: !prev[id] }))
@@ -176,19 +182,25 @@ export function CredentialsTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => onEdit(row.original)}>
-              <IconEdit className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
+            {canUpdate && (
+              <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                <IconEdit className="mr-2 h-4 w-4" /> Edit
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => copyToClipboard(row.original.value)}>
               <IconCopy className="mr-2 h-4 w-4" /> Copy Value
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => onDelete(row.original.id)}
-            >
-              <IconTrash className="mr-2 h-4 w-4" /> Delete
-            </DropdownMenuItem>
+            {canDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => onDelete(row.original.id)}
+                >
+                  <IconTrash className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -202,7 +214,7 @@ export function CredentialsTable({
       isLoading={isLoading}
       searchPlaceholder="Search credentials..."
       addLabel="Add Credential"
-      onAdd={onAdd}
+      onAdd={canCreate ? onAdd : undefined}
       onRowClick={onRowClick}
     />
   )

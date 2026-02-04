@@ -25,10 +25,12 @@ import { LiveTime } from "@/components/clients/live-time"
 import { DataTable } from "@/components/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { useAuth } from "@/hooks/use-auth"
 
 type Client = Tables<"clients">
 
 export default function ClientsPage() {
+  const { checkPermission } = useAuth()
   const [clients, setClients] = React.useState<Client[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -37,6 +39,10 @@ export default function ClientsPage() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [clientToDelete, setClientToDelete] = React.useState<string | null>(null)
+
+  const canCreate = checkPermission('create', 'clients')
+  const canUpdate = checkPermission('update', 'clients')
+  const canDelete = checkPermission('delete', 'clients')
 
   const fetchClients = React.useCallback(async () => {
     try {
@@ -177,15 +183,21 @@ export default function ClientsPage() {
             <DropdownMenuItem onClick={() => handleViewClient(row.original)}>
               <ExternalLink className="mr-2 h-4 w-4" /> View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleEditClient(row.original)}>
-              <Edit className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => handleDeleteClient(row.original.id)}
-            >
-              <Trash className="mr-2 h-4 w-4" /> Delete
-            </DropdownMenuItem>
+            
+            {canUpdate && (
+              <DropdownMenuItem onClick={() => handleEditClient(row.original)}>
+                <Edit className="mr-2 h-4 w-4" /> Edit
+              </DropdownMenuItem>
+            )}
+
+            {canDelete && (
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => handleDeleteClient(row.original.id)}
+              >
+                <Trash className="mr-2 h-4 w-4" /> Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -207,7 +219,7 @@ export default function ClientsPage() {
             isLoading={isLoading}
             searchPlaceholder="Search clients..."
             addLabel="Add Client"
-            onAdd={handleAddClient}
+            onAdd={canCreate ? handleAddClient : undefined}
             onRowClick={handleViewClient}
           />
         </div>

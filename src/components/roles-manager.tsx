@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -147,15 +147,13 @@ export function RolesManager() {
 
   function togglePermission(resource: string, action: string) {
     const permission = action === '*' ? `${resource}:*` : `${resource}:${action}`
-    const allPermission = `${resource}:*`
+    const allResourcePermission = `${resource}:*`
     const starPermission = '*'
 
     setFormData(prev => {
       let newPermissions = [...prev.permissions]
       
       if (newPermissions.includes(starPermission) && permission !== starPermission) {
-        // If they have global *, they have everything. To toggle off, we'd need to remove *
-        // For simplicity, let's just toast
         toast.info("This role has full access (*). Remove '*' to manage individual permissions.")
         return prev
       }
@@ -167,20 +165,18 @@ export function RolesManager() {
           newPermissions = ['*']
         }
       } else if (action === '*') {
-        if (newPermissions.includes(allPermission)) {
+        if (newPermissions.includes(allResourcePermission)) {
           newPermissions = newPermissions.filter(p => !p.startsWith(`${resource}:`))
         } else {
-          // Remove specific actions and add *
           newPermissions = newPermissions.filter(p => !p.startsWith(`${resource}:`))
-          newPermissions.push(allPermission)
+          newPermissions.push(allResourcePermission)
         }
       } else {
         if (newPermissions.includes(permission)) {
           newPermissions = newPermissions.filter(p => p !== permission)
         } else {
-          // If adding a specific action, make sure resource:* is not there
-          if (newPermissions.includes(allPermission)) {
-            newPermissions = newPermissions.filter(p => p !== allPermission)
+          if (newPermissions.includes(allResourcePermission)) {
+            newPermissions = newPermissions.filter(p => p !== allResourcePermission)
           }
           newPermissions.push(permission)
         }
@@ -193,7 +189,17 @@ export function RolesManager() {
   function hasPermission(resource: string, action: string) {
     if (formData.permissions.includes('*')) return true
     const permission = action === '*' ? `${resource}:*` : `${resource}:${action}`
-    return formData.permissions.includes(permission) || formData.permissions.includes(`${resource}:*`)
+    
+    if (formData.permissions.includes(permission) || formData.permissions.includes(`${resource}:*`)) {
+      return true
+    }
+
+    // Backward compatibility: 'write' covers 'create' and 'update'
+    if ((action === 'create' || action === 'update') && formData.permissions.includes(`${resource}:write`)) {
+      return true
+    }
+
+    return false
   }
 
   async function confirmDelete() {
@@ -215,6 +221,17 @@ export function RolesManager() {
       setRoleToDelete(null)
     }
   }
+
+  // Group resources
+  const groupedResources = useMemo(() => {
+    const groups: Record<string, typeof RESOURCES[number][]> = {}
+    RESOURCES.forEach(r => {
+      const group = (r as any).group || 'Other'
+      if (!groups[group]) groups[group] = []
+      groups[group].push(r)
+    })
+    return groups
+  }, [])
 
   const columns = useMemo<ColumnDef<CustomRole>[]>(() => [
     {
@@ -343,43 +360,61 @@ export function RolesManager() {
               />
             </div>
 
-            <div className="space-y-3 pt-4">
+            <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Permissions</Label>
-                <div className="flex items-center gap-2">
+                <div>
+                  <Label className="text-base font-semibold">Permissions</Label>
+                  <p className="text-sm text-muted-foreground">Define what this role can do across the system.</p>
+                </div>
+                <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
                   <Checkbox 
                     id="perm-all" 
                     checked={formData.permissions.includes('*')}
                     onCheckedChange={() => togglePermission('', '*')}
                   />
-                  <Label htmlFor="perm-all" className="text-sm font-bold text-primary">Full Admin Access (*)</Label>
+                  <Label htmlFor="perm-all" className="text-sm font-bold text-primary cursor-pointer">Full Admin Access (*)</Label>
                 </div>
               </div>
 
-              <div className="border rounded-md overflow-hidden">
+              <div className="border rounded-md overflow-hidden bg-background">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="w-[200px]">Resource</TableHead>
+                      <TableHead className="w-[240px]">Resource</TableHead>
                       {ACTIONS.map(action => (
-                        <TableHead key={action.id} className="text-center">{action.label}</TableHead>
+                        <TableHead key={action.id} className="text-center py-3">
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs font-bold uppercase tracking-wider">{action.label}</span>
+                          </div>
+                        </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {RESOURCES.map(resource => (
-                      <TableRow key={resource.id}>
-                        <TableCell className="font-medium">{resource.label}</TableCell>
-                        {ACTIONS.map(action => (
-                          <TableCell key={action.id} className="text-center">
-                            <Checkbox 
-                              checked={hasPermission(resource.id, action.id)}
-                              onCheckedChange={() => togglePermission(resource.id, action.id)}
-                              disabled={formData.permissions.includes('*') && action.id !== '*'}
-                            />
+                    {Object.entries(groupedResources).map(([group, resources]) => (
+                      <React.Fragment key={group}>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableCell colSpan={ACTIONS.length + 1} className="py-2 px-4 font-bold text-xs uppercase tracking-tight text-muted-foreground">
+                            {group}
                           </TableCell>
+                        </TableRow>
+                        {resources.map(resource => (
+                          <TableRow key={resource.id} className="hover:bg-muted/5">
+                            <TableCell className="font-medium pl-6">
+                              {resource.label}
+                            </TableCell>
+                            {ACTIONS.map(action => (
+                              <TableCell key={action.id} className="text-center">
+                                <Checkbox 
+                                  checked={hasPermission(resource.id, action.id)}
+                                  onCheckedChange={() => togglePermission(resource.id, action.id)}
+                                  disabled={formData.permissions.includes('*') && action.id !== '*'}
+                                />
+                              </TableCell>
+                            ))}
+                          </TableRow>
                         ))}
-                      </TableRow>
+                      </React.Fragment>
                     ))}
                   </TableBody>
                 </Table>

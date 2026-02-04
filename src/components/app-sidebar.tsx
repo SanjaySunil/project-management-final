@@ -9,6 +9,7 @@ import {
   Bell,
   Users,
   Briefcase,
+  DollarSign,
   Key,
   MessageSquare,
   MessageCircle,
@@ -46,11 +47,13 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       title: "Dashboard",
       url: "/dashboard/overview",
       icon: LayoutDashboard,
+      permission: { action: "read", resource: "dashboard" },
     },
     {
       title: "My Tasks",
       url: "/dashboard/tasks/assigned",
       icon: CheckSquare,
+      permission: { action: "read", resource: "tasks" },
     },
     {
       title: "Notifications",
@@ -63,11 +66,19 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       title: "Clients",
       url: "/dashboard/clients",
       icon: Users,
+      permission: { action: "read", resource: "clients" },
     },
     {
       title: "Projects",
       url: "/dashboard/projects",
       icon: Briefcase,
+      permission: { action: "read", resource: "projects" },
+    },
+    {
+      title: "Finances",
+      url: "/dashboard/finances",
+      icon: DollarSign,
+      permission: { action: "read", resource: "finances" },
     },
     {
       title: "Credentials",
@@ -81,11 +92,13 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       title: "Team Chat",
       url: "/dashboard/chat",
       icon: MessageSquare,
+      permission: { action: "read", resource: "chat" },
     },
     {
       title: "Direct Messages",
       url: "/dashboard/chat/dms",
       icon: MessageCircle,
+      permission: { action: "read", resource: "chat" },
     },
     {
       title: "Team",
@@ -107,6 +120,12 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
         {
           title: "Organization",
           url: "/dashboard/organization",
+          permission: { action: "read", resource: "organizations" },
+        },
+        {
+          title: "Roles & Permissions",
+          url: "/dashboard/team?tab=roles",
+          permission: { action: "read", resource: "roles" },
         },
         {
           title: "Audit Logs",
@@ -183,8 +202,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           ...item,
           isActive: true,
           items: [
-            { title: "Overview", url: `/dashboard/projects/${projectId}/overview` },
             { title: "Proposals", url: `/dashboard/projects/${projectId}/proposals` },
+            { title: "Overview", url: `/dashboard/projects/${projectId}/overview` },
             { title: "Project Chat", url: `/dashboard/projects/${projectId}/chat` },
             { title: "← All Projects", url: "/dashboard/projects" }
           ]

@@ -15,10 +15,12 @@ import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
 import { ProjectDetailsModal } from "@/components/projects/project-details-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import type { Tables } from "@/lib/database.types"
 
 export default function ProjectsPage() {
   const { user, role } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])
+  const [profiles, setProfiles] = React.useState<Tables<"profiles">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [editingProject, setEditingProject] = React.useState<ProjectWithClient | null>(null)
@@ -27,6 +29,20 @@ export default function ProjectsPage() {
   
   const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
   const [selectedProject, setSelectedProject] = React.useState<ProjectWithClient | null>(null)
+
+  const fetchProfiles = React.useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name", { ascending: true })
+      
+      if (error) throw error
+      setProfiles(data || [])
+    } catch (error: any) {
+      console.error("Failed to fetch profiles:", error)
+    }
+  }, [])
 
   const fetchProjects = React.useCallback(async () => {
     if (!user) return
@@ -70,7 +86,8 @@ export default function ProjectsPage() {
 
   React.useEffect(() => {
     fetchProjects()
-  }, [fetchProjects])
+    fetchProfiles()
+  }, [fetchProjects, fetchProfiles])
 
   const handleAddProject = () => {
     setEditingProject(null)
@@ -78,8 +95,8 @@ export default function ProjectsPage() {
   }
 
   const handleEditProject = (project: ProjectWithClient) => {
-    setSelectedProject(project)
-    setDetailsModalOpen(true)
+    setEditingProject(project)
+    setIsDialogOpen(true)
   }
 
   const handleDeleteProject = (id: string) => {
@@ -90,6 +107,34 @@ export default function ProjectsPage() {
   const handleViewDetails = (project: ProjectWithClient) => {
     setSelectedProject(project)
     setDetailsModalOpen(true)
+  }
+
+  const handleAssignMembers = async (projectId: string, memberIds: string[]) => {
+    try {
+      // Update members: delete old, insert new
+      const { error: deleteError } = await supabase
+        .from("project_members")
+        .delete()
+        .eq("project_id", projectId)
+      
+      if (deleteError) throw deleteError
+
+      if (memberIds.length > 0) {
+        const memberEntries = memberIds.map((userId) => ({
+          project_id: projectId,
+          user_id: userId,
+        }))
+        const { error: insertError } = await supabase
+          .from("project_members")
+          .insert(memberEntries)
+        if (insertError) throw insertError
+      }
+
+      toast.success("Project members updated")
+      fetchProjects()
+    } catch (error: any) {
+      toast.error("Failed to update members: " + error.message)
+    }
   }
 
   const confirmDeleteProject = async () => {
@@ -122,8 +167,8 @@ export default function ProjectsPage() {
           .eq("id", projectId)
         if (error) throw error
         
-        // Update members: delete old, insert new
-        await supabase.from("project_members").delete().eq("project_id", projectId)
+        // Update members using the helper logic
+        await handleAssignMembers(projectId, member_ids || [])
       } else {
         const { data, error } = await supabase
           .from("projects")
@@ -132,18 +177,18 @@ export default function ProjectsPage() {
           .single()
         if (error) throw error
         projectId = data.id
-      }
 
-      // Insert new members
-      if (member_ids && member_ids.length > 0) {
-        const memberEntries = member_ids.map((userId: string) => ({
-          project_id: projectId,
-          user_id: userId,
-        }))
-        const { error: memberError } = await supabase
-          .from("project_members")
-          .insert(memberEntries)
-        if (memberError) throw memberError
+        // Insert new members
+        if (member_ids && member_ids.length > 0) {
+          const memberEntries = member_ids.map((userId: string) => ({
+            project_id: projectId,
+            user_id: userId,
+          }))
+          const { error: memberError } = await supabase
+            .from("project_members")
+            .insert(memberEntries)
+          if (memberError) throw memberError
+        }
       }
 
       toast.success(editingProject ? "Project updated successfully" : "Project added successfully")
@@ -173,12 +218,14 @@ export default function ProjectsPage() {
         <div className="flex-1">
           <ProjectsTable 
             data={projects}
+            profiles={profiles}
             isLoading={isLoading}
             onEdit={handleEditProject}
             onDelete={handleDeleteProject}
             onAdd={handleAddProject}
             onViewProposals={handleViewDetails}
             onRowClick={handleViewDetails}
+            onAssignMembers={handleAssignMembers}
           />
         </div>
       </div>

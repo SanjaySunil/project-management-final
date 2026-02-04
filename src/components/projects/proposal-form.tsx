@@ -24,10 +24,16 @@ export function ProposalForm({
   isSubmitting = false,
 }: ProposalFormProps) {
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>(initialDeliverables)
+  const [orderSource, setOrderSource] = React.useState<string>(initialData?.order_source || "direct")
+  const [amount, setAmount] = React.useState<number>(Number(initialData?.amount) || 0)
 
   React.useEffect(() => {
     setDeliverables(initialDeliverables)
   }, [initialDeliverables])
+
+  const commissionRate = orderSource === "fiverr" ? 0.20 : 0
+  const commissionAmount = amount * commissionRate
+  const netAmount = amount - commissionAmount
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -35,8 +41,12 @@ export function ProposalForm({
     const values = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      amount: parseFloat(formData.get("amount") as string) || 0,
+      amount: amount,
       status: formData.get("status") as string,
+      order_source: orderSource,
+      commission_rate: commissionRate,
+      commission_amount: commissionAmount,
+      net_amount: netAmount,
     }
     await onSubmit(values, deliverables)
   }
@@ -65,16 +75,17 @@ export function ProposalForm({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount ($)</Label>
-            <Input
-              id="amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              defaultValue={initialData?.amount || ""}
-              required
-            />
+            <Label htmlFor="order_source">Order Source</Label>
+            <select
+              id="order_source"
+              name="order_source"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={orderSource}
+              onChange={(e) => setOrderSource(e.target.value)}
+            >
+              <option value="direct">Direct (Bank Transfer)</option>
+              <option value="fiverr">Fiverr</option>
+            </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
@@ -86,11 +97,41 @@ export function ProposalForm({
             >
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
-              <option value="accepted">Accepted</option>
+              <option value="active">Active</option>
+              <option value="complete">Complete</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="amount">Gross Amount ($)</Label>
+            <Input
+              id="amount"
+              name="amount"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={amount || ""}
+              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+          {orderSource === "fiverr" && (
+            <div className="space-y-2">
+              <Label>Commission (20%)</Label>
+              <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted/50 text-sm">
+                -${commissionAmount.toFixed(2)}
+              </div>
+            </div>
+          )}
+        </div>
+        {orderSource === "fiverr" && (
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 flex justify-between items-center">
+            <span className="text-sm font-medium">Net Revenue</span>
+            <span className="text-lg font-bold text-primary">${netAmount.toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       <hr className="border-border" />

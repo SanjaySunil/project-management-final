@@ -40,7 +40,10 @@ export function useNotifications() {
   useEffect(() => {
     if (!user) return
 
-    fetchNotifications()
+    const init = async () => {
+      await fetchNotifications()
+    }
+    init()
 
     const channel = supabase
       .channel(`notifications:${user.id}`)

@@ -20,6 +20,7 @@ import ChatPage from "@/pages/chat"
 import AccountPage from "@/pages/account"
 import OrganizationPage from "@/pages/organization"
 import NotificationsPage from "@/pages/notifications"
+import FinancesPage from "@/pages/finances"
 import { Toaster } from "@/components/ui/sonner"
 import ReloadPrompt from "@/components/reload-prompt"
 
@@ -56,6 +57,7 @@ export function App() {
               <Route path="projects/:projectId/chat/:channelId" element={<ChatPage />} />
               <Route path="tasks/assigned" element={<AssignedTasksPage />} />
               <Route path="credentials" element={<CredentialsPage />} />
+              <Route path="finances" element={<FinancesPage />} />
               <Route path="team" element={<TeamPage />} />
               <Route path="audit-logs" element={<AuditLogsPage />} />
               <Route path="account" element={<AccountPage />} />

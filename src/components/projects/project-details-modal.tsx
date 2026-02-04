@@ -232,34 +232,25 @@ export function ProjectDetailsModal({
             </DialogDescription>
           </DialogHeader>
           
-          <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
+          <Tabs defaultValue="proposals" className="flex-1 flex flex-col min-h-0">
             <div className="px-6 border-b">
               <TabsList variant="line" className="w-full justify-start h-12 bg-transparent p-0 gap-6">
-                <TabsTrigger 
-                  value="overview" 
-                  className="h-12 rounded-none data-[state=active]:bg-transparent shadow-none"
-                >
-                  Project Overview
-                </TabsTrigger>
                 <TabsTrigger 
                   value="proposals" 
                   className="h-12 rounded-none data-[state=active]:bg-transparent shadow-none"
                 >
                   Project Proposals
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="overview" 
+                  className="h-12 rounded-none data-[state=active]:bg-transparent shadow-none"
+                >
+                  Project Overview
+                </TabsTrigger>
               </TabsList>
             </div>
             
             <div className="flex-1 overflow-y-auto overflow-x-auto p-6">
-              <TabsContent value="overview" className="mt-0">
-                <ProjectForm
-                  initialValues={initialProjectFormValues}
-                  onSubmit={handleProjectSubmit}
-                  onCancel={() => onOpenChange(false)}
-                  isLoading={isSavingProject}
-                />
-              </TabsContent>
-              
               <TabsContent value="proposals" className="mt-0">
                 <ProposalsTable 
                   data={proposals} 
@@ -267,6 +258,15 @@ export function ProjectDetailsModal({
                   onEdit={handleEditProposal}
                   onDelete={handleDeleteProposal}
                   isLoading={isLoading}
+                />
+              </TabsContent>
+
+              <TabsContent value="overview" className="mt-0">
+                <ProjectForm
+                  initialValues={initialProjectFormValues}
+                  onSubmit={handleProjectSubmit}
+                  onCancel={() => onOpenChange(false)}
+                  isLoading={isSavingProject}
                 />
               </TabsContent>
             </div>

@@ -80,12 +80,37 @@ export function ProposalsTable({ data, projectId, onEdit, onDelete, isLoading }:
       enableHiding: false,
     },
     {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => (
+        <div className="max-w-[300px] truncate text-muted-foreground" title={row.original.description || ""}>
+          {row.original.description || "No description"}
+        </div>
+      ),
+    },
+    {
       accessorKey: "amount",
       header: () => <div className="w-full text-right">Amount</div>,
       cell: ({ row }) => (
         <div className="text-right font-medium">
-          ${row.original.amount?.toLocaleString()}
+          <div className="flex flex-col items-end">
+            <span>${row.original.amount?.toLocaleString()}</span>
+            {row.original.order_source === "fiverr" && (
+              <span className="text-[10px] text-muted-foreground">
+                Net: ${row.original.net_amount?.toLocaleString()}
+              </span>
+            )}
+          </div>
         </div>
+      ),
+    },
+    {
+      accessorKey: "order_source",
+      header: "Source",
+      cell: ({ row }) => (
+        <Badge variant="outline" className="capitalize">
+          {row.original.order_source === "fiverr" ? "Fiverr" : "Direct"}
+        </Badge>
       ),
     },
     {
@@ -95,8 +120,10 @@ export function ProposalsTable({ data, projectId, onEdit, onDelete, isLoading }:
         const status = row.original.status
         return (
           <Badge variant="outline" className="text-muted-foreground px-1.5 capitalize">
-            {status === "accepted" ? (
+            {status === "active" ? (
               <IconCircleCheckFilled className="size-4 fill-green-500 dark:fill-green-400 mr-1" />
+            ) : status === "complete" ? (
+              <IconCircleCheckFilled className="size-4 fill-blue-500 dark:fill-blue-400 mr-1" />
             ) : status === "draft" ? (
                 <IconLoader className="size-4 animate-spin mr-1" />
             ) : null}

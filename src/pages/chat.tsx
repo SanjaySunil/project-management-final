@@ -25,6 +25,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { usePresence } from "@/hooks/use-presence"
 import { useNotifications } from "@/hooks/use-notifications"
+import { MentionTextarea } from "@/components/mention-textarea"
 
 interface Project {
   id: string
@@ -63,10 +64,14 @@ export default function ChatPage() {
   const { projectId: routeProjectId, channelId: routeChannelId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, role } = useAuth()
+  const { user, role, checkPermission } = useAuth()
   const { isOnline } = usePresence()
   const { notifications, markAsRead } = useNotifications()
   
+  const canReadChat = checkPermission('read', 'chat')
+  const canCreateChannel = checkPermission('create', 'chat')
+  const canUpdateChannel = checkPermission('update', 'chat')
+
   const searchParams = new URLSearchParams(location.search)
   const dmUserId = searchParams.get("with")
   const isDMMode = location.pathname.includes("/chat/dms")
@@ -97,7 +102,7 @@ export default function ChatPage() {
     : "Global Workspace"
 
   const canManageChannel = selectedChannel && (
-    role === 'admin' || 
+    canUpdateChannel || 
     selectedChannel.created_by === user?.id
   ) && !selectedChannel.name.startsWith("dm--")
 
@@ -496,6 +501,17 @@ export default function ChatPage() {
      m.username?.toLowerCase().includes(dmSearchQuery.toLowerCase()))
   )
 
+  if (!canReadChat && role !== null) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="text-center">
+          <h3 className="text-lg font-bold">Access Denied</h3>
+          <p className="text-muted-foreground">You don't have permission to access the chat.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <SEO title="Chat" description="Communicate with your team and collaborate on projects in real-time." />
@@ -537,36 +553,38 @@ export default function ChatPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Dialog open={isNewChannelDialogOpen} onOpenChange={setIsNewChannelDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create a channel</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Channel name</Label>
-                        <Input
-                          id="name"
-                          placeholder="e.g. general"
-                          value={newChannelName}
-                          onChange={(e) => setNewChannelName(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Channels are where your team communicates in {currentProjectName}.
-                        </p>
+                {canCreateChannel && (
+                  <Dialog open={isNewChannelDialogOpen} onOpenChange={setIsNewChannelDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create a channel</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Channel name</Label>
+                          <Input
+                            id="name"
+                            placeholder="e.g. general"
+                            value={newChannelName}
+                            onChange={(e) => setNewChannelName(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Channels are where your team communicates in {currentProjectName}.
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsNewChannelDialogOpen(false)}>Cancel</Button>
-                      <Button onClick={handleCreateChannel}>Create</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsNewChannelDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateChannel}>Create</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </>
             )}
           </div>
@@ -887,9 +905,31 @@ export default function ChatPage() {
                               {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <p className="text-sm text-foreground/90 leading-normal whitespace-pre-wrap break-words">
-                            {message.content}
-                          </p>
+                          <div className="text-sm text-foreground/90 leading-normal whitespace-pre-wrap break-words">
+                            {(() => {
+                              if (!message.content.includes("@")) return message.content
+                              
+                              // Match @ followed by word characters, dots, or hyphens
+                              const parts = message.content.split(/(@[\w.-]+)/g)
+                              return parts.map((part, i) => {
+                                if (part.startsWith("@")) {
+                                  const username = part.slice(1).toLowerCase()
+                                  const isMember = members.some(m => 
+                                    (m.username?.toLowerCase() === username) || 
+                                    (m.full_name?.replace(/\s+/g, "").toLowerCase() === username)
+                                  )
+                                  if (isMember) {
+                                    return (
+                                      <span key={i} className="text-primary font-semibold bg-primary/10 px-1 rounded-sm">
+                                        {part}
+                                      </span>
+                                    )
+                                  }
+                                }
+                                return part
+                              })
+                            })()}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -903,19 +943,27 @@ export default function ChatPage() {
                   onSubmit={handleSendMessage}
                   className="relative rounded-xl border bg-background shadow-sm focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all"
                 >
-                  <textarea
+                  <MentionTextarea
                     placeholder={selectedChannel.name.startsWith("dm--") 
                       ? `Message ${getOtherUserFromDM(selectedChannel)?.full_name || "user"}`
                       : `Message #${selectedChannel.name}`}
-                    className="min-h-[80px] w-full resize-none border-0 bg-transparent p-3 text-sm focus-visible:ring-0"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage(e)
-                      }
+                    onSendMessage={(content) => {
+                      if (!content.trim() || !selectedChannel || !user) return
+                      
+                      const messageContent = content.trim()
+                      setNewMessage("")
+                      
+                      supabase.from("messages").insert({
+                        content: messageContent,
+                        channel_id: selectedChannel.id,
+                        user_id: user.id,
+                      }).then(({ error }) => {
+                        if (error) toast.error("Failed to send message")
+                      })
                     }}
+                    members={members}
                   />
                   <div className="flex items-center justify-between px-2 py-1.5 border-t bg-muted/5 rounded-b-xl">
                     <div className="flex gap-0.5">

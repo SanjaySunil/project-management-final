@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconPencil, IconTrash, IconLayoutKanban, IconTable, IconX } from "@tabler/icons-react"
+import { IconPlus, IconPencil, IconTrash, IconLayoutKanban, IconTable, IconX, IconList, IconCircle, IconCircleCheck, IconChevronDown, IconChevronRight } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,6 +37,7 @@ import {
 import type { Tables } from "@/lib/database.types"
 import { DataTable } from "@/components/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
+import { cn } from "@/lib/utils"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -94,8 +95,8 @@ interface KanbanBoardProps {
   onTaskCreate: (status: string) => void
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
-  view?: "kanban" | "table"
-  onViewChange?: (view: "kanban" | "table") => void
+  view?: "kanban" | "table" | "list"
+  onViewChange?: (view: "kanban" | "table" | "list") => void
   hideControls?: boolean
   hideCreate?: boolean
   isLoading?: boolean
@@ -124,7 +125,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks)
   const [activeTask, setActiveTask] = React.useState<Task | null>(null)
-  const [internalView, setInternalView] = React.useState<"kanban" | "table">("kanban")
+  const [internalView, setInternalView] = React.useState<"kanban" | "table" | "list">("kanban")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState<string | null>(null)
   
   // Use a ref to always have the latest tasks in handlers without re-rendering
@@ -297,11 +298,15 @@ export function KanbanBoard({
     <div className="flex flex-col gap-4 h-full">
       {!hideControls && (
         <div className="flex items-center justify-between">
-          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table")}>
+          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table" | "list")}>
             <TabsList>
               <TabsTrigger value="kanban" className="flex items-center gap-2">
                 <IconLayoutKanban className="size-4" />
                 Kanban
+              </TabsTrigger>
+              <TabsTrigger value="list" className="flex items-center gap-2">
+                <IconList className="size-4" />
+                List
               </TabsTrigger>
               <TabsTrigger value="table" className="flex items-center gap-2">
                 <IconTable className="size-4" />
@@ -350,10 +355,24 @@ export function KanbanBoard({
               </div>
             ))}
           </div>
+        ) : view === "list" ? (
+          <div className="space-y-4">
+            {COLUMNS.map((col) => (
+              <div key={col.id} className="space-y-2">
+                <Skeleton className="h-6 w-32" />
+                <div className="space-y-1">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-md" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <TaskTableView
             tasks={[]}
             members={members}
+            onTaskCreate={onTaskCreate}
             onTaskEdit={onTaskEdit}
             onTaskUpdate={onTaskUpdate}
             onTaskDelete={onTaskDelete}
@@ -397,10 +416,20 @@ export function KanbanBoard({
             </DragOverlay>
           </DndContext>
         </div>
+      ) : view === "list" ? (
+        <TaskListView
+          tasks={tasks}
+          members={members}
+          onTaskCreate={onTaskCreate}
+          onTaskEdit={onTaskEdit}
+          onTaskUpdate={onTaskUpdate}
+          onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
+        />
       ) : (
         <TaskTableView
           tasks={tasks}
           members={members}
+          onTaskCreate={onTaskCreate}
           onTaskEdit={onTaskEdit}
           onTaskUpdate={onTaskUpdate}
           onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
@@ -423,7 +452,168 @@ export function KanbanBoard({
   )
 }
 
-function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete, isLoading }: TaskViewProps) {
+function TaskListView({ tasks, members, onTaskCreate, onTaskEdit, onTaskUpdate, onTaskDelete }: TaskViewProps) {
+  const [expandedStatuses, setExpandedStatuses] = React.useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {}
+    COLUMNS.forEach(col => initial[col.id] = true)
+    return initial
+  })
+
+  const tasksByStatus = React.useMemo(() => {
+    const groups: Record<string, Task[]> = {}
+    COLUMNS.forEach((col) => (groups[col.id] = []))
+    tasks.forEach((task) => {
+      const status = task.status
+      if (groups[status]) {
+        groups[status].push(task)
+      } else {
+        groups["backlog"].push(task)
+      }
+    })
+    return groups
+  }, [tasks])
+
+  const toggleExpand = (statusId: string) => {
+    setExpandedStatuses(prev => ({ ...prev, [statusId]: !prev[statusId] }))
+  }
+
+  const handleStatusToggle = async (task: Task) => {
+    const isComplete = task.status === "complete"
+    const newStatus = isComplete ? "todo" : "complete"
+    await onTaskUpdate(task.id, { status: newStatus })
+  }
+
+  return (
+    <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+      {COLUMNS.map((column) => (
+        <div key={column.id} className="space-y-1">
+          <div className="flex items-center justify-between group/header">
+            <button
+              onClick={() => toggleExpand(column.id)}
+              className="flex items-center gap-2 px-2 py-1 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {expandedStatuses[column.id] ? (
+                <IconChevronDown className="size-4" />
+              ) : (
+                <IconChevronRight className="size-4" />
+              )}
+              <span className="capitalize">{column.title}</span>
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                {tasksByStatus[column.id].length}
+              </Badge>
+            </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 opacity-0 group-hover/header:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+              onClick={() => onTaskCreate(column.id)}
+            >
+              <IconPlus className="size-4" />
+            </Button>
+          </div>
+
+          {expandedStatuses[column.id] && (
+            <div className="space-y-1 ml-6">
+              {tasksByStatus[column.id].map((task) => (
+                <div
+                  key={task.id}
+                  className="group flex items-center gap-3 rounded-md border bg-card p-2 px-3 hover:border-primary/50 transition-all cursor-pointer shadow-sm"
+                  onClick={() => onTaskEdit(task)}
+                >
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleStatusToggle(task)
+                    }}
+                    className="flex shrink-0 items-center justify-center cursor-pointer text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {task.status === "complete" ? (
+                      <IconCircleCheck className="size-5 text-primary fill-primary/10" />
+                    ) : (
+                      <IconCircle className="size-5" />
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-1 flex-col min-w-0">
+                    <span className={cn(
+                      "text-sm font-medium truncate",
+                      task.status === "complete" && "text-muted-foreground line-through"
+                    )}>
+                      {task.title}
+                    </span>
+                    {task.proposals && (
+                      <span className="text-[10px] text-muted-foreground truncate">
+                        {task.proposals.projects?.name} • {task.proposals.title}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={task.profiles?.avatar_url || undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {task.profiles?.full_name ? task.profiles.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>Assign To</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTaskUpdate(task.id, { user_id: null }) }}>
+                          Unassigned
+                        </DropdownMenuItem>
+                        {members.map((member) => (
+                          <DropdownMenuItem 
+                            key={member.id}
+                            onClick={(e) => { e.stopPropagation(); onTaskUpdate(task.id, { user_id: member.id }) }}
+                          >
+                            {member.full_name || member.email}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onTaskDelete(task.id)
+                      }}
+                    >
+                      <IconTrash className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {tasksByStatus[column.id].length === 0 && (
+                <div className="py-2 text-xs text-muted-foreground italic">
+                  No tasks in this status
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-muted-foreground hover:text-foreground h-9 px-3"
+                onClick={() => onTaskCreate(column.id)}
+              >
+                <IconPlus className="size-4 mr-2" />
+                Add Task
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TaskTableView({ tasks, members, onTaskCreate, onTaskEdit, onTaskUpdate, onTaskDelete, isLoading }: TaskViewProps) {
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = React.useState<string>("all")
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState<string | null>(null)
@@ -615,6 +805,15 @@ function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete,
                 <IconX className="ml-2 h-4 w-4" />
               </Button>
             )}
+
+            <Button 
+              onClick={() => onTaskCreate(statusFilter === "all" ? "todo" : statusFilter)} 
+              size="sm" 
+              className="h-8 ml-auto"
+            >
+              <IconPlus className="size-4 mr-2" />
+              Add Task
+            </Button>
           </div>
         }
       />
@@ -637,6 +836,7 @@ function TaskTableView({ tasks, members, onTaskEdit, onTaskUpdate, onTaskDelete,
 interface TaskViewProps {
   tasks: Task[]
   members: Tables<"profiles">[]
+  onTaskCreate: (status: string) => void
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>

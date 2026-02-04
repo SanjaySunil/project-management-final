@@ -101,7 +101,7 @@ export type Database = {
           {
             foreignKeyName: "channels_proposal_id_fkey"
             columns: ["proposal_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
@@ -267,6 +267,64 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string | null
+          date: string | null
+          description: string
+          id: string
+          organization_id: string | null
+          project_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string | null
+          date?: string | null
+          description: string
+          id?: string
+          organization_id?: string | null
+          project_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          date?: string | null
+          description?: string
+          id?: string
+          organization_id?: string | null
+          project_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           channel_id: string | null
@@ -306,6 +364,85 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          created_at: string | null
+          dm_enabled: boolean | null
+          mention_enabled: boolean | null
+          task_enabled: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          dm_enabled?: boolean | null
+          mention_enabled?: boolean | null
+          task_enabled?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          dm_enabled?: boolean | null
+          mention_enabled?: boolean | null
+          task_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          link: string | null
+          metadata: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          metadata?: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          metadata?: Json | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           billing_email: string | null
@@ -338,6 +475,44 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      personal_tasks: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          order_index: number | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          order_index?: number | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          order_index?: number | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -382,18 +557,24 @@ export type Database = {
       }
       project_members: {
         Row: {
-          created_at: string | null
+          created_at: string
+          id: string
           project_id: string
+          role: string | null
           user_id: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
+          id?: string
           project_id: string
+          role?: string | null
           user_id: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
+          id?: string
           project_id?: string
+          role?: string | null
           user_id?: string
         }
         Relationships: [
@@ -454,9 +635,13 @@ export type Database = {
       proposals: {
         Row: {
           amount: number | null
+          commission_amount: number | null
+          commission_rate: number | null
           created_at: string | null
           description: string | null
           id: string
+          net_amount: number | null
+          order_source: string | null
           project_id: string | null
           status: string | null
           title: string
@@ -464,9 +649,13 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          commission_amount?: number | null
+          commission_rate?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
+          net_amount?: number | null
+          order_source?: string | null
           project_id?: string | null
           status?: string | null
           title: string
@@ -474,9 +663,13 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          commission_amount?: number | null
+          commission_rate?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
+          net_amount?: number | null
+          order_source?: string | null
           project_id?: string | null
           status?: string | null
           title?: string

@@ -388,7 +388,8 @@ export default function ProposalOverviewPage() {
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
-      case "accepted": return <Badge className="bg-green-500 hover:bg-green-600">Accepted</Badge>
+      case "active": return <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
+      case "complete": return <Badge className="bg-blue-500 hover:bg-blue-600">Complete</Badge>
       case "draft": return <Badge variant="secondary">Draft</Badge>
       case "sent": return <Badge variant="default">Sent</Badge>
       case "rejected": return <Badge variant="destructive">Rejected</Badge>
@@ -470,7 +471,14 @@ export default function ProposalOverviewPage() {
             <div className="flex items-center gap-3">
               <div className="text-right mr-4">
                 <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Total Amount</p>
-                <p className="text-2xl font-bold">${proposal.amount?.toLocaleString()}</p>
+                <div className="flex flex-col items-end">
+                  <p className="text-2xl font-bold">${proposal.amount?.toLocaleString()}</p>
+                  {proposal.order_source === "fiverr" && (
+                    <p className="text-xs text-muted-foreground">
+                      Net: <span className="font-medium text-primary">${proposal.net_amount?.toLocaleString()}</span>
+                    </p>
+                  )}
+                </div>
               </div>
               {getStatusBadge(proposal.status)}
             </div>
@@ -513,6 +521,16 @@ export default function ProposalOverviewPage() {
                       <p className="text-sm font-medium text-muted-foreground">Created On</p>
                       <p>{proposal.created_at ? new Date(proposal.created_at).toLocaleDateString() : "N/A"}</p>
                     </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Order Source</p>
+                      <p className="capitalize">{proposal.order_source === "fiverr" ? "Fiverr" : "Direct (Bank Transfer)"}</p>
+                    </div>
+                    {proposal.order_source === "fiverr" && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Commission (20%)</p>
+                        <p className="text-destructive">-${proposal.commission_amount?.toLocaleString()}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Status</p>
                       <p className="capitalize">{proposal.status}</p>

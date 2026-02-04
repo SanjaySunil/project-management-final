@@ -5,6 +5,8 @@ import {
   IconEdit,
   IconTrash,
   IconExternalLink,
+  IconPlus,
+  IconCheck,
 } from "@tabler/icons-react"
 
 import { DataTable } from "@/components/data-table"
@@ -19,7 +21,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import type { Tables } from "@/lib/database.types"
+import { useAuth } from "@/hooks/use-auth"
+import { cn } from "@/lib/utils"
 
 // Define a type for projects with client info
 export type ProjectWithClient = Tables<"projects"> & {
@@ -38,6 +55,7 @@ export type ProjectWithClient = Tables<"projects"> & {
 
 interface ProjectsTableProps {
   data: ProjectWithClient[]
+  profiles?: Tables<"profiles">[]
   isLoading?: boolean
   onEdit: (project: ProjectWithClient) => void
   onDelete: (id: string) => void
@@ -45,10 +63,12 @@ interface ProjectsTableProps {
   onViewProposals: (project: ProjectWithClient) => void
   disablePadding?: boolean
   onRowClick?: (project: ProjectWithClient) => void
+  onAssignMembers?: (projectId: string, memberIds: string[]) => Promise<void>
 }
 
 export function ProjectsTable({ 
   data, 
+  profiles = [],
   isLoading, 
   onEdit, 
   onDelete, 
@@ -56,8 +76,14 @@ export function ProjectsTable({
   onViewProposals,
   disablePadding = true,
   onRowClick,
+  onAssignMembers,
 }: ProjectsTableProps) {
+  const { checkPermission } = useAuth()
   const [activeTab, setActiveTab] = React.useState("all")
+
+  const canCreate = checkPermission('create', 'projects')
+  const canUpdate = checkPermission('update', 'projects')
+  const canDelete = checkPermission('delete', 'projects')
 
   const filteredData = React.useMemo(() => {
     if (activeTab === "all") return data
@@ -147,25 +173,85 @@ export function ProjectsTable({
       header: "Assigned To",
       cell: ({ row }) => {
         const members = row.original.project_members || []
-        if (members.length === 0) return <span className="text-muted-foreground text-xs italic">Unassigned</span>
+        const currentMemberIds = members.map(m => m.user_id)
         
         return (
-          <div className="flex -space-x-2">
-            {members.slice(0, 3).map((member, i) => {
-              const name = member.profiles?.full_name || "Unknown"
-              return (
-                <Avatar key={i} className="h-7 w-7 border-2 border-background ring-0">
-                  <AvatarImage src={member.profiles?.avatar_url || ""} />
-                  <AvatarFallback className="text-[10px]">
-                    {name.split(" ").map(n => n[0]).join("").toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              )
-            })}
-            {members.length > 3 && (
-              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
-                +{members.length - 3}
-              </div>
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex -space-x-2 overflow-hidden">
+              {members.slice(0, 3).map((member, i) => {
+                const name = member.profiles?.full_name || "Unknown"
+                return (
+                  <Avatar key={i} className="h-7 w-7 border-2 border-background ring-0">
+                    <AvatarImage src={member.profiles?.avatar_url || ""} />
+                    <AvatarFallback className="text-[10px]">
+                      {name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                )
+              })}
+              {members.length > 3 && (
+                <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
+                  +{members.length - 3}
+                </div>
+              )}
+            </div>
+            
+            {canUpdate && onAssignMembers && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7 rounded-full border border-dashed border-muted-foreground/50 hover:border-muted-foreground"
+                  >
+                    <IconPlus className="h-3.5 w-3.5" />
+                    <span className="sr-only">Assign members</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search team..." />
+                    <CommandList>
+                      <CommandEmpty>No one found.</CommandEmpty>
+                      <CommandGroup>
+                        {profiles.map((profile) => (
+                          <CommandItem
+                            key={profile.id}
+                            onSelect={() => {
+                              const newIds = currentMemberIds.includes(profile.id)
+                                ? currentMemberIds.filter(id => id !== profile.id)
+                                : [...currentMemberIds, profile.id]
+                              onAssignMembers(row.original.id, newIds)
+                            }}
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={profile.avatar_url || undefined} />
+                                <AvatarFallback className="text-[10px]">
+                                  {(profile.full_name || profile.email || "?").charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="truncate">{profile.full_name || profile.email}</span>
+                            </div>
+                            <IconCheck
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                currentMemberIds.includes(profile.id)
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
+            
+            {members.length === 0 && !canUpdate && (
+              <span className="text-muted-foreground text-xs italic">Unassigned</span>
             )}
           </div>
         )
@@ -199,16 +285,24 @@ export function ProjectsTable({
             <DropdownMenuItem onClick={() => onViewProposals(row.original)}>
               <IconExternalLink className="mr-2 h-4 w-4" /> View Proposals
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(row.original)}>
-              <IconEdit className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => onDelete(row.original.id)}
-            >
-              <IconTrash className="mr-2 h-4 w-4" /> Delete
-            </DropdownMenuItem>
+            
+            {canUpdate && (
+              <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                <IconEdit className="mr-2 h-4 w-4" /> Edit
+              </DropdownMenuItem>
+            )}
+
+            {canDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => onDelete(row.original.id)}
+                >
+                  <IconTrash className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -222,7 +316,7 @@ export function ProjectsTable({
       isLoading={isLoading}
       searchPlaceholder="Search projects..."
       addLabel="Add Project"
-      onAdd={onAdd}
+      onAdd={canCreate ? onAdd : undefined}
       disablePadding={disablePadding}
       tabs={tabs}
       activeTab={activeTab}

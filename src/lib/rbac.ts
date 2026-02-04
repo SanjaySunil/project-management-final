@@ -23,11 +23,17 @@ export const ROLES: Record<string, RoleData> = {
     label: 'Manager',
     description: 'Can manage projects, clients, and team members (except admins).',
     permissions: [
-      'projects:read', 'projects:write', 'projects:delete',
-      'clients:read', 'clients:write', 'clients:delete',
-      'team:read', 'team:write',
-      'proposals:read', 'proposals:write',
-      'credentials:read', 'credentials:write',
+      'dashboard:read',
+      'projects:*',
+      'tasks:*',
+      'deliverables:*',
+      'proposals:*',
+      'clients:*',
+      'finances:*',
+      'team:read', 'team:create', 'team:update',
+      'chat:*',
+      'credentials:*',
+      'audit_logs:read',
     ],
     is_system: true,
   },
@@ -35,11 +41,16 @@ export const ROLES: Record<string, RoleData> = {
     label: 'Developer',
     description: 'Can view and edit projects and tasks.',
     permissions: [
-      'projects:read', 'projects:write',
-      'clients:read',
-      'team:read',
+      'dashboard:read',
+      'projects:read', 'projects:update',
+      'tasks:*',
+      'deliverables:read', 'deliverables:update',
       'proposals:read',
-      'credentials:read', 'credentials:write',
+      'clients:read',
+      'finances:read',
+      'team:read',
+      'chat:*',
+      'credentials:read', 'credentials:create', 'credentials:update',
     ],
     is_system: true,
   },
@@ -47,31 +58,47 @@ export const ROLES: Record<string, RoleData> = {
     label: 'Viewer',
     description: 'Can only view resources.',
     permissions: [
+      'dashboard:read',
       'projects:read',
-      'clients:read',
-      'team:read',
+      'tasks:read',
+      'deliverables:read',
       'proposals:read',
+      'clients:read',
+      'finances:read',
+      'team:read',
+      'chat:read',
     ],
     is_system: true,
   },
 };
 
 export const RESOURCES = [
-  { id: 'projects', label: 'Projects' },
-  { id: 'clients', label: 'Clients' },
-  { id: 'team', label: 'Team' },
-  { id: 'proposals', label: 'Proposals' },
-  { id: 'credentials', label: 'Credentials' },
-  { id: 'audit_logs', label: 'Audit Logs' },
-  { id: 'organizations', label: 'Organization' },
-];
+  { id: 'dashboard', label: 'Dashboard', group: 'General' },
+  { id: 'projects', label: 'Projects', group: 'Project Management' },
+  { id: 'tasks', label: 'Tasks', group: 'Project Management' },
+  { id: 'deliverables', label: 'Deliverables', group: 'Project Management' },
+  { id: 'proposals', label: 'Proposals', group: 'Project Management' },
+  { id: 'clients', label: 'Clients', group: 'CRM' },
+  { id: 'finances', label: 'Finances', group: 'Business' },
+  { id: 'team', label: 'Team Members', group: 'User Management' },
+  { id: 'roles', label: 'Roles & Permissions', group: 'User Management' },
+  { id: 'chat', label: 'Chat & Messaging', group: 'Communication' },
+  { id: 'credentials', label: 'Credentials', group: 'Security' },
+  { id: 'audit_logs', label: 'Audit Logs', group: 'Security' },
+  { id: 'organizations', label: 'Organization Settings', group: 'Settings' },
+] as const;
+
+export type ResourceId = typeof RESOURCES[number]['id'];
 
 export const ACTIONS = [
-  { id: 'read', label: 'Read' },
-  { id: 'write', label: 'Write' },
-  { id: 'delete', label: 'Delete' },
-  { id: '*', label: 'All' },
-];
+  { id: 'read', label: 'Read', description: 'Can view the resource' },
+  { id: 'create', label: 'Create', description: 'Can create new entries' },
+  { id: 'update', label: 'Update', description: 'Can edit existing entries' },
+  { id: 'delete', label: 'Delete', description: 'Can remove entries' },
+  { id: '*', label: 'All', description: 'Full access to this resource' },
+] as const;
+
+export type ActionId = typeof ACTIONS[number]['id'];
 
 export function hasPermission(
   userRole: string | null, 
@@ -96,9 +123,17 @@ export function hasPermission(
 
 function checkPermissions(permissions: string[], action: string, resource: string): boolean {
   if (permissions.includes('*')) return true;
+  if (permissions.includes(`${resource}:*`)) return true;
   
   const permission = `${resource}:${action}`;
-  return permissions.includes(permission) || permissions.includes(`${resource}:*`);
+  if (permissions.includes(permission)) return true;
+
+  // Backward compatibility: 'write' covers 'create' and 'update'
+  if ((action === 'create' || action === 'update') && permissions.includes(`${resource}:write`)) {
+    return true;
+  }
+  
+  return false;
 }
 
 export function canManageRole(currentUserRole: string | null, targetRole: string | null): boolean {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
+import { useSearchParams } from "react-router-dom"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
 import { supabase } from "@/lib/supabase"
@@ -39,6 +40,8 @@ interface Profile {
 
 export default function TeamPage() {
   const { user, role, checkPermission, organizationId } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get("tab") || "members"
   const { isOnline } = usePresence()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [customRoles, setCustomRoles] = useState<Record<string, RoleData>>({})
@@ -56,8 +59,8 @@ export default function TeamPage() {
   }
 
   const canViewTeam = checkPermission("read", "team")
-  const canManageRoles = checkPermission("write", "team")
-  const canCreateMember = role === 'admin'
+  const canCreateMember = checkPermission("create", "team")
+  const canManageRoles = checkPermission("read", "roles")
 
   const fetchProfiles = useCallback(async () => {
     const { data, error } = await supabase
@@ -251,7 +254,11 @@ export default function TeamPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="members" className="w-full">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => setSearchParams({ tab: val })} 
+          className="w-full"
+        >
           <div>
             <TabsList>
               <TabsTrigger value="members">Team Members</TabsTrigger>
