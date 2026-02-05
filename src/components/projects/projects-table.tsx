@@ -64,6 +64,7 @@ interface ProjectsTableProps {
   disablePadding?: boolean
   onRowClick?: (project: ProjectWithClient) => void
   onAssignMembers?: (projectId: string, memberIds: string[]) => Promise<void>
+  defaultTab?: string
 }
 
 export function ProjectsTable({ 
@@ -77,9 +78,10 @@ export function ProjectsTable({
   disablePadding = true,
   onRowClick,
   onAssignMembers,
+  defaultTab = "all",
 }: ProjectsTableProps) {
   const { checkPermission } = useAuth()
-  const [activeTab, setActiveTab] = React.useState("all")
+  const [activeTab, setActiveTab] = React.useState(defaultTab)
 
   const canCreate = checkPermission('create', 'projects')
   const canUpdate = checkPermission('update', 'projects')

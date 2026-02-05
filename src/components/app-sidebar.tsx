@@ -26,8 +26,10 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarMenuSkeleton,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
 
@@ -38,6 +40,41 @@ interface SidebarItem {
   permission?: { action: string; resource: string }
   items?: SidebarItem[]
   isActive?: boolean
+}
+
+export function SidebarSkeleton() {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <div className="grid flex-1 gap-1">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 p-2 space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-3 w-16 ml-2 mb-2" />
+            {[...Array(i === 1 ? 4 : 3)].map((_, j) => (
+              <SidebarMenuSkeleton key={j} showIcon />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="p-4 border-t">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="grid flex-1 gap-1">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Sidebar data structure
@@ -138,8 +175,8 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, checkPermission } = useAuth()
-  const { organization } = useOrganization()
+  const { user, checkPermission, loading: authLoading } = useAuth()
+  const { organization, loading: orgLoading } = useOrganization()
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -149,6 +186,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       setOpenMobile(false)
     }
   }, [location.pathname, isMobile, setOpenMobile])
+
+  if (authLoading || orgLoading) {
+    return (
+      <Sidebar collapsible="icon" {...props}>
+        <SidebarSkeleton />
+      </Sidebar>
+    )
+  }
 
   const teams = [
     {
