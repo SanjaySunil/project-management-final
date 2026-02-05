@@ -19,7 +19,6 @@ const routeMap: Record<string, string> = {
   chat: "Chat",
   clients: "Clients",
   projects: "Projects",
-  proposals: "Proposals",
   credentials: "Credentials",
   team: "Team",
   "audit-logs": "Audit Logs",

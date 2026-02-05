@@ -4,7 +4,6 @@ import {
   IconDotsVertical,
   IconEdit,
   IconTrash,
-  IconExternalLink,
   IconPlus,
   IconCheck,
 } from "@tabler/icons-react"
@@ -60,10 +59,10 @@ interface ProjectsTableProps {
   onEdit: (project: ProjectWithClient) => void
   onDelete: (id: string) => void
   onAdd: () => void
-  onViewProposals: (project: ProjectWithClient) => void
   disablePadding?: boolean
   onRowClick?: (project: ProjectWithClient) => void
   onAssignMembers?: (projectId: string, memberIds: string[]) => Promise<void>
+  defaultTab?: string
 }
 
 export function ProjectsTable({ 
@@ -73,13 +72,13 @@ export function ProjectsTable({
   onEdit, 
   onDelete, 
   onAdd,
-  onViewProposals,
   disablePadding = true,
   onRowClick,
   onAssignMembers,
+  defaultTab = "active",
 }: ProjectsTableProps) {
   const { checkPermission } = useAuth()
-  const [activeTab, setActiveTab] = React.useState("all")
+  const [activeTab, setActiveTab] = React.useState(defaultTab)
 
   const canCreate = checkPermission('create', 'projects')
   const canUpdate = checkPermission('update', 'projects')
@@ -282,10 +281,6 @@ export function ProjectsTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => onViewProposals(row.original)}>
-              <IconExternalLink className="mr-2 h-4 w-4" /> View Proposals
-            </DropdownMenuItem>
-            
             {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(row.original)}>
                 <IconEdit className="mr-2 h-4 w-4" /> Edit
@@ -321,7 +316,7 @@ export function ProjectsTable({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
-      onRowClick={onRowClick || onViewProposals}
+      onRowClick={onRowClick}
     />
   )
 }

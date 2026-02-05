@@ -72,15 +72,6 @@ export type Task = {
   status: string
   order_index?: number | null
   user_id?: string | null
-  deliverable_id?: string | null
-  proposal_id?: string | null
-  proposals?: {
-    id: string
-    title: string
-    projects?: {
-      name: string
-    } | null
-  } | null
   profiles?: {
     full_name: string | null
     avatar_url: string | null
@@ -541,11 +532,6 @@ function TaskListView({ tasks, members, onTaskCreate, onTaskEdit, onTaskUpdate, 
                     )}>
                       {task.title}
                     </span>
-                    {task.proposals && (
-                      <span className="text-[10px] text-muted-foreground truncate">
-                        {task.proposals.projects?.name} • {task.proposals.title}
-                      </span>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
@@ -707,23 +693,6 @@ function TaskTableView({ tasks, members, onTaskCreate, onTaskEdit, onTaskUpdate,
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        )
-      }
-    },
-    {
-      header: "Project / Proposal",
-      cell: ({ row }) => {
-        const task = row.original
-        if (!task.proposals) return null
-        return (
-          <div className="flex flex-col gap-0.5 py-1 min-w-0">
-            <span className="text-xs font-medium truncate">
-              {task.proposals.projects?.name || "No Project"}
-            </span>
-            <span className="text-[10px] text-muted-foreground truncate">
-              {task.proposals.title}
-            </span>
-          </div>
         )
       }
     },
@@ -1067,4 +1036,3 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete }: Task
     </Card>
   )
 }
-
