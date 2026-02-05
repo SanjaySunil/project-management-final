@@ -23,6 +23,7 @@ import NotificationsPage from "@/pages/notifications"
 import FinancesPage from "@/pages/finances"
 import { Toaster } from "@/components/ui/sonner"
 import ReloadPrompt from "@/components/reload-prompt"
+import { PWAInstallModal } from "@/components/pwa-install-modal"
 
 export function App() {
   return (
@@ -69,6 +70,7 @@ export function App() {
           </Routes>
           <Toaster />
           <ReloadPrompt />
+          <PWAInstallModal />
         </OrganizationProvider>
       </AuthProvider>
     </Router>
