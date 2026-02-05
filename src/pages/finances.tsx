@@ -110,11 +110,11 @@ export default function FinancesPage() {
   const revenueColumns = [
     {
       accessorKey: "title",
-      header: "Template/Invoice",
+      header: "Proposal/Invoice",
       cell: ({ row }: any) => (
         <div className="flex flex-col">
           <span className="font-medium">{row.getValue("title")}</span>
-          <span className="text-[10px] text-muted-foreground uppercase">{row.original.order_source}</span>
+          <span className="text-xs text-muted-foreground">{row.original.projects?.name}</span>
         </div>
       )
     },
@@ -346,12 +346,12 @@ export default function FinancesPage() {
 
           <TabsContent value="revenue" className="space-y-4">
             <Card>
-                <CardHeader>
-                  <CardTitle>Revenue Breakdown</CardTitle>
-                  <CardDescription>
-                    Detailed breakdown of all income from projects and templates.
-                  </CardDescription>
-                </CardHeader>
+              <CardHeader>
+                <CardTitle>Revenue Sources</CardTitle>
+                <CardDescription>
+                  Detailed breakdown of all income from projects and proposals.
+                </CardDescription>
+              </CardHeader>
               <CardContent>
                 <DataTable 
                   columns={revenueColumns} 

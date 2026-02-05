@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
+import { ProjectProposalsModal } from "@/components/projects/project-proposals-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 interface ClientProjectsTabProps {
@@ -25,6 +26,9 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   const [editingProject, setEditingProject] = React.useState<ProjectWithClient | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
+
+  const [proposalsModalOpen, setProposalsModalOpen] = React.useState(false)
+  const [selectedProjectForProposals, setSelectedProjectForProposals] = React.useState<ProjectWithClient | null>(null)
 
   const fetchProjects = React.useCallback(async () => {
     if (!user) return
@@ -84,6 +88,11 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   const handleDeleteProject = (id: string) => {
     setProjectToDelete(id)
     setDeleteConfirmOpen(true)
+  }
+
+  const handleViewProposals = (project: ProjectWithClient) => {
+    setSelectedProjectForProposals(project)
+    setProposalsModalOpen(true)
   }
 
   const confirmDeleteProject = async () => {
@@ -169,9 +178,16 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
           onEdit={handleEditProject}
           onDelete={handleDeleteProject}
           onAdd={handleAddProject}
+          onViewProposals={handleViewProposals}
           disablePadding={true}
         />
       </div>
+
+      <ProjectProposalsModal 
+        project={selectedProjectForProposals}
+        open={proposalsModalOpen}
+        onOpenChange={setProposalsModalOpen}
+      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">

@@ -10,6 +10,8 @@ import ClientsPage from "@/pages/clients"
 import ClientOverviewPage from "@/pages/client-overview"
 import ClientProjectsPage from "@/pages/client-projects"
 import ProjectsPage from "@/pages/projects"
+import ProposalsPage from "@/pages/proposals"
+import ProposalOverviewPage from "@/pages/proposal-overview"
 import AssignedTasksPage from "@/pages/tasks-assigned"
 import CredentialsPage from "@/pages/credentials"
 import TeamPage from "@/pages/team"
@@ -49,6 +51,8 @@ export function App() {
               <Route path="clients/:clientId/overview" element={<ClientOverviewPage />} />
               <Route path="clients/:clientId/projects" element={<ClientProjectsPage />} />
               <Route path="projects" element={<ProjectsPage />} />
+              <Route path="projects/:projectId/proposals" element={<ProposalsPage />} />
+              <Route path="projects/:projectId/proposals/:proposalId" element={<ProposalOverviewPage />} />
               <Route path="projects/:projectId/chat" element={<ChatPage />} />
               <Route path="projects/:projectId/chat/:channelId" element={<ChatPage />} />
               <Route path="tasks/assigned" element={<AssignedTasksPage />} />

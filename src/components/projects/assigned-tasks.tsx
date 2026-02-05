@@ -53,6 +53,7 @@ export function AssignedTasks({
   const [mode, setMode] = React.useState<"project" | "personal">("project")
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
+  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [view, setView] = React.useState<"kanban" | "table" | "list">(defaultView || (hideHeader ? "table" : "kanban"))
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
@@ -68,16 +69,32 @@ export function AssignedTasks({
     try {
       setIsLoading(true)
       
-      const membersRes = await supabase
-        .from("profiles")
-        .select("*")
-        .order("full_name", { ascending: true })
+      const [membersRes, proposalsRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("*")
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("proposals")
+          .select("*")
+          .order("title", { ascending: true })
+      ])
 
       let tasksRes
       if (mode === "project") {
         tasksRes = await supabase
           .from("tasks")
-          .select(`*`)
+          .select(`
+            *,
+            proposals (
+              id,
+              title,
+              project_id,
+              projects (
+                name
+              )
+            )
+          `)
           .eq("user_id", targetUserId)
           .order("order_index", { ascending: true })
       } else {
@@ -89,6 +106,7 @@ export function AssignedTasks({
 
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
+      if (proposalsRes.error) throw proposalsRes.error
 
       const fetchedMembers = membersRes.data || []
       const fetchedTasks = (tasksRes.data || []).map((task: any) => ({
@@ -98,6 +116,7 @@ export function AssignedTasks({
 
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
+      setProposals(proposalsRes.data || [])
     } catch (error: unknown) {
       toast.error("Failed to fetch tasks: " + (error instanceof Error ? error.message : String(error)))
     } finally {
@@ -157,8 +176,28 @@ export function AssignedTasks({
         order_index: tasks.filter(t => t.status === creatingStatus).length
       }
 
+      if (mode === "project") {
+        payload.proposal_id = values.proposal_id === "none" ? null : values.proposal_id
+      }
+
       const query = (supabase.from as any)(table).insert([payload])
-      const res = await query.select("*").single()
+      
+      let res
+      if (mode === "project") {
+        res = await query.select(`
+          *,
+          proposals (
+            id,
+            title,
+            project_id,
+            projects (
+              name
+            )
+          )
+        `).single()
+      } else {
+        res = await query.select("*").single()
+      }
 
       if (res.error) throw res.error
 
@@ -186,6 +225,10 @@ export function AssignedTasks({
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+      }
+
+      if (mode === "project") {
+        updates.proposal_id = values.proposal_id === "none" ? null : (values.proposal_id || null)
       }
 
       const table = mode === "project" ? "tasks" : "personal_tasks"
@@ -405,6 +448,7 @@ export function AssignedTasks({
             onCancel={() => setIsCreateDialogOpen(false)}
             isLoading={isSubmitting}
             members={members}
+            proposals={proposals}
             hideAssignee={mode === "personal"}
             defaultValues={{
               user_id: targetUserId
@@ -431,11 +475,13 @@ export function AssignedTasks({
               }}
               isLoading={isSubmitting}
               members={members}
+              proposals={proposals}
               hideAssignee={mode === "personal"}
               defaultValues={{
                 title: editingTask.title,
                 description: editingTask.description || "",
                 user_id: editingTask.user_id,
+                proposal_id: editingTask.proposal_id,
               }}
             />
           )}
@@ -444,3 +490,5 @@ export function AssignedTasks({
     </div>
   )
 }
+
+

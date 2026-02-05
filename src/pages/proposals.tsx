@@ -1,10 +1,14 @@
 import * as React from "react"
+import { useParams, Link } from "react-router-dom"
 import { toast } from "sonner"
+import { ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
-import { ProposalsTable } from "./proposals-table"
-import { ProposalForm } from "./proposal-form"
-import type { Deliverable } from "./deliverables-manager"
+import { PageContainer } from "@/components/page-container"
+import { SEO } from "@/components/seo"
+import { ProposalsTable } from "@/components/projects/proposals-table"
+import { ProposalForm } from "@/components/projects/proposal-form"
+import type { Deliverable } from "@/components/projects/deliverables-manager"
 import {
   Dialog,
   DialogContent,
@@ -13,43 +17,28 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { type ProjectWithClient } from "./projects-table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ProjectForm } from "./project-form"
+import { Button } from "@/components/ui/button"
 
 type Proposal = Tables<"proposals">
 
-interface ProjectDetailsModalProps {
-  project: ProjectWithClient | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onProjectUpdated?: () => void
-}
-
-export function ProjectDetailsModal({
-  project,
-  open,
-  onOpenChange,
-  onProjectUpdated,
-}: ProjectDetailsModalProps) {
+export default function ProposalsPage() {
+  const { projectId } = useParams()
   const [proposals, setProposals] = React.useState<Proposal[]>([])
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [isFormDialogOpen, setIsFormDialogOpen] = React.useState(false)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [editingProposal, setEditingProposal] = React.useState<Proposal | null>(null)
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>([])
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [proposalToDelete, setProposalToDelete] = React.useState<string | null>(null)
-  const [isSavingProject, setIsSavingProject] = React.useState(false)
 
   const fetchProposals = React.useCallback(async () => {
-    if (!project) return
     try {
       setIsLoading(true)
       const { data, error } = await supabase
         .from("proposals")
         .select("*")
-        .eq("project_id", project.id)
+        .eq("project_id", projectId as string)
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -59,7 +48,7 @@ export function ProjectDetailsModal({
     } finally {
       setIsLoading(false)
     }
-  }, [project])
+  }, [projectId])
 
   const fetchDeliverables = React.useCallback(async (proposalId: string) => {
     try {
@@ -77,19 +66,19 @@ export function ProjectDetailsModal({
   }, [])
 
   React.useEffect(() => {
-    if (open && project) {
+    if (projectId) {
       fetchProposals()
     }
-  }, [open, project, fetchProposals])
+  }, [fetchProposals, projectId])
 
-  const handleEditProposal = async (proposal: Proposal | null) => {
+  const handleEdit = async (proposal: Proposal | null) => {
     setEditingProposal(proposal)
     if (proposal) {
       await fetchDeliverables(proposal.id)
     } else {
       setDeliverables([])
     }
-    setIsFormDialogOpen(true)
+    setIsDialogOpen(true)
   }
 
   const handleStatusChange = async (id: string, status: string) => {
@@ -107,12 +96,12 @@ export function ProjectDetailsModal({
     }
   }
 
-  const handleDeleteProposal = (id: string) => {
+  const handleDelete = (id: string) => {
     setProposalToDelete(id)
     setDeleteConfirmOpen(true)
   }
 
-  const confirmDeleteProposal = async () => {
+  const confirmDelete = async () => {
     if (!proposalToDelete) return
 
     try {
@@ -128,15 +117,14 @@ export function ProjectDetailsModal({
     }
   }
 
-  const handleProposalSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
-    if (!project) return
+  const handleSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
     try {
       setIsSubmitting(true)
       let proposalId = editingProposal?.id
 
       const proposalData = {
         ...values,
-        project_id: project.id,
+        project_id: projectId as string,
       }
 
       if (editingProposal?.id) {
@@ -184,7 +172,7 @@ export function ProjectDetailsModal({
         }
       }
 
-      setIsFormDialogOpen(false)
+      setIsDialogOpen(false)
       fetchProposals()
     } catch (error: any) {
       toast.error("Failed to save proposal: " + error.message)
@@ -193,105 +181,30 @@ export function ProjectDetailsModal({
     }
   }
 
-  const handleProjectSubmit = async (values: any) => {
-    if (!project) return
-    const { member_ids, ...projectValues } = values
-    
-    try {
-      setIsSavingProject(true)
-      const { error } = await supabase
-        .from("projects")
-        .update(projectValues)
-        .eq("id", project.id)
-      if (error) throw error
-      
-      // Update members: delete old, insert new
-      await supabase.from("project_members").delete().eq("project_id", project.id)
-      
-      if (member_ids && member_ids.length > 0) {
-        const memberEntries = member_ids.map((userId: string) => ({
-          project_id: project.id,
-          user_id: userId,
-        }))
-        const { error: memberError } = await supabase
-          .from("project_members")
-          .insert(memberEntries)
-        if (memberError) throw memberError
-      }
-
-      toast.success("Project updated successfully")
-      if (onProjectUpdated) onProjectUpdated()
-    } catch (error: any) {
-      toast.error("Failed to update project: " + error.message)
-    } finally {
-      setIsSavingProject(false)
-    }
-  }
-
-  const initialProjectFormValues = React.useMemo(() => {
-    if (!project) return {}
-    return {
-      ...project,
-      member_ids: project.project_members?.map(m => m.user_id) || []
-    }
-  }, [project])
-
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-0">
-            <DialogTitle>Project Details: {project?.name}</DialogTitle>
-            <DialogDescription>
-              View and manage project information and proposals.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Tabs defaultValue="proposals" className="flex-1 flex flex-col min-h-0">
-            <div className="px-6 border-b">
-              <TabsList variant="line" className="w-full justify-start h-12 bg-transparent p-0 gap-6">
-                <TabsTrigger 
-                  value="proposals" 
-                  className="h-12 rounded-none data-[state=active]:bg-transparent shadow-none"
-                >
-                  Project Proposals
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="overview" 
-                  className="h-12 rounded-none data-[state=active]:bg-transparent shadow-none"
-                >
-                  Project Overview
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto overflow-x-auto p-6">
-              <TabsContent value="proposals" className="mt-0">
-                <ProposalsTable 
-                  data={proposals} 
-                  projectId={project?.id || ""}
-                  onEdit={handleEditProposal}
-                  onDelete={handleDeleteProposal}
-                  onStatusChange={handleStatusChange}
-                  isLoading={isLoading}
-                />
-              </TabsContent>
+    <PageContainer>
+      <SEO title="Project Proposals" description="Create and manage business proposals and deliverables for this project." />
+      <div className="flex flex-1 flex-col gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/dashboard/projects">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Projects
+            </Link>
+          </Button>
+        </div>
+        <ProposalsTable 
+          data={proposals} 
+          projectId={projectId as string}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
+          isLoading={isLoading}
+        />
+      </div>
 
-              <TabsContent value="overview" className="mt-0">
-                <ProjectForm
-                  initialValues={initialProjectFormValues}
-                  onSubmit={handleProjectSubmit}
-                  onCancel={() => onOpenChange(false)}
-                  isLoading={isSavingProject}
-                />
-              </TabsContent>
-            </div>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto z-[60]">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProposal ? "Edit Proposal" : "Create Proposal"}</DialogTitle>
             <DialogDescription>
@@ -304,8 +217,8 @@ export function ProjectDetailsModal({
           <ProposalForm
             initialData={editingProposal}
             initialDeliverables={deliverables}
-            onSubmit={handleProposalSubmit}
-            onCancel={() => setIsFormDialogOpen(false)}
+            onSubmit={handleSubmit}
+            onCancel={() => setIsDialogOpen(false)}
             isSubmitting={isSubmitting}
           />
         </DialogContent>
@@ -314,10 +227,10 @@ export function ProjectDetailsModal({
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
-        onConfirm={confirmDeleteProposal}
+        onConfirm={confirmDelete}
         title="Delete Proposal"
         description="Are you sure you want to delete this proposal? This action cannot be undone."
       />
-    </>
+    </PageContainer>
   )
 }

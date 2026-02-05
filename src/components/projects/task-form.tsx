@@ -24,6 +24,7 @@ const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   user_id: z.string().nullable().optional(),
+  proposal_id: z.string().nullable().optional(),
 })
 
 export type TaskFormValues = z.infer<typeof taskSchema>
@@ -34,6 +35,7 @@ interface TaskFormProps {
   onDelete?: () => void
   isLoading?: boolean
   members: Tables<"profiles">[]
+  proposals?: Tables<"proposals">[]
   defaultValues?: Partial<TaskFormValues>
   hideAssignee?: boolean
 }
@@ -44,6 +46,7 @@ export function TaskForm({
   onDelete,
   isLoading, 
   members, 
+  proposals,
   defaultValues,
   hideAssignee = false
 }: TaskFormProps) {
@@ -53,6 +56,7 @@ export function TaskForm({
       title: defaultValues?.title || "",
       description: defaultValues?.description || "",
       user_id: defaultValues?.user_id || null,
+      proposal_id: defaultValues?.proposal_id || null,
     },
   })
 
@@ -115,6 +119,36 @@ export function TaskForm({
                     {members.map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.full_name || member.email || member.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+        {proposals && proposals.length > 0 && (
+          <FormField
+            control={form.control}
+            name="proposal_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Proposal</FormLabel>
+                <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value || "none"}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a proposal" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {proposals.map((proposal) => (
+                      <SelectItem key={proposal.id} value={proposal.id}>
+                        {proposal.title}
                       </SelectItem>
                     ))}
                   </SelectContent>

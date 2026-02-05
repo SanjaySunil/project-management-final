@@ -223,6 +223,7 @@ export default function ProjectsPage() {
             onEdit={handleEditProject}
             onDelete={handleDeleteProject}
             onAdd={handleAddProject}
+            onViewProposals={handleViewDetails}
             onRowClick={handleViewDetails}
             onAssignMembers={handleAssignMembers}
           />

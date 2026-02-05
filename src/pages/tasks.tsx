@@ -32,7 +32,17 @@ export default function TasksPage() {
       const [tasksRes, membersRes] = await Promise.all([
         supabase
           .from("tasks")
-          .select(`*`)
+          .select(`
+            *,
+            proposals (
+              id,
+              title,
+              project_id,
+              projects (
+                name
+              )
+            )
+          `)
           .order("order_index", { ascending: true }),
         supabase
           .from("profiles")
@@ -104,10 +114,21 @@ export default function TasksPage() {
           title: values.title,
           description: values.description,
           user_id: values.user_id === "unassigned" ? null : values.user_id,
+          proposal_id: values.proposal_id === "none" ? null : values.proposal_id,
           status: creatingStatus,
           order_index: tasks.filter(t => t.status === creatingStatus).length
         }])
-        .select(`*`)
+        .select(`
+          *,
+          proposals (
+            id,
+            title,
+            project_id,
+            projects (
+              name
+            )
+          )
+        `)
         .single()
 
       if (error) throw error
@@ -136,6 +157,7 @@ export default function TasksPage() {
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+        proposal_id: values.proposal_id === "none" ? null : (values.proposal_id || null),
       }
 
       const { error } = await supabase
@@ -188,7 +210,7 @@ export default function TasksPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-              <p className="text-sm text-muted-foreground">Manage and track your project tasks.</p>
+              <p className="text-sm text-muted-foreground">Manage and track your project tasks across all proposals.</p>
             </div>
           </div>
         </div>
@@ -245,6 +267,7 @@ export default function TasksPage() {
                 title: editingTask.title,
                 description: editingTask.description || "",
                 user_id: editingTask.user_id,
+                proposal_id: editingTask.proposal_id,
               }}
             />
           )}

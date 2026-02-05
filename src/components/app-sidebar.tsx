@@ -26,10 +26,8 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  SidebarMenuSkeleton,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
 
@@ -40,41 +38,6 @@ interface SidebarItem {
   permission?: { action: string; resource: string }
   items?: SidebarItem[]
   isActive?: boolean
-}
-
-export function SidebarSkeleton() {
-  return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-lg" />
-          <div className="grid flex-1 gap-1">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-16" />
-          </div>
-        </div>
-      </div>
-      <div className="flex-1 p-2 space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="space-y-2">
-            <Skeleton className="h-3 w-16 ml-2 mb-2" />
-            {[...Array(i === 1 ? 4 : 3)].map((_, j) => (
-              <SidebarMenuSkeleton key={j} showIcon />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="p-4 border-t">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-9 w-9 rounded-full" />
-          <div className="grid flex-1 gap-1">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-32" />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // Sidebar data structure
@@ -175,8 +138,8 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, checkPermission, loading: authLoading } = useAuth()
-  const { organization, loading: orgLoading } = useOrganization()
+  const { user, checkPermission } = useAuth()
+  const { organization } = useOrganization()
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -187,14 +150,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   }, [location.pathname, isMobile, setOpenMobile])
 
-  if (authLoading || orgLoading) {
-    return (
-      <Sidebar collapsible="icon" {...props}>
-        <SidebarSkeleton />
-      </Sidebar>
-    )
-  }
-
   const teams = [
     {
       name: organization?.name || "Acme Inc",
@@ -204,7 +159,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   ]
 
   const projectMatch = matchPath({ path: "/dashboard/projects/:projectId/*" }, location.pathname)
-  const projectId = projectMatch?.params.projectId
+  const proposalMatch = matchPath({ path: "/dashboard/projects/:projectId/proposals/:proposalId" }, location.pathname)
+  
+  const projectId = projectMatch?.params.projectId || proposalMatch?.params.projectId
+  const proposalId = proposalMatch?.params.proposalId
 
   const clientMatch = matchPath({ path: "/dashboard/clients/:clientId/*" }, location.pathname)
   const clientId = clientMatch?.params.clientId
@@ -239,11 +197,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     
     return items.map((item: SidebarItem) => {
       // Project contextual sub-menu
-      if (item.title === "Projects" && projectId) {
+      if (item.title === "Projects" && projectId && !proposalId) {
         return {
           ...item,
           isActive: true,
           items: [
+            { title: "Proposals", url: `/dashboard/projects/${projectId}/proposals` },
             { title: "Overview", url: `/dashboard/projects/${projectId}/overview` },
             { title: "Project Chat", url: `/dashboard/projects/${projectId}/chat` },
             { title: "← All Projects", url: "/dashboard/projects" }
@@ -251,7 +210,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         }
       }
       
-      // Keep Projects highlighted when inside a project
+      // Keep Projects highlighted when inside a project or proposal
       if (item.title === "Projects" && (projectId || location.pathname.startsWith("/dashboard/projects"))) {
         return { ...item, isActive: true }
       }
