@@ -444,8 +444,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <div className="flex flex-col gap-2">
+    <div className="flex flex-1 flex-col gap-4 overflow-hidden">
+      <div className="flex flex-col gap-2 shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -470,8 +470,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         </div>
       </div>
 
-      <Tabs defaultValue="kanban" className="flex-1 flex flex-col gap-4">
-        <TabsList className="w-fit">
+      <Tabs defaultValue="kanban" className="flex-1 flex flex-col gap-4 min-h-0">
+        <TabsList className="w-fit shrink-0">
           <TabsTrigger value="overview" className="gap-2">
             <IconFileText className="h-4 w-4" /> Overview
           </TabsTrigger>
@@ -483,8 +483,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex-1">
-          <div className="flex flex-col gap-6">
+        <TabsContent value="overview" className="flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-6 pb-6">
             <div className="flex justify-end">
               <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
                 <IconEdit className="h-4 w-4" /> Edit Proposal
@@ -549,8 +549,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           </div>
         </TabsContent>
 
-        <TabsContent value="kanban" className="flex-1 min-h-[600px]">
-          <div className="flex flex-1 flex-col h-full">
+        <TabsContent value="kanban" className="flex-1 min-h-0">
+          <div className="flex flex-col h-full overflow-hidden">
             <KanbanBoard 
               tasks={tasks} 
               members={members}
@@ -563,7 +563,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           </div>
         </TabsContent>
 
-        <TabsContent value="messages" className="flex-1 h-[600px]">
+        <TabsContent value="messages" className="flex-1 min-h-0">
           <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
             <div className="flex h-12 items-center px-4 border-b bg-muted/30">
               <Hash className="h-4 w-4 mr-2 text-muted-foreground" />

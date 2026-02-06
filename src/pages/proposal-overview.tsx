@@ -25,10 +25,10 @@ export default function ProposalOverviewPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer className="h-full overflow-hidden">
       <SEO title="Proposal Details" />
-      <div className="flex flex-1 flex-col gap-4">
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-1 flex-col gap-4 h-full overflow-hidden">
+        <div className="flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
             <Button asChild variant="ghost" className="w-fit -ml-2 h-8 text-muted-foreground">
               <Link to={`/dashboard/projects/${projectId}`}>

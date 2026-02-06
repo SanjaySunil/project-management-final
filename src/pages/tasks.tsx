@@ -200,10 +200,10 @@ export default function TasksPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer className="h-full overflow-hidden">
       <SEO title="Tasks - Kanban Board" />
-      <div className="flex flex-1 flex-col gap-4">
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-1 flex-col gap-4 h-full overflow-hidden">
+        <div className="flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <IconLayoutKanban className="h-6 w-6" />
@@ -215,7 +215,7 @@ export default function TasksPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-[500px]">
+        <div className="flex-1 min-h-0">
           <KanbanBoard 
             tasks={tasks} 
             members={members}
@@ -227,6 +227,7 @@ export default function TasksPage() {
           />
         </div>
       </div>
+
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">

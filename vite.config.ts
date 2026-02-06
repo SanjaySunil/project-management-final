@@ -1,11 +1,29 @@
 import path from "path"
+import { execSync } from "child_process"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
 
+const getGitVersion = () => {
+  try {
+    return execSync("git describe --tags --always --dirty").toString().trim()
+  } catch (e) {
+    try {
+      return execSync("git rev-parse --short HEAD").toString().trim()
+    } catch (e2) {
+      return "v0.0.0"
+    }
+  }
+}
+
+const appVersion = getGitVersion()
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react(),
     tailwindcss(),

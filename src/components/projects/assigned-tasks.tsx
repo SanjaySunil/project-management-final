@@ -276,9 +276,9 @@ export function AssignedTasks({
   }, [targetUserId, currentUser?.id, targetUser, mode])
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex flex-col gap-6 h-full overflow-hidden">
       {!hideHeader && (
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">
@@ -332,7 +332,7 @@ export function AssignedTasks({
       )}
 
       {hideHeader && (
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 shrink-0">
           <Tabs value={mode} onValueChange={(v) => setMode(v as "project" | "personal")}>
             <TabsList>
               <TabsTrigger value="project" className="flex items-center gap-2">
@@ -349,11 +349,11 @@ export function AssignedTasks({
       )}
 
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
+        <div className="flex h-64 items-center justify-center shrink-0">
           <p>Loading tasks...</p>
         </div>
       ) : filteredTasks.length === 0 ? (
-        <Empty className="border-none bg-transparent">
+        <Empty className="border-none bg-transparent shrink-0">
           <EmptyMedia variant="icon">
             <IconClipboardList className="h-6 w-6" />
           </EmptyMedia>
@@ -376,7 +376,7 @@ export function AssignedTasks({
           )}
         </Empty>
       ) : (
-        <div className="flex-1 overflow-hidden min-h-[500px]">
+        <div className="flex-1 overflow-hidden min-h-0">
           <KanbanBoard 
             tasks={filteredTasks}
             members={members}

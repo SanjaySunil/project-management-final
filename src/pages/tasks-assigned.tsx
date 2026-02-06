@@ -8,9 +8,9 @@ export default function AssignedTasksPage() {
   const userId = searchParams.get("user") || undefined
 
   return (
-    <PageContainer>
+    <PageContainer className="h-full overflow-hidden">
       <SEO title="Assigned Tasks" />
-      <div className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-1 flex-col gap-4 h-full overflow-hidden">
         <AssignedTasks userId={userId} />
       </div>
     </PageContainer>

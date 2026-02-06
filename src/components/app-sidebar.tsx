@@ -312,6 +312,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} />
+        <div className="px-4 py-2 text-[10px] text-muted-foreground font-mono opacity-50">
+          {__APP_VERSION__}
+        </div>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

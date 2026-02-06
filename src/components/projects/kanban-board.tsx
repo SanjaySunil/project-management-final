@@ -276,9 +276,9 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-4 h-full overflow-hidden">
       {!hideControls && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm font-medium">
             <IconLayoutKanban className="size-4" />
             Kanban
@@ -294,16 +294,16 @@ export function KanbanBoard({
       )}
 
       {isLoading ? (
-        <div className="flex h-full gap-4 overflow-x-auto pb-4">
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0">
           {COLUMNS.map((column) => (
-            <div key={column.id} className="flex h-full w-72 flex-col gap-3 rounded-lg bg-muted/50 p-3">
+            <div key={column.id} className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-lg bg-muted/50 p-3">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-24" />
                   <Skeleton className="h-5 w-8 rounded-full" />
                 </div>
               </div>
-              <div className="flex flex-1 flex-col gap-3">
+              <div className="flex flex-1 flex-col gap-3 overflow-hidden">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Card key={i} className="p-3">
                     <div className="space-y-3">
@@ -324,7 +324,7 @@ export function KanbanBoard({
           ))}
         </div>
       ) : (
-        <div className="flex h-full gap-4 overflow-x-auto pb-4">
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0">
           <DndContext
             sensors={sensors}
             collisionDetection={customCollisionDetection}
@@ -423,7 +423,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTask
         items={tasks.map((t) => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto min-h-0">
           {tasks.map((task) => (
             <SortableTaskCard 
               key={task.id} 
