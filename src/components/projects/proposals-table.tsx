@@ -37,11 +37,12 @@ interface ProposalsTableProps {
   projectId: string
   onEdit: (proposal: Proposal | null) => void
   onDelete: (id: string) => void
+  onView?: (proposal: Proposal) => void
   onStatusChange?: (id: string, status: string) => void
   isLoading?: boolean
 }
 
-export function ProposalsTable({ data, projectId, onEdit, onDelete, onStatusChange, isLoading }: ProposalsTableProps) {
+export function ProposalsTable({ data, projectId, onEdit, onDelete, onView, onStatusChange, isLoading }: ProposalsTableProps) {
 
   const columns: ColumnDef<Proposal>[] = [
     {
@@ -74,6 +75,19 @@ export function ProposalsTable({ data, projectId, onEdit, onDelete, onStatusChan
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => {
+        if (onView) {
+          return (
+            <div className="flex flex-col">
+              <button
+                onClick={() => onView(row.original)}
+                className="flex items-center gap-2 hover:underline text-primary font-medium text-left"
+              >
+                <IconFileText className="h-4 w-4 text-muted-foreground" />
+                {row.original.title}
+              </button>
+            </div>
+          )
+        }
         return (
           <div className="flex flex-col">
             <Link 
@@ -187,10 +201,23 @@ export function ProposalsTable({ data, projectId, onEdit, onDelete, onStatusChan
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem asChild>
-              <Link to={`/dashboard/projects/${projectId}/proposals/${row.original.id}`}>
-                <IconExternalLink className="mr-2 h-4 w-4" /> View Details
-              </Link>
+            <DropdownMenuItem 
+              onClick={() => {
+                if (onView) {
+                  onView(row.original)
+                }
+              }}
+              asChild={!onView}
+            >
+              {onView ? (
+                <div className="flex items-center">
+                  <IconExternalLink className="mr-2 h-4 w-4" /> View Details
+                </div>
+              ) : (
+                <Link to={`/dashboard/projects/${projectId}/proposals/${row.original.id}`}>
+                  <IconExternalLink className="mr-2 h-4 w-4" /> View Details
+                </Link>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(row.original)}>Edit</DropdownMenuItem>
             <DropdownMenuItem onClick={() => {

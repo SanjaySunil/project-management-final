@@ -36,16 +36,12 @@ import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 interface AssignedTasksProps {
   userId?: string
   hideHeader?: boolean
-  defaultView?: "kanban" | "table" | "list"
-  hideViewToggle?: boolean
   defaultStatusFilter?: string
 }
 
 export function AssignedTasks({ 
   userId, 
   hideHeader = false,
-  defaultView,
-  hideViewToggle = false,
   defaultStatusFilter = "active"
 }: AssignedTasksProps) {
   const { user: currentUser } = useAuth()
@@ -55,7 +51,6 @@ export function AssignedTasks({
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
-  const [view, setView] = React.useState<"kanban" | "table" | "list">(defaultView || (hideHeader ? "table" : "kanban"))
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
@@ -312,25 +307,6 @@ export function AssignedTasks({
                 Add Task
               </Button>
 
-              {!hideViewToggle && (
-                <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table" | "list")}>
-                  <TabsList>
-                    <TabsTrigger value="kanban">
-                      <IconLayoutKanban className="mr-2 h-4 w-4" />
-                      Kanban
-                    </TabsTrigger>
-                    <TabsTrigger value="list">
-                      <IconList className="mr-2 h-4 w-4" />
-                      List
-                    </TabsTrigger>
-                    <TabsTrigger value="table">
-                      <IconTable className="mr-2 h-4 w-4" />
-                      Table
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -355,7 +331,7 @@ export function AssignedTasks({
         </div>
       )}
 
-      {hideHeader && !hideViewToggle && (
+      {hideHeader && (
         <div className="flex items-center justify-between mb-4">
           <Tabs value={mode} onValueChange={(v) => setMode(v as "project" | "personal")}>
             <TabsList>
@@ -366,23 +342,6 @@ export function AssignedTasks({
               <TabsTrigger value="personal" className="flex items-center gap-2">
                 <IconUser className="size-4" />
                 Personal
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "table" | "list")}>
-            <TabsList>
-              <TabsTrigger value="kanban">
-                <IconLayoutKanban className="mr-2 h-4 w-4" />
-                Kanban
-              </TabsTrigger>
-              <TabsTrigger value="list">
-                <IconList className="mr-2 h-4 w-4" />
-                List
-              </TabsTrigger>
-              <TabsTrigger value="table">
-                <IconTable className="mr-2 h-4 w-4" />
-                Table
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -428,8 +387,6 @@ export function AssignedTasks({
               setIsEditDialogOpen(true)
             }}
             onTaskDelete={handleTaskDelete}
-            view={view}
-            onViewChange={setView}
             hideControls
           />
         </div>

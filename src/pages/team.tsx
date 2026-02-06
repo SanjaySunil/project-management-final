@@ -160,12 +160,17 @@ export default function TeamPage() {
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({ role: newRole })
         .eq('id', profile.id)
+        .select()
 
       if (error) throw error
+      
+      if (!data || data.length === 0) {
+        throw new Error("No profile was updated. You might not have permission or the user does not exist.")
+      }
       
       setProfiles(profiles.map(p => p.id === profile.id ? { ...p, role: newRole } : p))
       const roleLabel = customRoles[newRole]?.label || ROLES[newRole]?.label || newRole
@@ -195,12 +200,17 @@ export default function TeamPage() {
     if (!profileToDelete) return
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .delete()
         .eq('id', profileToDelete.id)
+        .select()
 
       if (error) throw error
+      
+      if (!data || data.length === 0) {
+        throw new Error("No profile was deleted. You might not have permission.")
+      }
       
       setProfiles(profiles.filter(p => p.id !== profileToDelete.id))
       toast.success("User profile deleted")

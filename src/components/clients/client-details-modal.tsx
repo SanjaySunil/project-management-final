@@ -15,12 +15,14 @@ interface ClientDetailsModalProps {
   client: Client | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUpdate?: () => void
 }
 
 export function ClientDetailsModal({
   client,
   open,
   onOpenChange,
+  onUpdate,
 }: ClientDetailsModalProps) {
   if (!client) return null
 
@@ -39,7 +41,7 @@ export function ClientDetailsModal({
               <TabsTrigger value="projects">Projects</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
-              <ClientOverview clientId={client.id} />
+              <ClientOverview clientId={client.id} onUpdate={onUpdate} />
             </TabsContent>
             <TabsContent value="projects" className="mt-4">
               <ClientProjectsTab clientId={client.id} />

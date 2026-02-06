@@ -4,9 +4,10 @@ interface LiveTimeProps {
   timezone?: string | null
   country?: string | null
   city?: string | null
+  baseTime?: Date | null
 }
 
-export function LiveTime({ timezone, country, city }: LiveTimeProps) {
+export function LiveTime({ timezone, country, city, baseTime }: LiveTimeProps) {
   const [time, setTime] = React.useState<string>("")
 
   React.useEffect(() => {
@@ -29,7 +30,7 @@ export function LiveTime({ timezone, country, city }: LiveTimeProps) {
 
     const updateTime = () => {
       try {
-        const now = new Date()
+        const now = baseTime || new Date()
         const formatter = new Intl.DateTimeFormat("en-US", {
           hour: "numeric",
           minute: "2-digit",
@@ -43,9 +44,13 @@ export function LiveTime({ timezone, country, city }: LiveTimeProps) {
     }
 
     updateTime()
-    const interval = setInterval(updateTime, 30000)
-    return () => clearInterval(interval)
-  }, [timezone, city, country])
+    
+    // Only set interval if we are showing live time
+    if (!baseTime) {
+      const interval = setInterval(updateTime, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [timezone, city, country, baseTime])
 
   return <span className="font-mono">{time}</span>
 }

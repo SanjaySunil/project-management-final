@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { type ProjectWithClient } from "./projects-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProjectForm } from "./project-form"
+import { ProposalDetailsModal } from "./proposal-details-modal"
 
 type Proposal = Tables<"proposals">
 
@@ -41,6 +42,8 @@ export function ProjectDetailsModal({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [proposalToDelete, setProposalToDelete] = React.useState<string | null>(null)
   const [isSavingProject, setIsSavingProject] = React.useState(false)
+  const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
+  const [selectedProposalId, setSelectedProposalId] = React.useState<string | null>(null)
 
   const fetchProposals = React.useCallback(async () => {
     if (!project) return
@@ -272,6 +275,10 @@ export function ProjectDetailsModal({
                   projectId={project?.id || ""}
                   onEdit={handleEditProposal}
                   onDelete={handleDeleteProposal}
+                  onView={(p) => {
+                    setSelectedProposalId(p.id)
+                    setDetailsModalOpen(true)
+                  }}
                   onStatusChange={handleStatusChange}
                   isLoading={isLoading}
                 />
@@ -289,6 +296,13 @@ export function ProjectDetailsModal({
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      <ProposalDetailsModal
+        projectId={project?.id || ""}
+        proposalId={selectedProposalId}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+      />
 
       <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto z-[60]">
