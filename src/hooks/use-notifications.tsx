@@ -106,13 +106,47 @@ export function useNotifications() {
     }
   }
 
+  const deleteNotifications = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const { error } = await (supabase.from as any)("notifications")
+      .delete()
+      .in("id", ids)
+
+    if (!error) {
+      setNotifications((prev) => {
+        const filtered = prev.filter((n) => !ids.includes(n.id))
+        setUnreadCount(filtered.filter(n => !n.is_read).length)
+        return filtered
+      })
+    }
+  }
+
+  const markNotificationsAsRead = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const { error } = await (supabase.from as any)("notifications")
+      .update({ is_read: true })
+      .in("id", ids)
+
+    if (!error) {
+      setNotifications((prev) =>
+        prev.map((n) => (ids.includes(n.id) ? { ...n, is_read: true } : n))
+      )
+      setUnreadCount((prev) => {
+        const markedReadCount = notifications.filter(n => ids.includes(n.id) && !n.is_read).length
+        return Math.max(0, prev - markedReadCount)
+      })
+    }
+  }
+
   return {
     notifications,
     unreadCount,
     isLoading,
     markAsRead,
     markAllAsRead,
+    markNotificationsAsRead,
     deleteNotification,
+    deleteNotifications,
     refresh: fetchNotifications,
   }
 }

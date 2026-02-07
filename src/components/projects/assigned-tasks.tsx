@@ -121,8 +121,10 @@ export function AssignedTasks({
       setMembers(fetchedMembers)
       setProposals(proposalsRes.data || [])
       setProjects(projectsRes.data || [])
-    } catch (error: unknown) {
-      toast.error("Failed to fetch tasks: " + (error instanceof Error ? error.message : String(error)))
+    } catch (error: any) {
+      console.error("Fetch tasks error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to fetch tasks: " + message)
     } finally {
       setIsLoading(false)
     }
@@ -155,8 +157,10 @@ export function AssignedTasks({
       if (error) throw error
       
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
-    } catch (error: unknown) {
-      toast.error("Failed to update task: " + (error instanceof Error ? error.message : String(error)))
+    } catch (error: any) {
+      console.error("Update task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to update task: " + message)
     }
   }
 
@@ -179,7 +183,7 @@ export function AssignedTasks({
         user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
         status: creatingStatus,
         order_index: tasks.filter(t => t.status === creatingStatus).length,
-        parent_id: values.parent_id || creatingParentId
+        parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId)
       }
 
       if (mode === "project") {
@@ -216,8 +220,10 @@ export function AssignedTasks({
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
-    } catch (error: unknown) {
-      toast.error("Failed to create task: " + (error instanceof Error ? error.message : String(error)))
+    } catch (error: any) {
+      console.error("Create task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to create task: " + message)
     } finally {
       setIsSubmitting(false)
     }
@@ -232,7 +238,7 @@ export function AssignedTasks({
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
-        parent_id: values.parent_id || null
+        parent_id: values.parent_id === "none" ? null : (values.parent_id || null)
       }
 
       if (mode === "project") {
@@ -255,8 +261,10 @@ export function AssignedTasks({
       setIsEditDialogOpen(false)
       setEditingTask(null)
       toast.success("Task updated successfully")
-    } catch (error: unknown) {
-      toast.error("Failed to update task: " + (error instanceof Error ? error.message : String(error)))
+    } catch (error: any) {
+      console.error("Update task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to update task: " + message)
     } finally {
       setIsSubmitting(false)
     }
@@ -309,8 +317,10 @@ export function AssignedTasks({
 
       setTasks(prev => [...prev, newTask as Task])
       toast.success("Subtask added")
-    } catch (error: unknown) {
-      toast.error("Failed to add subtask: " + (error instanceof Error ? error.message : String(error)))
+    } catch (error: any) {
+      console.error("Quick create task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to add subtask: " + message)
     }
   }
 
@@ -325,8 +335,10 @@ export function AssignedTasks({
 
       setTasks(prev => prev.filter(t => t.id !== taskId))
       toast.success("Task deleted successfully")
-    } catch (error: unknown) {
-      toast.error("Failed to delete task: " + (error instanceof Error ? error.message : String(error)))
+    } catch (error: any) {
+      console.error("Delete task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to delete task: " + message)
     }
   }
 

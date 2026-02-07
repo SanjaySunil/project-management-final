@@ -1,4 +1,5 @@
-import { Check, CheckCheck, Info, CheckCircle2, AlertCircle, MessageSquare, Trash2, AtSign, ClipboardList, Settings2, BellRing } from "lucide-react"
+import { useState } from "react"
+import { Check, CheckCheck, Info, CheckCircle2, AlertCircle, MessageSquare, Trash2, AtSign, ClipboardList, Settings2, BellRing, Square, CheckSquare } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
@@ -15,9 +16,55 @@ import { formatDistanceToNow } from "date-fns"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function NotificationsPage() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, isLoading } = useNotifications()
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    markNotificationsAsRead,
+    deleteNotification, 
+    deleteNotifications,
+    isLoading 
+  } = useNotifications()
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState("all")
+
+  const filteredNotifications = notifications.filter(n => {
+    if (activeTab === "unread") return !n.is_read
+    if (activeTab === "read") return n.is_read
+    return true
+  })
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === filteredNotifications.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredNotifications.map(n => n.id))
+    }
+  }
+
+  const handleToggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    await deleteNotifications(selectedIds)
+    setSelectedIds([])
+    toast.success(`${selectedIds.length} notifications deleted`)
+  }
+
+  const handleBulkMarkAsRead = async () => {
+    if (selectedIds.length === 0) return
+    await markNotificationsAsRead(selectedIds)
+    setSelectedIds([])
+    toast.success(`${selectedIds.length} notifications marked as read`)
+  }
 
   return (
     <PageContainer>
@@ -33,34 +80,86 @@ export default function NotificationsPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 gap-1.5 text-xs" 
-                onClick={markAllAsRead}
-              >
-                <CheckCheck className="h-3.5 w-3.5" />
-                Mark all as read
-              </Button>
+            {selectedIds.length > 0 ? (
+              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
+                <span className="text-xs text-muted-foreground mr-1">
+                  {selectedIds.length} selected
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-1.5 text-xs" 
+                  onClick={handleBulkMarkAsRead}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Mark read
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive" 
+                  onClick={handleBulkDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              </div>
+            ) : (
+              unreadCount > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-1.5 text-xs" 
+                  onClick={markAllAsRead}
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  Mark all as read
+                </Button>
+              )
             )}
           </div>
         </div>
 
         <div>
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid w-full max-w-[400px] grid-cols-4 h-9">
-              <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-              <TabsTrigger value="unread" className="text-xs">Unread</TabsTrigger>
-              <TabsTrigger value="read" className="text-xs">Read</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs gap-1.5">
-                <Settings2 className="h-3.5 w-3.5" />
-                Settings
-              </TabsTrigger>
-            </TabsList>
+          <Tabs defaultValue="all" value={activeTab} onValueChange={(val) => {
+            setActiveTab(val)
+            setSelectedIds([])
+          }} className="w-full">
+            <div className="flex items-center justify-between gap-4">
+              <TabsList className="grid w-full max-w-[400px] grid-cols-4 h-9">
+                <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+                <TabsTrigger value="unread" className="text-xs">Unread</TabsTrigger>
+                <TabsTrigger value="read" className="text-xs">Read</TabsTrigger>
+                <TabsTrigger value="settings" className="text-xs gap-1.5">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Settings
+                </TabsTrigger>
+              </TabsList>
+              
+              {activeTab !== "settings" && notifications.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 gap-1.5 text-xs px-2" 
+                    onClick={handleSelectAll}
+                  >
+                    {selectedIds.length === filteredNotifications.length && filteredNotifications.length > 0 ? (
+                      <CheckSquare className="h-3.5 w-3.5" />
+                    ) : (
+                      <Square className="h-3.5 w-3.5" />
+                    )}
+                    Select all
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <TabsContent value="all" className="mt-4">
               <NotificationList 
                 items={notifications} 
+                selectedIds={selectedIds}
+                onToggleSelection={handleToggleSelection}
                 onMarkAsRead={markAsRead} 
                 onDelete={deleteNotification}
                 isLoading={isLoading} 
@@ -69,6 +168,8 @@ export default function NotificationsPage() {
             <TabsContent value="unread" className="mt-4">
               <NotificationList 
                 items={notifications.filter(n => !n.is_read)} 
+                selectedIds={selectedIds}
+                onToggleSelection={handleToggleSelection}
                 onMarkAsRead={markAsRead} 
                 onDelete={deleteNotification}
                 isLoading={isLoading}
@@ -77,6 +178,8 @@ export default function NotificationsPage() {
             <TabsContent value="read" className="mt-4">
               <NotificationList 
                 items={notifications.filter(n => n.is_read)} 
+                selectedIds={selectedIds}
+                onToggleSelection={handleToggleSelection}
                 onMarkAsRead={markAsRead} 
                 onDelete={deleteNotification}
                 isLoading={isLoading}
@@ -253,11 +356,15 @@ function NotificationSettingsView() {
 
 function NotificationList({ 
   items, 
+  selectedIds,
+  onToggleSelection,
   onMarkAsRead,
   onDelete,
   isLoading
 }: { 
   items: Notification[],
+  selectedIds: string[],
+  onToggleSelection: (id: string) => void,
   onMarkAsRead: (id: string) => void,
   onDelete: (id: string) => void,
   isLoading: boolean
@@ -324,15 +431,32 @@ function NotificationList({
       ) : (
         items.map((notification) => {
           const Icon = getIcon(notification.type)
+          const isSelected = selectedIds.includes(notification.id)
           return (
             <div
               key={notification.id}
               className={cn(
-                "flex items-start gap-3 p-4 transition-colors hover:bg-muted/50 cursor-pointer",
-                !notification.is_read && "bg-primary/5"
+                "flex items-start gap-3 p-4 transition-colors hover:bg-muted/50 cursor-pointer group",
+                !notification.is_read && "bg-primary/5",
+                isSelected && "bg-primary/10 hover:bg-primary/15"
               )}
               onClick={() => handleNotificationClick(notification)}
             >
+              <div 
+                className="mt-1" 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleSelection(notification.id)
+                }}
+              >
+                <Checkbox 
+                  checked={isSelected} 
+                  className={cn(
+                    "h-4 w-4 transition-opacity",
+                    !isSelected && "opacity-0 group-hover:opacity-100"
+                  )}
+                />
+              </div>
               <div className={cn(
                 "mt-0.5 rounded-full p-1.5 shrink-0",
                 getTypeColor(notification.type)

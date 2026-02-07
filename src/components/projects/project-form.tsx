@@ -27,6 +27,8 @@ import { MultiSelect } from "@/components/ui/multi-select"
 const projectSchema = z.object({
   name: z.string().min(2, "Project name must be at least 2 characters"),
   description: z.string().optional(),
+  source_repo: z.string().optional().nullable(),
+  deployment_repo: z.string().optional().nullable(),
   status: z.string().min(1, "Status is required"),
   client_id: z.string().min(1, "Please select a client"),
   member_ids: z.array(z.string()),
@@ -38,6 +40,8 @@ interface ProjectFormProps {
   initialValues?: Partial<{
     name: string
     description: string | null
+    source_repo: string | null
+    deployment_repo: string | null
     status: string | null
     client_id: string | null
     member_ids: string[]
@@ -70,11 +74,22 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
     defaultValues: {
       name: initialValues?.name || "",
       description: initialValues?.description || "",
+      source_repo: (initialValues?.source_repo || "").replace("arehsoft/", ""),
+      deployment_repo: (initialValues?.deployment_repo || "").replace("sanjaysunil/", ""),
       status: initialValues?.status || "active",
       client_id: initialValues?.client_id || "",
       member_ids: initialValues?.member_ids || [],
     },
   })
+
+  const handleFormSubmit = (values: ProjectFormValues) => {
+    const finalValues = {
+      ...values,
+      source_repo: values.source_repo ? `arehsoft/${values.source_repo.replace("arehsoft/", "")}` : null,
+      deployment_repo: values.deployment_repo ? `sanjaysunil/${values.deployment_repo.replace("sanjaysunil/", "")}` : null,
+    }
+    onSubmit(finalValues)
+  }
 
   React.useEffect(() => {
     async function fetchData() {
@@ -109,7 +124,7 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -118,6 +133,50 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
               <FormLabel>Project Name <span className="text-destructive">*</span></FormLabel>
               <FormControl>
                 <Input placeholder="Website Redesign" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="source_repo"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Source Repository (GitHub)</FormLabel>
+              <FormControl>
+                <div className="flex items-center">
+                  <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">arehsoft/</span>
+                  <Input 
+                    placeholder="repo-name" 
+                    {...field} 
+                    value={field.value || ''} 
+                    className="rounded-l-none"
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="deployment_repo"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Deployment Repository (GitHub)</FormLabel>
+              <FormControl>
+                <div className="flex items-center">
+                  <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">sanjaysunil/</span>
+                  <Input 
+                    placeholder="repo-name-deploy" 
+                    {...field} 
+                    value={field.value || ''} 
+                    className="rounded-l-none"
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>

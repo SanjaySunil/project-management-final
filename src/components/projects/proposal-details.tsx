@@ -142,7 +142,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setMembers(fetchedMembers)
 
     } catch (error: any) {
-      toast.error("Failed to fetch proposal details: " + error.message)
+      console.error("Fetch proposal details error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to fetch proposal details: " + message)
     } finally {
       setIsLoading(false)
     }
@@ -183,7 +185,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setIsDialogOpen(false)
       fetchData()
     } catch (error: any) {
-      toast.error("Failed to save proposal: " + error.message)
+      console.error("Save proposal error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to save proposal: " + message)
     } finally {
       setIsSubmitting(false)
     }
@@ -200,7 +204,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       if (error) throw error
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
     } catch (error: any) {
-      toast.error("Failed to update task: " + error.message)
+      console.error("Update task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to update task: " + message)
     }
   }
 
@@ -221,7 +227,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           description: values.description,
           user_id: values.user_id === "unassigned" ? null : values.user_id,
           proposal_id: proposalId,
-          parent_id: values.parent_id || creatingParentId,
+          parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId),
           status: creatingStatus,
           order_index: tasks.filter(t => t.status === creatingStatus).length
         }])
@@ -235,7 +241,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setCreatingParentId(null)
       toast.success("Task created successfully")
     } catch (error: any) {
-      toast.error("Failed to create task: " + error.message)
+      console.error("Create task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to create task: " + message)
     } finally {
       setIsTaskSubmitting(false)
     }
@@ -249,7 +257,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
-        parent_id: values.parent_id || null,
+        parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
       const { error } = await supabase.from("tasks").update(updates).eq("id", editingTask.id)
       if (error) throw error
@@ -260,7 +268,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setEditingTask(null)
       toast.success("Task updated successfully")
     } catch (error: any) {
-      toast.error("Failed to update task: " + error.message)
+      console.error("Update task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to update task: " + message)
     } finally {
       setIsTaskSubmitting(false)
     }
@@ -285,7 +295,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setTasks(prev => [...prev, newTask as Task])
       toast.success("Subtask added")
     } catch (error: any) {
-      toast.error("Failed to add subtask: " + error.message)
+      console.error("Quick create task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to add subtask: " + message)
     }
   }
 
@@ -296,7 +308,9 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setTasks(prev => prev.filter(t => t.id !== taskId))
       toast.success("Task deleted successfully")
     } catch (error: any) {
-      toast.error("Failed to delete task: " + error.message)
+      console.error("Delete task error:", error)
+      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
+      toast.error("Failed to delete task: " + message)
     }
   }
 

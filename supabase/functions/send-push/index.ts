@@ -13,7 +13,16 @@ serve(async (req) => {
   }
 
   try {
-    const { user_id, title, content, link } = await req.json()
+    const { user_id, title, content, link, secret } = await req.json()
+
+    // Simple secret check to prevent unauthorized use
+    const INTERNAL_SECRET = Deno.env.get('INTERNAL_PUSH_SECRET')
+    if (INTERNAL_SECRET && secret !== INTERNAL_SECRET) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      })
+    }
 
     if (!user_id) {
       throw new Error('User ID is required')

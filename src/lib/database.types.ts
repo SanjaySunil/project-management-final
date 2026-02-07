@@ -41,8 +41,8 @@ export type Database = {
           id?: string
           new_data?: Json | null
           old_data?: Json | null
-          record_id?: string
-          table_name?: string
+          record_id: string
+          table_name: string
           user_id?: string | null
         }
         Relationships: [
@@ -488,6 +488,7 @@ export type Database = {
           description: string | null
           id: string
           order_index: number | null
+          parent_id: string | null
           status: string
           title: string
           user_id: string
@@ -497,6 +498,7 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number | null
+          parent_id?: string | null
           status?: string
           title: string
           user_id: string
@@ -506,11 +508,19 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number | null
+          parent_id?: string | null
           status?: string
           title?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "personal_tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "personal_tasks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "personal_tasks_user_id_fkey"
             columns: ["user_id"]
@@ -604,27 +614,33 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string | null
+          deployment_repo: string | null
           description: string | null
           id: string
           name: string
+          source_repo: string | null
           status: string | null
           user_id: string | null
         }
         Insert: {
           client_id?: string | null
           created_at?: string | null
+          deployment_repo?: string | null
           description?: string | null
           id?: string
           name: string
+          source_repo?: string | null
           status?: string | null
           user_id?: string | null
         }
         Update: {
           client_id?: string | null
           created_at?: string | null
+          deployment_repo?: string | null
           description?: string | null
           id?: string
           name?: string
+          source_repo?: string | null
           status?: string | null
           user_id?: string | null
         }
