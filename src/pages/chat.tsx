@@ -4,7 +4,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { SEO } from "@/components/seo"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
-import { Hash, Plus, MessageSquare, Send, Search, Bell, Info, ChevronDown, Globe, Settings, Trash2 } from "lucide-react"
+import { Hash, Plus, MessageSquare, Send, Search, Bell, Info, ChevronDown, Globe, Settings, Trash2, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils"
 import { usePresence } from "@/hooks/use-presence"
 import { useNotifications } from "@/hooks/use-notifications"
 import { MentionTextarea } from "@/components/mention-textarea"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface Project {
   id: string
@@ -67,6 +68,7 @@ export default function ChatPage() {
   const { user, role, checkPermission } = useAuth()
   const { isOnline } = usePresence()
   const { notifications, markAsRead } = useNotifications()
+  const isMobile = useIsMobile()
   
   const canReadChat = checkPermission('read', 'chat')
   const canCreateChannel = checkPermission('create', 'chat')
@@ -131,6 +133,17 @@ export default function ChatPage() {
       navigate("/dashboard/chat")
     }
   }, [navigate])
+
+  const handleBackToList = React.useCallback(() => {
+    if (isDMMode) {
+      navigate("/dashboard/chat/dms")
+    } else if (currentProjectId) {
+      navigate(`/dashboard/projects/${currentProjectId}/chat`)
+    } else {
+      navigate("/dashboard/chat")
+    }
+    setSelectedChannel(null)
+  }, [navigate, isDMMode, currentProjectId])
 
   const handleStartDM = React.useCallback(async (otherUser: Profile) => {
     if (!user || isCreatingDM.current) return
@@ -300,7 +313,7 @@ export default function ChatPage() {
       channelToSelect = channels.find(c => c.id === routeChannelId)
     }
     
-    if (!channelToSelect) {
+    if (!channelToSelect && !isMobile) {
       if (isDMMode) {
         // Pick first DM channel
         channelToSelect = channels.find(c => c.name.startsWith("dm--"))
@@ -318,7 +331,7 @@ export default function ChatPage() {
     } else if (!channelToSelect && selectedChannel) {
       setSelectedChannel(null)
     }
-  }, [routeChannelId, channels, isDMMode, currentProjectId, selectedChannel?.id])
+  }, [routeChannelId, channels, isDMMode, currentProjectId, selectedChannel?.id, isMobile])
 
   // Fetch messages when selectedChannel changes
   useEffect(() => {
@@ -517,7 +530,11 @@ export default function ChatPage() {
       <SEO title="Chat" description="Communicate with your team and collaborate on projects in real-time." />
       <div className="flex flex-1 h-[calc(100vh-64px)] overflow-hidden">
         {/* Chat Sidebar */}
-        <div className="flex w-64 flex-col border-r bg-muted/20">
+        <div className={cn(
+          "flex w-64 flex-col border-r bg-muted/20",
+          isMobile && selectedChannel && "hidden",
+          isMobile && !selectedChannel && "w-full"
+        )}>
           <div className="flex h-14 items-center justify-between px-4 border-b">
             {isDMMode ? (
               <div className="flex items-center h-9 px-2">
@@ -735,12 +752,20 @@ export default function ChatPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex flex-1 flex-col overflow-hidden bg-background">
+        <div className={cn(
+          "flex flex-1 flex-col overflow-hidden bg-background",
+          isMobile && !selectedChannel && "hidden"
+        )}>
           {selectedChannel ? (
             <>
               {/* Chat Header */}
               <div className="flex h-14 items-center justify-between px-4 border-b">
                 <div className="flex items-center gap-2 overflow-hidden">
+                  {isMobile && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 -ml-2" onClick={handleBackToList}>
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                  )}
                   {selectedChannel.name.startsWith("dm--") ? (
                     (() => {
                       const otherUser = getOtherUserFromDM(selectedChannel)
