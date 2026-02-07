@@ -57,7 +57,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 
-import { ROLES, type RoleData } from "@/lib/rbac"
+import { ROLES, type RoleData, canManageUsers } from "@/lib/rbac"
 
 interface Profile {
   id: string
@@ -191,7 +191,7 @@ export function UsersTable({
               <DropdownMenuItem
                 key={roleKey}
                 onClick={() => onChangeRole(row.original, roleKey)}
-                disabled={currentUserRole !== 'admin' || row.original.role === roleKey}
+                disabled={!canManageUsers(currentUserRole) || row.original.role === roleKey}
               >
                 <div className="flex flex-col gap-0.5">
                   <span className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export function UsersTable({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600" onClick={() => onDelete(row.original)} disabled={currentUserRole !== 'admin'}>
+            <DropdownMenuItem className="text-red-600" onClick={() => onDelete(row.original)} disabled={!canManageUsers(currentUserRole)}>
               <IconUserMinus className="mr-2 h-4 w-4" />
               Delete User
             </DropdownMenuItem>
