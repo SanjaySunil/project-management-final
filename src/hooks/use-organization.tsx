@@ -10,6 +10,7 @@ interface Organization {
   email: string | null
   billing_email: string | null
   logo: string | null
+  sidebar_settings?: Record<string, boolean>
 }
 
 interface OrganizationContextType {
@@ -24,6 +25,7 @@ const DEFAULT_ORG: Organization = {
   email: "",
   billing_email: "",
   logo: "",
+  sidebar_settings: {},
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)

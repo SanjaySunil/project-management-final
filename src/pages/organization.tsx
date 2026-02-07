@@ -12,12 +12,27 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { Building2, Globe, Mail, Save, Upload, AlertCircle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useOrganization } from "@/hooks/use-organization"
 import { useAuth } from "@/hooks/use-auth"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+const SIDEBAR_ITEMS = [
+  { id: "Dashboard", label: "Dashboard" },
+  { id: "My Tasks", label: "My Tasks" },
+  { id: "Notifications", label: "Notifications" },
+  { id: "Clients", label: "Clients" },
+  { id: "Projects", label: "Projects" },
+  { id: "Finances", label: "Finances" },
+  { id: "Credentials", label: "Credentials" },
+  { id: "Team Chat", label: "Team Chat" },
+  { id: "Direct Messages", label: "Direct Messages" },
+  { id: "Team", label: "Team" },
+  { id: "Audit Logs", label: "Audit Logs" },
+]
 
 export default function OrganizationPage() {
   const { role } = useAuth()
@@ -39,6 +54,16 @@ export default function OrganizationPage() {
     setLoading(true)
     await updateOrganization(orgData)
     setLoading(false)
+  }
+
+  const handleSidebarToggle = (itemId: string, enabled: boolean) => {
+    setOrgData({
+      ...orgData,
+      sidebar_settings: {
+        ...(orgData.sidebar_settings || {}),
+        [itemId]: enabled,
+      },
+    })
   }
 
   const initials = orgData.name
@@ -139,6 +164,32 @@ export default function OrganizationPage() {
 
           <Card className="col-span-4 lg:col-span-3">
             <CardHeader>
+              <CardTitle>Sidebar Configuration</CardTitle>
+              <CardDescription>
+                Toggle which pages are visible in the sidebar for all users.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4">
+                {SIDEBAR_ITEMS.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between">
+                    <Label htmlFor={`sidebar-${item.id}`} className="flex-1 cursor-pointer">
+                      {item.label}
+                    </Label>
+                    <Switch
+                      id={`sidebar-${item.id}`}
+                      checked={orgData.sidebar_settings?.[item.id] !== false}
+                      onCheckedChange={(checked) => handleSidebarToggle(item.id, checked)}
+                      disabled={!isAdmin}
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="col-span-4 lg:col-span-3">
+            <CardHeader>
               <CardTitle>Billing Contact</CardTitle>
               <CardDescription>
                 Where we should send your invoices.
@@ -161,6 +212,7 @@ export default function OrganizationPage() {
             </CardContent>
           </Card>
         </div>
+
 
         <Card>
           <CardHeader>

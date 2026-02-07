@@ -454,6 +454,7 @@ export type Database = {
           id: string
           logo: string | null
           name: string
+          sidebar_settings: Json | null
           updated_at: string | null
           vat_enabled: boolean | null
           vat_rate: number | null
@@ -466,6 +467,7 @@ export type Database = {
           id?: string
           logo?: string | null
           name: string
+          sidebar_settings?: Json | null
           updated_at?: string | null
           vat_enabled?: boolean | null
           vat_rate?: number | null
@@ -478,6 +480,7 @@ export type Database = {
           id?: string
           logo?: string | null
           name?: string
+          sidebar_settings?: Json | null
           updated_at?: string | null
           vat_enabled?: boolean | null
           vat_rate?: number | null

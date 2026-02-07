@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Link, useLocation } from "react-router-dom"
 import { ModeToggle } from "./mode-toggle"
-import { NotificationsPopover } from "./notifications-popover"
+import { NotificationsButton } from "./notifications-button"
 import React from "react"
 
 const routeMap: Record<string, string> = {
@@ -115,7 +115,7 @@ export function SiteHeader() {
       </div>
       <div className="flex items-center gap-2 px-4 lg:px-6">
         <ModeToggle />
-        <NotificationsPopover />
+        <NotificationsButton />
       </div>
     </header>
   )

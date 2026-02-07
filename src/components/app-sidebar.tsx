@@ -112,12 +112,6 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       permission: { action: "read", resource: "projects" },
     },
     {
-      title: "All Tasks",
-      url: "/dashboard/tasks",
-      icon: CheckSquare,
-      permission: { action: "read", resource: "tasks" },
-    },
-    {
       title: "Finances",
       url: "/dashboard/finances",
       icon: DollarSign,
@@ -222,10 +216,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: user?.user_metadata?.avatar_url || "/avatars/shadcn.jpg",
   }
 
-  // Helper to filter items by permission
+  // Helper to filter items by permission and sidebar settings
   const filterByPermission = (items: SidebarItem[]): SidebarItem[] => {
     console.log('Sidebar: Filtering items', items.map(i => i.title));
     return items.filter(item => {
+      // Check if item is hidden in organization settings
+      if (organization?.sidebar_settings) {
+        const isHidden = organization.sidebar_settings[item.title] === false;
+        if (isHidden) {
+          console.log(`Sidebar: Item "${item.title}" is hidden by organization settings`);
+          return false;
+        }
+      }
+
       if (item.permission) {
         const hasPerm = checkPermission(item.permission.action, item.permission.resource);
         console.log(`Sidebar: Permission check for "${item.title}": resource=${item.permission.resource}, action=${item.permission.action}, result=${hasPerm}`);
