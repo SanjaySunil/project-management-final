@@ -176,10 +176,12 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, checkPermission, loading: authLoading } = useAuth()
+  const { user, role, checkPermission, loading: authLoading } = useAuth()
   const { organization, loading: orgLoading } = useOrganization()
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
+
+  console.log(`AppSidebar render: authLoading=${authLoading}, orgLoading=${orgLoading}, role=${role}, user=${user?.id}`);
 
   // Close sidebar on mobile when location changes
   React.useEffect(() => {
@@ -189,6 +191,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, [location.pathname, isMobile, setOpenMobile])
 
   if (authLoading || orgLoading) {
+    console.log(`AppSidebar: Showing skeleton (authLoading=${authLoading}, orgLoading=${orgLoading})`);
     return (
       <Sidebar collapsible="icon" {...props}>
         <SidebarSkeleton />
@@ -221,9 +224,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Helper to filter items by permission
   const filterByPermission = (items: SidebarItem[]): SidebarItem[] => {
+    console.log('Sidebar: Filtering items', items.map(i => i.title));
     return items.filter(item => {
       if (item.permission) {
-        return checkPermission(item.permission.action, item.permission.resource)
+        const hasPerm = checkPermission(item.permission.action, item.permission.resource);
+        console.log(`Sidebar: Permission check for "${item.title}": resource=${item.permission.resource}, action=${item.permission.action}, result=${hasPerm}`);
+        return hasPerm;
       }
       return true
     }).map(item => {

@@ -31,13 +31,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single()
 
+      if (error) {
+        console.error('AuthProvider: Error fetching profile:', error)
+      }
+
+      console.log('AuthProvider: Profile data received:', data)
+
       if (data) {
+        console.log('AuthProvider: Setting role to', data.role)
         setRole(data.role ?? null)
         setOrganizationId(data.organization_id ?? null)
+      } else {
+        console.warn('AuthProvider: No profile data found for user')
       }
-      console.log('AuthProvider: Profile fetched successfully')
+      console.log('AuthProvider: Profile fetching sequence complete')
     } catch (error) {
-      console.error('AuthProvider: Error fetching supplemental data:', error)
+      console.error('AuthProvider: Unexpected error fetching supplemental data:', error)
     }
   }, [])
 

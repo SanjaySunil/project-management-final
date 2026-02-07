@@ -35,22 +35,39 @@ export function hasPermission(
   action: string, 
   resource: string
 ): boolean {
-  if (!userRole) return false;
+  console.log(`Checking permission: role=${userRole}, action=${action}, resource=${resource}`);
+  if (!userRole) {
+    console.log('Permission denied: No user role provided');
+    return false;
+  }
   
   // Normalize role
   const role = (userRole.toLowerCase() === 'admin' ? 'admin' : 'employee') as Role;
   const roleData = ROLES[role];
   
-  if (!roleData) return false;
+  if (!roleData) {
+    console.log(`Permission denied: No role data found for role=${role}`);
+    return false;
+  }
 
   const { permissions } = roleData;
   
-  if (permissions.includes('*')) return true;
-  if (permissions.includes(`${resource}:*`)) return true;
+  if (permissions.includes('*')) {
+    console.log('Permission granted: Global wildcard (*) found');
+    return true;
+  }
+  if (permissions.includes(`${resource}:*`)) {
+    console.log(`Permission granted: Resource wildcard (${resource}:*) found`);
+    return true;
+  }
   
   const permission = `${resource}:${action}`;
-  if (permissions.includes(permission)) return true;
+  if (permissions.includes(permission)) {
+    console.log(`Permission granted: Explicit permission (${permission}) found`);
+    return true;
+  }
 
+  console.log(`Permission denied: No matching permission found for ${resource}:${action}`);
   return false;
 }
 
