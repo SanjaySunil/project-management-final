@@ -452,6 +452,8 @@ export type Database = {
           logo: string | null
           name: string
           updated_at: string | null
+          vat_enabled: boolean | null
+          vat_rate: number | null
           website: string | null
         }
         Insert: {
@@ -462,6 +464,8 @@ export type Database = {
           logo?: string | null
           name: string
           updated_at?: string | null
+          vat_enabled?: boolean | null
+          vat_rate?: number | null
           website?: string | null
         }
         Update: {
@@ -472,6 +476,8 @@ export type Database = {
           logo?: string | null
           name?: string
           updated_at?: string | null
+          vat_enabled?: boolean | null
+          vat_rate?: number | null
           website?: string | null
         }
         Relationships: []
@@ -641,6 +647,7 @@ export type Database = {
           description: string | null
           id: string
           net_amount: number | null
+          order_index: number | null
           order_source: string | null
           project_id: string | null
           status: string | null
@@ -655,6 +662,7 @@ export type Database = {
           description?: string | null
           id?: string
           net_amount?: number | null
+          order_index?: number | null
           order_source?: string | null
           project_id?: string | null
           status?: string | null
@@ -669,6 +677,7 @@ export type Database = {
           description?: string | null
           id?: string
           net_amount?: number | null
+          order_index?: number | null
           order_source?: string | null
           project_id?: string | null
           status?: string | null
@@ -685,6 +694,27 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          created_at: string | null
+          id: string
+          subscription: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          subscription: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          subscription?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           created_at: string | null
@@ -692,6 +722,7 @@ export type Database = {
           description: string | null
           id: string
           order_index: number | null
+          parent_id: string | null
           proposal_id: string | null
           status: string
           title: string
@@ -703,6 +734,7 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number | null
+          parent_id?: string | null
           proposal_id?: string | null
           status?: string
           title: string
@@ -714,6 +746,7 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number | null
+          parent_id?: string | null
           proposal_id?: string | null
           status?: string
           title?: string
@@ -725,6 +758,13 @@ export type Database = {
             columns: ["deliverable_id"]
             isOneToOne: false
             referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {

@@ -156,10 +156,10 @@ export default function ClientsPage() {
     {
       accessorKey: "location",
       header: "Location",
-      accessorFn: (row) => `${row.city || ""} ${row.country || ""}`.trim(),
+      accessorFn: (row) => `${row.city || ""} ${row.state || ""} ${row.country || ""}`.trim(),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {[row.original.city, row.original.country].filter(Boolean).join(", ") || "-"}
+          {[row.original.city, row.original.state, row.original.country].filter(Boolean).join(", ") || "-"}
         </span>
       ),
     },
@@ -170,6 +170,7 @@ export default function ClientsPage() {
         <LiveTime 
           timezone={row.original.timezone} 
           country={row.original.country}
+          state={row.original.state}
           city={row.original.city}
           baseTime={baseTime}
         />
@@ -261,7 +262,10 @@ export default function ClientsPage() {
         client={viewingClient}
         open={isDetailsModalOpen}
         onOpenChange={setIsDetailsModalOpen}
-        onUpdate={fetchClients}
+        onUpdate={() => {
+          fetchClients()
+          setIsDetailsModalOpen(false)
+        }}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

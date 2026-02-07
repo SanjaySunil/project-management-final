@@ -161,8 +161,6 @@ export function UserDetailsModal({
               <AssignedTasks 
                 userId={user.id} 
                 hideHeader 
-                defaultView="table" 
-                hideViewToggle 
                 defaultStatusFilter="in progress"
               />
             </TabsContent>
@@ -182,8 +180,6 @@ export function UserDetailsModal({
               <AssignedTasks 
                 userId={user.id} 
                 hideHeader 
-                defaultView="table" 
-                hideViewToggle 
               />
             </TabsContent>
 

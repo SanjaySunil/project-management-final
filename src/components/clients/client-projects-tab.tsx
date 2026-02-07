@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
@@ -19,6 +20,8 @@ interface ClientProjectsTabProps {
 }
 
 export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user, role } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -74,6 +77,20 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
       fetchProjects()
     }
   }, [fetchProjects, clientId])
+
+  // Handle opening proposals modal from state (e.g. when navigating back from a proposal)
+  React.useEffect(() => {
+    if (!isLoading && projects.length > 0 && location.state?.openProposalsFor) {
+      const projectId = location.state.openProposalsFor
+      const project = projects.find(p => p.id === projectId)
+      if (project) {
+        setSelectedProjectForProposals(project)
+        setProposalsModalOpen(true)
+        // Clear the state so it doesn't re-open on refresh
+        navigate(location.pathname, { replace: true, state: {} })
+      }
+    }
+  }, [isLoading, projects, location.state, navigate, location.pathname])
 
   const handleAddProject = () => {
     setEditingProject(null)

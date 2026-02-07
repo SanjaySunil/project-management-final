@@ -18,18 +18,21 @@ import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
 export default function TasksPage() {
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
+  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
+  const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
+  const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const fetchInitialData = React.useCallback(async () => {
     try {
       setIsLoading(true)
       
-      const [tasksRes, membersRes] = await Promise.all([
+      const [tasksRes, membersRes, proposalsRes, projectsRes] = await Promise.all([
         supabase
           .from("tasks")
           .select(`
@@ -47,11 +50,22 @@ export default function TasksPage() {
         supabase
           .from("profiles")
           .select("*")
-          .order("full_name", { ascending: true })
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("proposals")
+          .select("*")
+          .order("order_index", { ascending: true })
+          .order("title", { ascending: true }),
+        supabase
+          .from("projects")
+          .select("*")
+          .order("name", { ascending: true })
       ])
 
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
+      if (proposalsRes.error) throw proposalsRes.error
+      if (projectsRes.error) throw projectsRes.error
 
       const fetchedMembers = membersRes.data || []
       const fetchedTasks = (tasksRes.data || []).map(task => ({
@@ -61,6 +75,8 @@ export default function TasksPage() {
 
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
+      setProposals(proposalsRes.data || [])
+      setProjects(projectsRes.data || [])
     } catch (error: unknown) {
       toast.error("Failed to fetch data: " + (error instanceof Error ? error.message : String(error)))
     } finally {
@@ -93,8 +109,9 @@ export default function TasksPage() {
     }
   }
 
-  const handleTaskCreateTrigger = (status: string) => {
+  const handleTaskCreateTrigger = (status: string, parentId?: string) => {
     setCreatingStatus(status)
+    setCreatingParentId(parentId || null)
     setIsCreateDialogOpen(true)
   }
 
@@ -115,6 +132,7 @@ export default function TasksPage() {
           description: values.description,
           user_id: values.user_id === "unassigned" ? null : values.user_id,
           proposal_id: values.proposal_id === "none" ? null : values.proposal_id,
+          parent_id: values.parent_id || creatingParentId,
           status: creatingStatus,
           order_index: tasks.filter(t => t.status === creatingStatus).length
         }])
@@ -140,6 +158,7 @@ export default function TasksPage() {
 
       setTasks(prev => [...prev, newTask as Task])
       setIsCreateDialogOpen(false)
+      setCreatingParentId(null)
       toast.success("Task created successfully")
     } catch (error: unknown) {
       toast.error("Failed to create task: " + (error instanceof Error ? error.message : String(error)))
@@ -158,6 +177,7 @@ export default function TasksPage() {
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
         proposal_id: values.proposal_id === "none" ? null : (values.proposal_id || null),
+        parent_id: values.parent_id || null,
       }
 
       const { error } = await supabase
@@ -199,10 +219,51 @@ export default function TasksPage() {
     }
   }
 
+  const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
+    try {
+      // Find parent task to inherit proposal/project if needed
+      const parentTask = tasks.find(t => t.id === parentId)
+      
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([{
+          title,
+          status,
+          parent_id: parentId,
+          proposal_id: parentTask?.proposal_id || null,
+          order_index: tasks.filter(t => t.parent_id === parentId).length
+        }])
+        .select(`
+          *,
+          proposals (
+            id,
+            title,
+            project_id,
+            projects (
+              name
+            )
+          )
+        `)
+        .single()
+
+      if (error) throw error
+
+      const newTask = {
+        ...data,
+        profiles: null
+      }
+
+      setTasks(prev => [...prev, newTask as Task])
+      toast.success("Subtask added")
+    } catch (error: unknown) {
+      toast.error("Failed to add subtask: " + (error instanceof Error ? error.message : String(error)))
+    }
+  }
+
   return (
-    <PageContainer className="h-full overflow-hidden">
+    <PageContainer className="min-h-0 overflow-hidden">
       <SEO title="Tasks - Kanban Board" />
-      <div className="flex flex-1 flex-col gap-4 h-full overflow-hidden">
+      <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-hidden">
         <div className="flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -221,6 +282,7 @@ export default function TasksPage() {
             members={members}
             onTaskUpdate={handleTaskUpdate}
             onTaskCreate={handleTaskCreateTrigger}
+            onTaskQuickCreate={handleTaskQuickCreate}
             onTaskEdit={handleTaskEditTrigger}
             onTaskDelete={handleTaskDelete}
             isLoading={isLoading}
@@ -239,9 +301,18 @@ export default function TasksPage() {
           </DialogHeader>
           <TaskForm 
             onSubmit={handleTaskCreate}
-            onCancel={() => setIsCreateDialogOpen(false)}
+            onCancel={() => {
+              setIsCreateDialogOpen(false)
+              setCreatingParentId(null)
+            }}
             isLoading={isSubmitting}
             members={members}
+            proposals={proposals}
+            projects={projects}
+            tasks={tasks}
+            defaultValues={{
+              parent_id: creatingParentId
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -262,13 +333,20 @@ export default function TasksPage() {
                 handleTaskDelete(editingTask.id)
                 setIsEditDialogOpen(false)
               }}
+              onSubtaskToggle={(id, status) => handleTaskUpdate(id, { status: status === 'complete' ? 'todo' : 'complete' })}
+              onAddSubtask={(title) => handleTaskQuickCreate(editingTask.status, editingTask.id, title)}
               isLoading={isSubmitting}
               members={members}
+              proposals={proposals}
+              projects={projects}
+              tasks={tasks}
               defaultValues={{
+                id: editingTask.id,
                 title: editingTask.title,
                 description: editingTask.description || "",
                 user_id: editingTask.user_id,
                 proposal_id: editingTask.proposal_id,
+                parent_id: editingTask.parent_id,
               }}
             />
           )}

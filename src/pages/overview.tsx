@@ -40,7 +40,7 @@ export default function OverviewPage() {
           supabase.from("projects").select("*", { count: "exact", head: true }),
           supabase.from("clients").select("*", { count: "exact", head: true }),
           supabase.from("proposals").select("amount").in("status", ["active", "complete"]),
-          supabase.from("tasks").select("*", { count: "exact", head: true }).neq("status", "done"),
+          supabase.from("tasks").select("*", { count: "exact", head: true }).neq("status", "complete"),
           supabase.from("audit_logs").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(5),
           supabase.from("projects").select("*, clients(first_name, last_name)").order("created_at", { ascending: false }).limit(5)
         ])

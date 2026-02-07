@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useNavigate, useLocation } from "react-router-dom"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
@@ -14,7 +15,7 @@ import { ProposalForm } from "@/components/projects/proposal-form"
 import type { Deliverable } from "@/components/projects/deliverables-manager"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { ProjectWithClient } from "@/components/projects/projects-table"
-import { ProposalDetailsModal } from "./proposal-details-modal"
+import { updateProjectStatus } from "@/lib/projects"
 
 type Proposal = Tables<"proposals">
 
@@ -25,6 +26,8 @@ interface ProjectProposalsModalProps {
 }
 
 export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectProposalsModalProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [proposals, setProposals] = React.useState<Proposal[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isFormOpen, setIsFormOpen] = React.useState(false)
@@ -33,8 +36,6 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [proposalToDelete, setProposalToDelete] = React.useState<string | null>(null)
-  const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
-  const [selectedProposalId, setSelectedProposalId] = React.useState<string | null>(null)
 
   const fetchProposals = React.useCallback(async () => {
     if (!project) return
@@ -45,6 +46,7 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
         .from("proposals")
         .select("*")
         .eq("project_id", project.id)
+        .order("order_index", { ascending: true })
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -55,6 +57,30 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
       setIsLoading(false)
     }
   }, [project])
+
+  const handleReorder = async (newData: Proposal[]) => {
+    // Optimistic update
+    const oldData = [...proposals]
+    setProposals(newData)
+
+    try {
+      const updatePromises = newData.map((proposal, index) => 
+        supabase
+          .from("proposals")
+          .update({ order_index: index })
+          .eq("id", proposal.id)
+      )
+
+      const results = await Promise.all(updatePromises)
+      const error = results.find(r => r.error)?.error
+
+      if (error) throw error
+      toast.success("Order updated")
+    } catch (error: any) {
+      setProposals(oldData)
+      toast.error("Failed to update order: " + error.message)
+    }
+  }
 
   const fetchDeliverables = React.useCallback(async (proposalId: string) => {
     try {
@@ -95,6 +121,11 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
         .eq("id", id)
 
       if (error) throw error
+      
+      if (project) {
+        await updateProjectStatus(project.id)
+      }
+      
       toast.success("Proposal status updated")
       fetchProposals()
     } catch (error: any) {
@@ -108,11 +139,14 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
   }
 
   const confirmDelete = async () => {
-    if (!proposalToDelete) return
+    if (!proposalToDelete || !project) return
 
     try {
       const { error } = await supabase.from("proposals").delete().eq("id", proposalToDelete)
       if (error) throw error
+      
+      await updateProjectStatus(project.id)
+      
       toast.success("Proposal deleted successfully")
       fetchProposals()
     } catch (error: any) {
@@ -145,7 +179,10 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
       } else {
         const { data, error } = await supabase
           .from("proposals")
-          .insert([proposalData])
+          .insert([{
+            ...proposalData,
+            order_index: proposals.length
+          }])
           .select()
           .single()
         if (error) throw error
@@ -180,6 +217,8 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
         }
       }
 
+      await updateProjectStatus(project.id)
+
       setIsFormOpen(false)
       fetchProposals()
     } catch (error: any) {
@@ -207,22 +246,18 @@ export function ProjectProposalsModal({ project, open, onOpenChange }: ProjectPr
               onEdit={handleEdit}
               onDelete={handleDelete}
               onView={(p) => {
-                setSelectedProposalId(p.id)
-                setDetailsModalOpen(true)
+                navigate(`/dashboard/projects/${project?.id}/proposals/${p.id}`, {
+                  state: { returnTo: location.pathname }
+                })
+                onOpenChange(false)
               }}
               onStatusChange={handleStatusChange}
+              onDataChange={handleReorder}
               isLoading={isLoading}
             />
           </div>
         </DialogContent>
       </Dialog>
-
-      <ProposalDetailsModal
-        projectId={project?.id || ""}
-        proposalId={selectedProposalId}
-        open={detailsModalOpen}
-        onOpenChange={setDetailsModalOpen}
-      />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">

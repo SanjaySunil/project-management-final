@@ -199,7 +199,11 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
           render={({ field }) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select 
+                onValueChange={field.onChange} 
+                defaultValue={field.value}
+                disabled={!!initialValues?.name}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -212,6 +216,11 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[0.8rem] text-muted-foreground">
+                {!!initialValues?.name 
+                  ? "Project status is automatically updated based on proposals." 
+                  : "Initial status for the new project."}
+              </p>
               <FormMessage />
             </FormItem>
           )}
@@ -236,7 +245,7 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
             Cancel
           </Button>
           <Button type="submit" disabled={isLoading || isFetchingData}>
-            {isLoading ? "Saving..." : "Save Project"}
+            {isLoading ? "Saving..." : (initialValues?.name ? "Save Changes" : "Save Project")}
           </Button>
         </div>
       </form>

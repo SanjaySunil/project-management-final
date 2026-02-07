@@ -28,6 +28,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "autoUpdate",
       includeAssets: ["vite.svg"],
       manifest: {
@@ -51,6 +54,10 @@ export default defineConfig({
             purpose: "any maskable",
           },
         ],
+      },
+      devOptions: {
+        enabled: true,
+        type: "module",
       },
     }),
   ],

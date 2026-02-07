@@ -13,7 +13,7 @@ export function DashboardLayout({ children, className }: { children?: React.Reac
       <AppSidebar />
       <SidebarInset>
         <SiteHeader />
-        <div className={cn("flex flex-1 flex-col @container/main", className)}>
+        <div className={cn("flex flex-1 flex-col min-h-0 overflow-y-auto @container/main", className)}>
           {children || <Outlet />}
         </div>
       </SidebarInset>

@@ -10,7 +10,7 @@ import {
   IconX
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-import { DataTable } from "@/components/data-table"
+import { DataTable, DragHandle } from "@/components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -39,12 +39,33 @@ interface ProposalsTableProps {
   onDelete: (id: string) => void
   onView?: (proposal: Proposal) => void
   onStatusChange?: (id: string, status: string) => void
+  onDataChange?: (data: Proposal[]) => void
   isLoading?: boolean
 }
 
-export function ProposalsTable({ data, projectId, onEdit, onDelete, onView, onStatusChange, isLoading }: ProposalsTableProps) {
+export function ProposalsTable({ 
+  data, 
+  projectId, 
+  onEdit, 
+  onDelete, 
+  onView, 
+  onStatusChange, 
+  onDataChange,
+  isLoading 
+}: ProposalsTableProps) {
 
   const columns: ColumnDef<Proposal>[] = [
+    {
+      id: "drag-handle",
+      header: "",
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center">
+          <DragHandle id={row.original.id} />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       id: "select",
       header: ({ table }) => (
@@ -245,6 +266,8 @@ export function ProposalsTable({ data, projectId, onEdit, onDelete, onView, onSt
       addLabel="Create Proposal"
       onAdd={() => onEdit(null as any)}
       isLoading={isLoading}
+      enableReordering={true}
+      onDataChange={onDataChange}
     />
   )
 }

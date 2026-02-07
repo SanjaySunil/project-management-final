@@ -1,6 +1,6 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconTable, IconLayoutKanban, IconFilter, IconClipboardList, IconUser, IconBriefcase, IconList, IconPlus } from "@tabler/icons-react"
+import { IconFilter, IconClipboardList, IconUser, IconBriefcase, IconPlus } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
@@ -50,12 +50,14 @@ export function AssignedTasks({
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
+  const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
+  const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const fetchTasks = React.useCallback(async () => {
@@ -64,7 +66,7 @@ export function AssignedTasks({
     try {
       setIsLoading(true)
       
-      const [membersRes, proposalsRes] = await Promise.all([
+      const [membersRes, proposalsRes, projectsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("*")
@@ -72,7 +74,12 @@ export function AssignedTasks({
         supabase
           .from("proposals")
           .select("*")
-          .order("title", { ascending: true })
+          .order("order_index", { ascending: true })
+          .order("title", { ascending: true }),
+        supabase
+          .from("projects")
+          .select("*")
+          .order("name", { ascending: true })
       ])
 
       let tasksRes
@@ -102,6 +109,7 @@ export function AssignedTasks({
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
       if (proposalsRes.error) throw proposalsRes.error
+      if (projectsRes.error) throw projectsRes.error
 
       const fetchedMembers = membersRes.data || []
       const fetchedTasks = (tasksRes.data || []).map((task: any) => ({
@@ -112,6 +120,7 @@ export function AssignedTasks({
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
       setProposals(proposalsRes.data || [])
+      setProjects(projectsRes.data || [])
     } catch (error: unknown) {
       toast.error("Failed to fetch tasks: " + (error instanceof Error ? error.message : String(error)))
     } finally {
@@ -151,8 +160,9 @@ export function AssignedTasks({
     }
   }
 
-  const handleTaskCreateTrigger = (status: string) => {
+  const handleTaskCreateTrigger = (status: string, parentId?: string) => {
     setCreatingStatus(status)
+    setCreatingParentId(parentId || null)
     setIsCreateDialogOpen(true)
   }
 
@@ -168,7 +178,8 @@ export function AssignedTasks({
         description: values.description,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
         status: creatingStatus,
-        order_index: tasks.filter(t => t.status === creatingStatus).length
+        order_index: tasks.filter(t => t.status === creatingStatus).length,
+        parent_id: values.parent_id || creatingParentId
       }
 
       if (mode === "project") {
@@ -203,6 +214,7 @@ export function AssignedTasks({
 
       setTasks(prev => [...prev, newTask as Task])
       setIsCreateDialogOpen(false)
+      setCreatingParentId(null)
       toast.success("Task created successfully")
     } catch (error: unknown) {
       toast.error("Failed to create task: " + (error instanceof Error ? error.message : String(error)))
@@ -220,6 +232,7 @@ export function AssignedTasks({
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+        parent_id: values.parent_id || null
       }
 
       if (mode === "project") {
@@ -246,6 +259,58 @@ export function AssignedTasks({
       toast.error("Failed to update task: " + (error instanceof Error ? error.message : String(error)))
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
+    if (!targetUserId) return
+
+    try {
+      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const parentTask = tasks.find(t => t.id === parentId)
+      
+      const payload: any = {
+        title,
+        status,
+        parent_id: parentId,
+        user_id: targetUserId,
+        order_index: tasks.filter(t => t.parent_id === parentId).length
+      }
+
+      if (mode === "project") {
+        payload.proposal_id = parentTask?.proposal_id || null
+      }
+
+      const query = (supabase.from as any)(table).insert([payload])
+      
+      let res
+      if (mode === "project") {
+        res = await query.select(`
+          *,
+          proposals (
+            id,
+            title,
+            project_id,
+            projects (
+              name
+            )
+          )
+        `).single()
+      } else {
+        res = await query.select("*").single()
+      }
+
+      if (res.error) throw res.error
+
+      const newTask = {
+        ...res.data,
+        profiles: members.find(m => m.id === res.data.user_id) || null
+      }
+
+      setTasks(prev => [...prev, newTask as Task])
+      toast.success("Subtask added")
+    } catch (error: unknown) {
+      toast.error("Failed to add subtask: " + (error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -382,6 +447,7 @@ export function AssignedTasks({
             members={members}
             onTaskUpdate={handleTaskUpdate}
             onTaskCreate={handleTaskCreateTrigger}
+            onTaskQuickCreate={handleTaskQuickCreate}
             onTaskEdit={(task) => {
               setEditingTask(task as Task)
               setIsEditDialogOpen(true)
@@ -402,13 +468,19 @@ export function AssignedTasks({
           </DialogHeader>
           <TaskForm 
             onSubmit={handleTaskCreate}
-            onCancel={() => setIsCreateDialogOpen(false)}
+            onCancel={() => {
+              setIsCreateDialogOpen(false)
+              setCreatingParentId(null)
+            }}
             isLoading={isSubmitting}
             members={members}
             proposals={proposals}
+            projects={projects}
+            tasks={tasks}
             hideAssignee={mode === "personal"}
             defaultValues={{
-              user_id: targetUserId
+              user_id: targetUserId,
+              parent_id: creatingParentId
             }}
           />
         </DialogContent>
@@ -430,15 +502,21 @@ export function AssignedTasks({
                 handleTaskDelete(editingTask.id)
                 setIsEditDialogOpen(false)
               }}
+              onSubtaskToggle={(id, status) => handleTaskUpdate(id, { status: status === 'complete' ? 'todo' : 'complete' })}
+              onAddSubtask={(title) => handleTaskQuickCreate(editingTask.status, editingTask.id, title)}
               isLoading={isSubmitting}
               members={members}
               proposals={proposals}
+              projects={projects}
+              tasks={tasks}
               hideAssignee={mode === "personal"}
               defaultValues={{
+                id: editingTask.id,
                 title: editingTask.title,
                 description: editingTask.description || "",
                 user_id: editingTask.user_id,
                 proposal_id: editingTask.proposal_id,
+                parent_id: editingTask.parent_id,
               }}
             />
           )}

@@ -1,6 +1,4 @@
-import * as React from "react"
 import { useParams, Link } from "react-router-dom"
-import { IconArrowLeft } from "@tabler/icons-react"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
 import { Button } from "@/components/ui/button"
@@ -25,19 +23,9 @@ export default function ProposalOverviewPage() {
   }
 
   return (
-    <PageContainer className="h-full overflow-hidden">
+    <PageContainer className="p-0 lg:p-0 min-h-0 overflow-hidden">
       <SEO title="Proposal Details" />
-      <div className="flex flex-1 flex-col gap-4 h-full overflow-hidden">
-        <div className="flex flex-col gap-2 shrink-0">
-          <div className="flex items-center justify-between">
-            <Button asChild variant="ghost" className="w-fit -ml-2 h-8 text-muted-foreground">
-              <Link to={`/dashboard/projects/${projectId}`}>
-                <IconArrowLeft className="mr-2 h-4 w-4" /> Back to Project
-              </Link>
-            </Button>
-          </div>
-        </div>
-
+      <div className="flex flex-1 flex-col gap-2 min-h-0 overflow-hidden pt-4 lg:pt-6">
         <ProposalDetails projectId={projectId} proposalId={proposalId} />
       </div>
     </PageContainer>

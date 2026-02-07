@@ -41,7 +41,11 @@ export function ClientDetailsModal({
               <TabsTrigger value="projects">Projects</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
-              <ClientOverview clientId={client.id} onUpdate={onUpdate} />
+              <ClientOverview 
+                clientId={client.id} 
+                onUpdate={onUpdate} 
+                onCancel={() => onOpenChange(false)}
+              />
             </TabsContent>
             <TabsContent value="projects" className="mt-4">
               <ClientProjectsTab clientId={client.id} />

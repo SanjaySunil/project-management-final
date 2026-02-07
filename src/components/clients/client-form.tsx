@@ -61,6 +61,62 @@ interface ClientFormProps {
   isLoading?: boolean
 }
 
+const STATE_TIMEZONES: Record<string, string> = {
+  // US States
+  "alabama": "America/Chicago",
+  "alaska": "America/Anchorage",
+  "arizona": "America/Phoenix",
+  "arkansas": "America/Chicago",
+  "california": "America/Los_Angeles",
+  "colorado": "America/Denver",
+  "connecticut": "America/New_York",
+  "delaware": "America/New_York",
+  "dc": "America/New_York",
+  "district of columbia": "America/New_York",
+  "florida": "America/New_York",
+  "georgia": "America/New_York",
+  "hawaii": "Pacific/Honolulu",
+  "idaho": "America/Boise",
+  "illinois": "America/Chicago",
+  "indiana": "America/Indiana/Indianapolis",
+  "iowa": "America/Chicago",
+  "kansas": "America/Chicago",
+  "kentucky": "America/New_York",
+  "louisiana": "America/Chicago",
+  "maine": "America/New_York",
+  "maryland": "America/New_York",
+  "massachusetts": "America/New_York",
+  "michigan": "America/Detroit",
+  "minnesota": "America/Chicago",
+  "mississippi": "America/Chicago",
+  "missouri": "America/Chicago",
+  "montana": "America/Denver",
+  "nebraska": "America/Chicago",
+  "nevada": "America/Los_Angeles",
+  "new hampshire": "America/New_York",
+  "new jersey": "America/New_York",
+  "new mexico": "America/Denver",
+  "new york": "America/New_York",
+  "north carolina": "America/New_York",
+  "north dakota": "America/Chicago",
+  "ohio": "America/New_York",
+  "oklahoma": "America/Chicago",
+  "oregon": "America/Los_Angeles",
+  "pennsylvania": "America/New_York",
+  "rhode island": "America/New_York",
+  "south carolina": "America/New_York",
+  "south dakota": "America/Chicago",
+  "tennessee": "America/Chicago",
+  "texas": "America/Chicago",
+  "utah": "America/Denver",
+  "vermont": "America/New_York",
+  "virginia": "America/New_York",
+  "washington": "America/Los_Angeles",
+  "west virginia": "America/New_York",
+  "wisconsin": "America/Chicago",
+  "wyoming": "America/Denver",
+}
+
 export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: ClientFormProps) {
   const [countriesList, setCountriesList] = React.useState<any[]>([])
   const [statesList, setStatesList] = React.useState<any[]>([])
@@ -276,6 +332,14 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
                               GetCity(selectedCountry.id, state.id).then((result) => {
                                 setCitiesList(result)
                               })
+
+                              // Auto-set timezone based on state if country is USA
+                              if (selectedCountry.iso2 === 'US' || selectedCountry.name?.toLowerCase() === 'united states') {
+                                const stateTz = STATE_TIMEZONES[state.name.toLowerCase()]
+                                if (stateTz) {
+                                  form.setValue("timezone", stateTz)
+                                }
+                              }
                             }
                             setIsStatePickerOpen(false)
                           }}
@@ -394,7 +458,7 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
             Cancel
           </Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Client"}
+            {isLoading ? "Saving..." : (initialValues?.first_name ? "Save Changes" : "Save Client")}
           </Button>
         </div>
       </form>

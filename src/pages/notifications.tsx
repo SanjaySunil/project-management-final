@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Info, CheckCircle2, AlertCircle, MessageSquare, Trash2, AtSign, ClipboardList, Settings2 } from "lucide-react"
+import { Check, CheckCheck, Info, CheckCircle2, AlertCircle, MessageSquare, Trash2, AtSign, ClipboardList, Settings2, BellRing } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useNotifications } from "@/hooks/use-notifications"
 import { useNotificationSettings } from "@/hooks/use-notification-settings"
+import { usePushNotifications } from "@/hooks/use-push-notifications"
 import type { Notification } from "@/hooks/use-notifications"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDistanceToNow } from "date-fns"
@@ -93,6 +94,7 @@ export default function NotificationsPage() {
 
 function NotificationSettingsView() {
   const { settings, updateSettings, isLoading } = useNotificationSettings()
+  const { permission, requestPermission } = usePushNotifications()
 
   const handleToggle = async (key: string, value: boolean) => {
     const success = await updateSettings({ [key]: value })
@@ -100,6 +102,14 @@ function NotificationSettingsView() {
       toast.success("Settings updated")
     } else {
       toast.error("Failed to update settings")
+    }
+  }
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      await requestPermission()
+    } else {
+      toast.info("To disable push notifications completely, please update your browser settings.")
     }
   }
 
@@ -142,6 +152,28 @@ function NotificationSettingsView() {
         </div>
         
         <div className="divide-y">
+          {/* Push Notifications */}
+          <div className="px-6 py-4 flex items-center justify-between gap-4 transition-colors hover:bg-muted/10">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 p-2.5 rounded-xl shrink-0">
+                <BellRing className="h-5 w-5" />
+              </div>
+              <div className="space-y-0.5">
+                <Label htmlFor="push_enabled" className="text-sm font-bold cursor-pointer">
+                  Browser Push Notifications
+                </Label>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  Receive notifications even when the app is closed.
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="push_enabled"
+              checked={permission === "granted"}
+              onCheckedChange={handlePushToggle}
+            />
+          </div>
+
           {/* Direct Messages */}
           <div className="px-6 py-4 flex items-center justify-between gap-4 transition-colors hover:bg-muted/10">
             <div className="flex items-center gap-4 flex-1">

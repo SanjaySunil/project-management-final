@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
@@ -15,9 +16,12 @@ import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
 import { ProjectDetailsModal } from "@/components/projects/project-details-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { updateProjectStatus } from "@/lib/projects"
 import type { Tables } from "@/lib/database.types"
 
 export default function ProjectsPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user, role } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])
   const [profiles, setProfiles] = React.useState<Tables<"profiles">[]>([])
@@ -76,7 +80,18 @@ export default function ProjectsPage() {
       const { data, error } = await query.order("created_at", { ascending: false })
 
       if (error) throw error
-      setProjects((data as any) || [])
+      
+      const projectsWithSync = (data as any) || []
+      
+      // Update statuses in background/parallel to ensure consistency
+      // Note: In a real production app with many projects, you'd do this 
+      // via a database trigger or cron job instead of client-side.
+      await Promise.all(projectsWithSync.map(async (p: any) => {
+        const syncedStatus = await updateProjectStatus(p.id)
+        p.status = syncedStatus
+      }))
+
+      setProjects(projectsWithSync)
     } catch (error: any) {
       toast.error("Failed to fetch projects: " + error.message)
     } finally {
@@ -88,6 +103,20 @@ export default function ProjectsPage() {
     fetchProjects()
     fetchProfiles()
   }, [fetchProjects, fetchProfiles])
+
+  // Handle opening proposals modal from state (e.g. when navigating back from a proposal)
+  React.useEffect(() => {
+    if (!isLoading && projects.length > 0 && location.state?.openProposalsFor) {
+      const projectId = location.state.openProposalsFor
+      const project = projects.find(p => p.id === projectId)
+      if (project) {
+        setSelectedProject(project)
+        setDetailsModalOpen(true)
+        // Clear the state so it doesn't re-open on refresh
+        navigate(location.pathname, { replace: true, state: {} })
+      }
+    }
+  }, [isLoading, projects, location.state, navigate, location.pathname])
 
   const handleAddProject = () => {
     setEditingProject(null)
@@ -226,6 +255,7 @@ export default function ProjectsPage() {
             onViewProposals={handleViewDetails}
             onRowClick={handleViewDetails}
             onAssignMembers={handleAssignMembers}
+            defaultTab="active"
           />
         </div>
       </div>
@@ -234,7 +264,10 @@ export default function ProjectsPage() {
         project={selectedProject}
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
-        onProjectUpdated={fetchProjects}
+        onProjectUpdated={() => {
+          fetchProjects()
+          setDetailsModalOpen(false)
+        }}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

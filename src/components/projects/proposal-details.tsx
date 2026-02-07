@@ -60,6 +60,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
+  const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isTaskSubmitting, setIsTaskSubmitting] = React.useState(false)
 
   // Chat state
@@ -203,6 +204,12 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     }
   }
 
+  const handleTaskCreateTrigger = (status: string, parentId?: string) => {
+    setCreatingStatus(status)
+    setCreatingParentId(parentId || null)
+    setIsCreateDialogOpen(true)
+  }
+
   const handleTaskCreate = async (values: TaskFormValues) => {
     if (!creatingStatus) return
     try {
@@ -214,6 +221,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           description: values.description,
           user_id: values.user_id === "unassigned" ? null : values.user_id,
           proposal_id: proposalId,
+          parent_id: values.parent_id || creatingParentId,
           status: creatingStatus,
           order_index: tasks.filter(t => t.status === creatingStatus).length
         }])
@@ -224,6 +232,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       const newTask = { ...data, profiles: members.find(m => m.id === data.user_id) || null }
       setTasks(prev => [...prev, newTask as Task])
       setIsCreateDialogOpen(false)
+      setCreatingParentId(null)
       toast.success("Task created successfully")
     } catch (error: any) {
       toast.error("Failed to create task: " + error.message)
@@ -240,6 +249,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         title: values.title,
         description: values.description || null,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+        parent_id: values.parent_id || null,
       }
       const { error } = await supabase.from("tasks").update(updates).eq("id", editingTask.id)
       if (error) throw error
@@ -253,6 +263,29 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       toast.error("Failed to update task: " + error.message)
     } finally {
       setIsTaskSubmitting(false)
+    }
+  }
+
+  const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([{
+          title,
+          status,
+          parent_id: parentId,
+          proposal_id: proposalId,
+          order_index: tasks.filter(t => t.parent_id === parentId).length
+        }])
+        .select(`*, proposals(id, title, project_id, projects(name))`)
+        .single()
+
+      if (error) throw error
+      const newTask = { ...data, profiles: null }
+      setTasks(prev => [...prev, newTask as Task])
+      toast.success("Subtask added")
+    } catch (error: any) {
+      toast.error("Failed to add subtask: " + error.message)
     }
   }
 
@@ -274,7 +307,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     async function setupChat() {
       setIsChatLoading(true)
       // Find or create channel for this proposal
-      let { data: channelData, error: channelError } = await supabase
+      const { data: initialChannelData, error: channelError } = await supabase
         .from("channels")
         .select("*")
         .eq("proposal_id", proposalId)
@@ -286,6 +319,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         return
       }
 
+      let channelData = initialChannelData
       if (!channelData) {
         // Create channel
         const { data: newChannel, error: createError } = await supabase
@@ -401,7 +435,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   if (isLoading && !proposal) {
     return (
       <div className="flex flex-1 flex-col gap-4">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 px-4 lg:px-6">
           <Skeleton className="h-8 w-48" />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
             <div className="flex items-center gap-3">
@@ -417,12 +451,12 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
             </div>
           </div>
         </div>
-        <div className="flex gap-4 border-b pb-1">
+        <div className="flex gap-4 border-b pb-1 px-4 lg:px-6">
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-24" />
         </div>
-        <div className="grid gap-6 md:grid-cols-3 mt-4">
+        <div className="grid gap-6 md:grid-cols-3 mt-4 px-4 lg:px-6">
           <div className="md:col-span-2 space-y-6">
             <Skeleton className="h-48 w-full" />
             <Skeleton className="h-64 w-full" />
@@ -445,7 +479,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-hidden">
-      <div className="flex flex-col gap-2 shrink-0">
+      <div className="flex flex-col gap-2 shrink-0 px-4 lg:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -471,19 +505,21 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       </div>
 
       <Tabs defaultValue="kanban" className="flex-1 flex flex-col gap-4 min-h-0">
-        <TabsList className="w-fit shrink-0">
-          <TabsTrigger value="overview" className="gap-2">
-            <IconFileText className="h-4 w-4" /> Overview
-          </TabsTrigger>
-          <TabsTrigger value="kanban" className="gap-2">
-            <IconLayoutKanban className="h-4 w-4" /> Kanban
-          </TabsTrigger>
-          <TabsTrigger value="messages" className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Messages
-          </TabsTrigger>
-        </TabsList>
+        <div className="px-4 lg:px-6 shrink-0">
+          <TabsList className="w-fit">
+            <TabsTrigger value="overview" className="gap-2">
+              <IconFileText className="h-4 w-4" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="kanban" className="gap-2">
+              <IconLayoutKanban className="h-4 w-4" /> Kanban
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="gap-2">
+              <MessageSquare className="h-4 w-4" /> Messages
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="overview" className="flex-1 overflow-y-auto">
+        <TabsContent value="overview" className="flex-1 overflow-y-auto px-4 lg:px-6">
           <div className="flex flex-col gap-6 pb-6">
             <div className="flex justify-end">
               <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
@@ -555,7 +591,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
               tasks={tasks} 
               members={members}
               onTaskUpdate={handleTaskUpdate}
-              onTaskCreate={(status) => { setCreatingStatus(status); setIsCreateDialogOpen(true); }}
+              onTaskCreate={handleTaskCreateTrigger}
+              onTaskQuickCreate={handleTaskQuickCreate}
               onTaskEdit={(task) => { setEditingTask(task); setIsEditDialogOpen(true); }}
               onTaskDelete={handleTaskDelete}
               isLoading={isLoading}
@@ -563,7 +600,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           </div>
         </TabsContent>
 
-        <TabsContent value="messages" className="flex-1 min-h-0">
+        <TabsContent value="messages" className="flex-1 min-h-0 flex flex-col px-4 lg:px-6 pb-4 lg:pb-6 mt-2">
           <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
             <div className="flex h-12 items-center px-4 border-b bg-muted/30">
               <Hash className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -632,7 +669,19 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
             <DialogTitle>Create New Task</DialogTitle>
             <DialogDescription>Add a new task to the {creatingStatus} column.</DialogDescription>
           </DialogHeader>
-          <TaskForm onSubmit={handleTaskCreate} onCancel={() => setIsCreateDialogOpen(false)} isLoading={isTaskSubmitting} members={members} />
+          <TaskForm 
+            onSubmit={handleTaskCreate} 
+            onCancel={() => {
+              setIsCreateDialogOpen(false)
+              setCreatingParentId(null)
+            }} 
+            isLoading={isTaskSubmitting} 
+            members={members} 
+            tasks={tasks}
+            defaultValues={{
+              parent_id: creatingParentId
+            }}
+          />
         </DialogContent>
       </Dialog>
 
@@ -650,9 +699,19 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
                 handleTaskDelete(editingTask.id)
                 setIsEditDialogOpen(false)
               }}
+              onSubtaskToggle={(id, status) => handleTaskUpdate(id, { status: status === 'complete' ? 'todo' : 'complete' })}
+              onAddSubtask={(title) => handleTaskQuickCreate(editingTask.status, editingTask.id, title)}
               isLoading={isTaskSubmitting} 
               members={members}
-              defaultValues={{ title: editingTask.title, description: editingTask.description || "", user_id: editingTask.user_id, proposal_id: editingTask.proposal_id }}
+              tasks={tasks}
+              defaultValues={{ 
+                id: editingTask.id,
+                title: editingTask.title, 
+                description: editingTask.description || "", 
+                user_id: editingTask.user_id, 
+                proposal_id: editingTask.proposal_id,
+                parent_id: editingTask.parent_id
+              }}
             />
           )}
         </DialogContent>

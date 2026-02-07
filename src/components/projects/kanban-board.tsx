@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,17 +55,19 @@ const customCollisionDetection: CollisionDetection = (args) => {
 
 export type Task = {
   id: string
-  created_at?: string | null
+  created_at: string | null
   title: string
-  description?: string | null
+  description: string | null
   status: string
-  order_index?: number | null
-  user_id?: string | null
-  deliverable_id?: string | null
-  proposal_id?: string | null
+  order_index: number | null
+  user_id: string | null
+  parent_id: string | null
+  deliverable_id: string | null
+  proposal_id: string | null
   proposals?: {
     id: string
     title: string
+    project_id?: string | null
     projects?: {
       name: string
     } | null
@@ -81,7 +83,8 @@ interface KanbanBoardProps {
   tasks: Task[]
   members: Tables<"profiles">[]
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
-  onTaskCreate: (status: string) => void
+  onTaskCreate: (status: string, parentId?: string) => void
+  onTaskQuickCreate?: (status: string, parentId: string, title: string) => void | Promise<void>
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
   hideControls?: boolean
@@ -102,9 +105,10 @@ export function KanbanBoard({
   members,
   onTaskUpdate,
   onTaskCreate,
+  onTaskQuickCreate,
   onTaskEdit,
   onTaskDelete,
-  hideControls = false,
+  hideControls = true,
   hideCreate = false,
   isLoading = false
 }: KanbanBoardProps) {
@@ -139,7 +143,12 @@ export function KanbanBoard({
   const tasksByStatus = React.useMemo(() => {
     const groups: Record<string, Task[]> = {}
     COLUMNS.forEach((col) => (groups[col.id] = []))
-    tasks.forEach((task) => {
+    
+    // Get a set of IDs for quick lookup
+    const taskIds = new Set(tasks.map(t => t.id))
+    
+    // Only include tasks that are top-level OR whose parent is NOT in this list
+    tasks.filter(t => !t.parent_id || !taskIds.has(t.parent_id)).forEach((task) => {
       const status = task.status
       if (groups[status]) {
         groups[status].push(task)
@@ -153,6 +162,11 @@ export function KanbanBoard({
       groups[status].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
     })
     return groups
+  }, [tasks])
+
+  // Get subtasks for a task
+  const getSubtasks = React.useCallback((taskId: string) => {
+    return tasks.filter(t => t.parent_id === taskId)
   }, [tasks])
 
   function handleDragStart(event: DragStartEvent) {
@@ -276,9 +290,9 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex flex-col gap-4 h-full overflow-hidden">
+    <div className="flex flex-1 flex-col gap-3 min-h-0 overflow-hidden">
       {!hideControls && (
-        <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center justify-between shrink-0 px-4 lg:px-6">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm font-medium">
             <IconLayoutKanban className="size-4" />
             Kanban
@@ -294,9 +308,9 @@ export function KanbanBoard({
       )}
 
       {isLoading ? (
-        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0">
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0 px-4 lg:px-6">
           {COLUMNS.map((column) => (
-            <div key={column.id} className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-lg bg-muted/50 p-3">
+            <div key={column.id} className="flex h-full w-80 shrink-0 flex-col gap-3 rounded-lg bg-muted/50 p-3">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-24" />
@@ -324,7 +338,7 @@ export function KanbanBoard({
           ))}
         </div>
       ) : (
-        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0">
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0 px-4 lg:px-6">
           <DndContext
             sensors={sensors}
             collisionDetection={customCollisionDetection}
@@ -340,9 +354,12 @@ export function KanbanBoard({
                 tasks={tasksByStatus[column.id]}
                 members={members}
                 onAddTask={!hideCreate ? () => onTaskCreate(column.id) : undefined}
+                onAddSubtask={!hideCreate ? (parentId) => onTaskCreate(column.id, parentId) : undefined}
+                onQuickAddSubtask={!hideCreate && onTaskQuickCreate ? (parentId, title) => onTaskQuickCreate(column.id, parentId, title) : undefined}
                 onTaskEdit={onTaskEdit}
                 onTaskUpdate={onTaskUpdate}
                 onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
+                getSubtasks={getSubtasks}
               />
             ))}
 
@@ -352,9 +369,10 @@ export function KanbanBoard({
                   task={activeTask} 
                   isOverlay 
                   members={members} 
-                  onEdit={() => onTaskEdit(activeTask)}
-                  onUpdate={(updates) => onTaskUpdate(activeTask.id, updates)}
+                  onEdit={onTaskEdit}
+                  onUpdate={onTaskUpdate}
                   onDelete={() => setIsDeleteDialogOpen(activeTask.id)}
+                  subtasks={getSubtasks(activeTask.id)}
                 />
               ) : null}
             </DragOverlay>
@@ -384,12 +402,15 @@ interface KanbanColumnProps {
   tasks: Task[]
   members: Tables<"profiles">[]
   onAddTask?: () => void
+  onAddSubtask?: (parentId: string) => void
+  onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
+  getSubtasks: (taskId: string) => Task[]
 }
 
-function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTaskUpdate, onTaskDelete }: KanbanColumnProps) {
+function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskDelete, getSubtasks }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: id,
   })
@@ -397,7 +418,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTask
   return (
     <div 
       ref={setNodeRef}
-      className="flex h-full w-72 flex-col gap-3 rounded-lg bg-muted/50 p-3"
+      className="flex h-full w-80 shrink-0 flex-col gap-3 rounded-lg bg-muted/50 p-3"
     >
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
@@ -432,6 +453,9 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onTaskEdit, onTask
               onEdit={onTaskEdit}
               onUpdate={onTaskUpdate}
               onTaskDelete={onTaskDelete}
+              onAddSubtask={onAddSubtask}
+              onQuickAddSubtask={onQuickAddSubtask}
+              subtasks={getSubtasks(task.id)}
             />
           ))}
           {tasks.length === 0 && (
@@ -451,9 +475,12 @@ interface SortableTaskCardProps {
   onEdit: (task: Task) => void | Promise<void>
   onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
+  onAddSubtask?: (parentId: string) => void
+  onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
+  subtasks: Task[]
 }
 
-function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete }: SortableTaskCardProps) {
+function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAddSubtask, onQuickAddSubtask, subtasks }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -489,9 +516,12 @@ function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete }: Sor
       <TaskCard 
         task={task} 
         members={members} 
-        onEdit={() => onEdit(task)}
-        onUpdate={(updates) => onUpdate(task.id, updates)}
+        onEdit={onEdit}
+        onUpdate={onUpdate}
         onDelete={() => onTaskDelete(task.id)}
+        onAddSubtask={onAddSubtask}
+        onQuickAddSubtask={onQuickAddSubtask}
+        subtasks={subtasks}
       />
     </div>
   )
@@ -501,20 +531,44 @@ interface TaskCardProps {
   task: Task
   isOverlay?: boolean
   members: Tables<"profiles">[]
-  onEdit: () => void | Promise<void>
-  onUpdate: (updates: Partial<Task>) => void | Promise<void>
+  onEdit: (task: Task) => void | Promise<void>
+  onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onDelete: () => void
+  onAddSubtask?: (parentId: string) => void
+  onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
+  subtasks: Task[]
 }
 
-function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete }: TaskCardProps) {
+function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddSubtask, onQuickAddSubtask, subtasks }: TaskCardProps) {
+  const [isAddingSubtask, setIsAddingSubtask] = React.useState(false)
+  const [newSubtaskTitle, setNewSubtaskTitle] = React.useState("")
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
   const userInitials = task.profiles?.full_name
     ? task.profiles.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
     : task.profiles?.email?.slice(0, 2).toUpperCase() || '?'
 
+  const completedSubtasks = subtasks.filter(st => st.status === 'complete').length
+
+  const handleQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newSubtaskTitle.trim() || !onQuickAddSubtask) return
+    
+    await onQuickAddSubtask(task.id, newSubtaskTitle.trim())
+    setNewSubtaskTitle("")
+    setIsAddingSubtask(false)
+  }
+
+  React.useEffect(() => {
+    if (isAddingSubtask && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isAddingSubtask])
+
   return (
     <Card 
       className={`group relative cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors ${isOverlay ? "ring-2 ring-primary" : ""}`}
-      onClick={onEdit}
+      onClick={() => onEdit(task)}
     >
       <CardHeader className="p-3">
         <div className="flex items-start justify-between gap-2">
@@ -522,28 +576,118 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete }: Task
             {task.title}
           </CardTitle>
           {!isOverlay && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-            >
-              <IconTrash className="size-3.5" />
-            </Button>
+            <div className="flex gap-1">
+              {onAddSubtask && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsAddingSubtask(true)
+                  }}
+                >
+                  <IconPlus className="size-3.5" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+              >
+                <IconTrash className="size-3.5" />
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
 
-      {(task.description || members.length > 0) && (
+      {(task.description || members.length > 0 || subtasks.length > 0 || isAddingSubtask) && (
         <CardContent className="px-3 pb-3 pt-0">
           {task.description && (
             <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
               {task.description}
             </p>
           )}
+
+          {(subtasks.length > 0 || isAddingSubtask) && (
+            <div className="mb-3 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Subtasks</span>
+                <span>{completedSubtasks}/{subtasks.length}</span>
+              </div>
+              <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all" 
+                  style={{ width: `${subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                {subtasks.map(st => (
+                  <div 
+                    key={st.id} 
+                    className="flex items-center gap-2 text-[10px] p-1 rounded hover:bg-muted/50 group/st"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEdit(st)
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-4 p-0 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onUpdate(st.id, { status: st.status === 'complete' ? 'todo' : 'complete' })
+                      }}
+                    >
+                      {st.status === 'complete' ? (
+                        <IconCircleCheck className="size-3.5 text-green-500" />
+                      ) : (
+                        <IconCircle className="size-3.5" />
+                      )}
+                    </Button>
+                    <span className={`truncate ${st.status === 'complete' ? 'line-through text-muted-foreground' : ''}`}>
+                      {st.title}
+                    </span>
+                  </div>
+                ))}
+                
+                {isAddingSubtask && (
+                  <form 
+                    onSubmit={handleQuickAdd}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 mt-1"
+                  >
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      className="flex-1 bg-muted border-none rounded px-1.5 py-0.5 text-[10px] focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Add subtask..."
+                      value={newSubtaskTitle}
+                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setIsAddingSubtask(false)
+                          setNewSubtaskTitle("")
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!newSubtaskTitle.trim()) {
+                          setIsAddingSubtask(false)
+                        }
+                      }}
+                    />
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -565,7 +709,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete }: Task
                 <DropdownMenuItem 
                   onClick={(e) => {
                     e.stopPropagation()
-                    onUpdate({ user_id: null })
+                    onUpdate(task.id, { user_id: null })
                   }}
                 >
                   <div className="flex items-center gap-2">
@@ -580,7 +724,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete }: Task
                     key={member.id}
                     onClick={(e) => {
                       e.stopPropagation()
-                      onUpdate({ user_id: member.id })
+                      onUpdate(task.id, { user_id: member.id })
                     }}
                   >
                     <div className="flex items-center gap-2">

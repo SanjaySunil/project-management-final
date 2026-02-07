@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Button } from "@/components/ui/button"
+import { updateProjectStatus } from "@/lib/projects"
 
 type Proposal = Tables<"proposals">
 
@@ -39,6 +40,7 @@ export default function ProposalsPage() {
         .from("proposals")
         .select("*")
         .eq("project_id", projectId as string)
+        .order("order_index", { ascending: true })
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -49,6 +51,31 @@ export default function ProposalsPage() {
       setIsLoading(false)
     }
   }, [projectId])
+
+  const handleReorder = async (newData: Proposal[]) => {
+    // Optimistic update
+    const oldData = [...proposals]
+    setProposals(newData)
+
+    try {
+      // Update each proposal's order_index individually to avoid issues with upsert
+      const updatePromises = newData.map((proposal, index) => 
+        supabase
+          .from("proposals")
+          .update({ order_index: index })
+          .eq("id", proposal.id)
+      )
+
+      const results = await Promise.all(updatePromises)
+      const error = results.find(r => r.error)?.error
+
+      if (error) throw error
+      toast.success("Order updated")
+    } catch (error: any) {
+      setProposals(oldData)
+      toast.error("Failed to update order: " + error.message)
+    }
+  }
 
   const fetchDeliverables = React.useCallback(async (proposalId: string) => {
     try {
@@ -89,6 +116,11 @@ export default function ProposalsPage() {
         .eq("id", id)
 
       if (error) throw error
+      
+      if (projectId) {
+        await updateProjectStatus(projectId)
+      }
+      
       toast.success("Proposal status updated")
       fetchProposals()
     } catch (error: any) {
@@ -107,6 +139,11 @@ export default function ProposalsPage() {
     try {
       const { error } = await supabase.from("proposals").delete().eq("id", proposalToDelete)
       if (error) throw error
+      
+      if (projectId) {
+        await updateProjectStatus(projectId)
+      }
+      
       toast.success("Proposal deleted successfully")
       fetchProposals()
     } catch (error: any) {
@@ -137,7 +174,10 @@ export default function ProposalsPage() {
       } else {
         const { data, error } = await supabase
           .from("proposals")
-          .insert([proposalData])
+          .insert([{
+            ...proposalData,
+            order_index: proposals.length
+          }])
           .select()
           .single()
         if (error) throw error
@@ -172,6 +212,10 @@ export default function ProposalsPage() {
         }
       }
 
+      if (projectId) {
+        await updateProjectStatus(projectId)
+      }
+
       setIsDialogOpen(false)
       fetchProposals()
     } catch (error: any) {
@@ -199,6 +243,7 @@ export default function ProposalsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
+          onDataChange={handleReorder}
           isLoading={isLoading}
         />
       </div>

@@ -112,6 +112,12 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       permission: { action: "read", resource: "projects" },
     },
     {
+      title: "All Tasks",
+      url: "/dashboard/tasks",
+      icon: CheckSquare,
+      permission: { action: "read", resource: "tasks" },
+    },
+    {
       title: "Finances",
       url: "/dashboard/finances",
       icon: DollarSign,
@@ -312,7 +318,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} />
-        <div className="px-4 py-2 text-[10px] text-muted-foreground font-mono opacity-50">
+        <div className="px-4 py-2 text-[10px] text-muted-foreground font-mono opacity-50 group-data-[collapsible=icon]:hidden">
           {__APP_VERSION__}
         </div>
       </SidebarFooter>
