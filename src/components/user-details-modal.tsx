@@ -51,8 +51,8 @@ export function UserDetailsModal({
   if (!user) return null
 
   const allRoles = availableRoles || ROLES
-  const roleKey = user.role || 'viewer'
-  const roleData = allRoles[roleKey] || ROLES[roleKey] || ROLES.viewer
+  const roleKey = (user.role || 'employee') as keyof typeof ROLES
+  const roleData = allRoles[roleKey] || ROLES.employee
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,7 +74,7 @@ export function UserDetailsModal({
               {user.full_name || user.username || "Anonymous User"}
             </DialogTitle>
             <Badge 
-              variant={roleKey === 'admin' ? 'default' : roleKey === 'manager' ? 'secondary' : 'outline'} 
+              variant={roleKey === 'admin' ? 'default' : 'secondary'} 
               className="w-fit capitalize"
             >
               {roleData.label}

@@ -122,7 +122,7 @@ export function MentionTextarea({
             {...props}
             ref={textareaRef}
             className={cn(
-              "min-h-[80px] w-full resize-none border-0 bg-transparent p-3 text-sm focus-visible:ring-0",
+              "min-h-[80px] w-full resize-none border-0 bg-transparent p-3 text-base md:text-sm focus-visible:ring-0",
               className
             )}
             value={value}

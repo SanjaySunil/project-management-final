@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Tables } from "@/lib/database.types"
+import { useAuth } from "@/hooks/use-auth"
 
 type Proposal = Tables<"proposals">
 
@@ -53,6 +54,8 @@ export function ProposalsTable({
   onDataChange,
   isLoading 
 }: ProposalsTableProps) {
+  const { role } = useAuth()
+  const isAdmin = role === "admin"
 
   const columns: ColumnDef<Proposal>[] = [
     {
@@ -133,22 +136,24 @@ export function ProposalsTable({
         </div>
       ),
     },
-    {
-      accessorKey: "amount",
-      header: () => <div className="w-full text-right">Amount</div>,
-      cell: ({ row }) => (
-        <div className="text-right font-medium">
-          <div className="flex flex-col items-end">
-            <span>${row.original.amount?.toLocaleString()}</span>
-            {row.original.order_source === "fiverr" && (
-              <span className="text-[10px] text-muted-foreground">
-                Net: ${row.original.net_amount?.toLocaleString()}
-              </span>
-            )}
+    ...(isAdmin ? [
+      {
+        accessorKey: "amount",
+        header: () => <div className="w-full text-right">Amount</div>,
+        cell: ({ row }: { row: any }) => (
+          <div className="text-right font-medium">
+            <div className="flex flex-col items-end">
+              <span>${row.original.amount?.toLocaleString()}</span>
+              {row.original.order_source === "fiverr" && (
+                <span className="text-[10px] text-muted-foreground">
+                  Net: ${row.original.net_amount?.toLocaleString()}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
-    },
+        ),
+      }
+    ] : []),
     {
       accessorKey: "order_source",
       header: "Source",

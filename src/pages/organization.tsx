@@ -100,7 +100,7 @@ export default function OrganizationPage() {
                       value={orgData.name}
                       onChange={(e) => setOrgData({ ...orgData, name: e.target.value })}
                       className="pl-9"
-                      placeholder="Acme Inc"
+                      placeholder="Organization Name"
                     />
                   </div>
                 </div>

@@ -23,10 +23,10 @@ import {
 import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import type { Tables } from "@/lib/database.types"
+import { supabase } from "@/lib/supabase"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { cn } from "@/lib/utils"
 
 // Custom collision detection strategy for multi-container kanban
 const customCollisionDetection: CollisionDetection = (args) => {
@@ -77,6 +78,7 @@ export type Task = {
     avatar_url: string | null
     email: string | null
   } | null
+  task_attachments?: Tables<"task_attachments">[]
 }
 
 interface KanbanBoardProps {
@@ -108,7 +110,7 @@ export function KanbanBoard({
   onTaskQuickCreate,
   onTaskEdit,
   onTaskDelete,
-  hideControls = true,
+  hideControls = false,
   hideCreate = false,
   isLoading = false
 }: KanbanBoardProps) {
@@ -308,27 +310,27 @@ export function KanbanBoard({
       )}
 
       {isLoading ? (
-        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0 px-4 lg:px-6">
+        <div className="flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0 px-4 lg:px-6">
           {COLUMNS.map((column) => (
-            <div key={column.id} className="flex h-full w-80 shrink-0 flex-col gap-3 rounded-lg bg-muted/50 p-3">
+            <div key={column.id} className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-5 w-8 rounded-full" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-6 rounded-full" />
                 </div>
               </div>
-              <div className="flex flex-1 flex-col gap-3 overflow-hidden">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Card key={i} className="p-3">
-                    <div className="space-y-3">
-                      <Skeleton className="h-4 w-3/4" />
-                      <div className="space-y-2">
-                        <Skeleton className="h-3 w-full" />
-                        <Skeleton className="h-3 w-1/2" />
+              <div className="flex flex-1 flex-col gap-2 overflow-hidden">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="p-2.5">
+                    <div className="space-y-2">
+                      <Skeleton className="h-3.5 w-3/4" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-2 w-full" />
+                        <Skeleton className="h-2 w-1/2" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-6 w-6 rounded-full" />
-                        <Skeleton className="h-3 w-20" />
+                      <div className="flex items-center gap-2 pt-1">
+                        <Skeleton className="h-4 w-4 rounded-full" />
+                        <Skeleton className="h-2 w-16" />
                       </div>
                     </div>
                   </Card>
@@ -338,7 +340,7 @@ export function KanbanBoard({
           ))}
         </div>
       ) : (
-        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 min-h-0 px-4 lg:px-6">
+        <div className="flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0 px-4 lg:px-6">
           <DndContext
             sensors={sensors}
             collisionDetection={customCollisionDetection}
@@ -418,23 +420,23 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
   return (
     <div 
       ref={setNodeRef}
-      className="flex h-full w-80 shrink-0 flex-col gap-3 rounded-lg bg-muted/50 p-3"
+      className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2"
     >
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-1 mb-1">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold">{title}</h3>
-          <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+          <h3 className="text-sm font-semibold text-muted-foreground/80">{title}</h3>
+          <span className="text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
             {tasks.length}
-          </Badge>
+          </span>
         </div>
         {onAddTask && (
           <Button
             variant="ghost"
             size="icon"
-            className="size-8 text-muted-foreground hover:text-foreground"
+            className="size-7 text-muted-foreground hover:text-foreground"
             onClick={onAddTask}
           >
-            <IconPlus className="size-4" />
+            <IconPlus className="size-3.5" />
           </Button>
         )}
       </div>
@@ -444,7 +446,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
         items={tasks.map((t) => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto min-h-0">
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar">
           {tasks.map((task) => (
             <SortableTaskCard 
               key={task.id} 
@@ -459,12 +461,24 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
             />
           ))}
           {tasks.length === 0 && (
-            <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-dashed p-8 text-center text-sm text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-dashed p-6 text-center text-xs text-muted-foreground/50">
               No tasks
             </div>
           )}
         </div>
       </SortableContext>
+      
+      {onAddTask && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-1 h-8 px-2 font-normal text-xs"
+          onClick={onAddTask}
+        >
+          <IconPlus className="size-3.5 mr-2" />
+          Add Task
+        </Button>
+      )}
     </div>
   )
 }
@@ -550,6 +564,8 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
 
   const completedSubtasks = subtasks.filter(st => st.status === 'complete').length
 
+  const imageAttachment = task.task_attachments?.find(a => a.file_type.startsWith('image/'))
+
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newSubtaskTitle.trim() || !onQuickAddSubtask) return
@@ -567,182 +583,188 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
 
   return (
     <Card 
-      className={`group relative cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors ${isOverlay ? "ring-2 ring-primary" : ""}`}
+      className={cn(
+        "group relative cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors p-2.5 shadow-none py-0 gap-0",
+        isOverlay && "ring-2 ring-primary"
+      )}
       onClick={() => onEdit(task)}
     >
-      <CardHeader className="p-3">
+      <div className="flex flex-col gap-2 py-2.5">
+        {imageAttachment && (
+          <div className="aspect-video w-full overflow-hidden rounded-md">
+            <img 
+              src={supabase.storage.from('task-attachments').getPublicUrl(imageAttachment.file_path).data.publicUrl} 
+              alt={imageAttachment.file_name}
+              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+            />
+          </div>
+        )}
+        
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-sm font-medium">
+          <h4 className="text-sm font-semibold leading-tight line-clamp-3">
             {task.title}
-          </CardTitle>
+          </h4>
           {!isOverlay && (
-            <div className="flex gap-1">
+            <div className="flex gap-0.5 shrink-0">
               {onAddSubtask && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-7 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
+                  className="size-6 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
                   onClick={(e) => {
                     e.stopPropagation()
                     setIsAddingSubtask(true)
                   }}
                 >
-                  <IconPlus className="size-3.5" />
+                  <IconPlus className="size-3" />
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 transition-opacity"
+                className="size-6 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 transition-opacity"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDelete()
                 }}
               >
-                <IconTrash className="size-3.5" />
+                <IconTrash className="size-3" />
               </Button>
             </div>
           )}
         </div>
-      </CardHeader>
 
-      {(task.description || members.length > 0 || subtasks.length > 0 || isAddingSubtask) && (
-        <CardContent className="px-3 pb-3 pt-0">
-          {task.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-              {task.description}
-            </p>
-          )}
+        {task.description && (
+          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+            {task.description}
+          </p>
+        )}
 
-          {(subtasks.length > 0 || isAddingSubtask) && (
-            <div className="mb-3 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>Subtasks</span>
-                <span>{completedSubtasks}/{subtasks.length}</span>
-              </div>
-              <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all" 
-                  style={{ width: `${subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                {subtasks.map(st => (
-                  <div 
-                    key={st.id} 
-                    className="flex items-center gap-2 text-[10px] p-1 rounded hover:bg-muted/50 group/st"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(st)
-                    }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-4 p-0 shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onUpdate(st.id, { status: st.status === 'complete' ? 'todo' : 'complete' })
-                      }}
-                    >
-                      {st.status === 'complete' ? (
-                        <IconCircleCheck className="size-3.5 text-green-500" />
-                      ) : (
-                        <IconCircle className="size-3.5" />
-                      )}
-                    </Button>
-                    <span className={`truncate ${st.status === 'complete' ? 'line-through text-muted-foreground' : ''}`}>
-                      {st.title}
-                    </span>
-                  </div>
-                ))}
-                
-                {isAddingSubtask && (
-                  <form 
-                    onSubmit={handleQuickAdd}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 mt-1"
-                  >
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      className="flex-1 bg-muted border-none rounded px-1.5 py-0.5 text-[10px] focus:ring-1 focus:ring-primary outline-none"
-                      placeholder="Add subtask..."
-                      value={newSubtaskTitle}
-                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setIsAddingSubtask(false)
-                          setNewSubtaskTitle("")
-                        }
-                      }}
-                      onBlur={() => {
-                        if (!newSubtaskTitle.trim()) {
-                          setIsAddingSubtask(false)
-                        }
-                      }}
-                    />
-                  </form>
-                )}
-              </div>
+        {(subtasks.length > 0 || isAddingSubtask) && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="font-medium">Subtasks</span>
+              <span className="bg-muted px-1 rounded-sm">{completedSubtasks}/{subtasks.length}</span>
             </div>
-          )}
-
-          <div className="flex items-center justify-between gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" className="h-auto p-0 hover:bg-transparent">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6 border-2 border-background">
-                      <AvatarImage src={task.profiles?.avatar_url || undefined} />
-                      <AvatarFallback className="text-[10px]">{userInitials}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                      {task.profiles?.full_name || task.profiles?.email || "Unassigned"}
-                    </span>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel>Assign To</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
+            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all" 
+                style={{ width: `${subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+              {subtasks.map(st => (
+                <div 
+                  key={st.id} 
+                  className="flex items-center gap-1.5 text-[10px] py-0.5 px-1 rounded hover:bg-muted/50 group/st"
                   onClick={(e) => {
                     e.stopPropagation()
-                    onUpdate(task.id, { user_id: null })
+                    onEdit(st)
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onUpdate(st.id, { status: st.status === 'complete' ? 'todo' : 'complete' })
+                    }}
+                  >
+                    {st.status === 'complete' ? (
+                      <IconCircleCheck className="size-3 text-green-500" />
+                    ) : (
+                      <IconCircle className="size-3" />
+                    )}
+                  </button>
+                  <span className={`truncate flex-1 ${st.status === 'complete' ? 'line-through text-muted-foreground/60' : ''}`}>
+                    {st.title}
+                  </span>
+                </div>
+              ))}
+              
+              {isAddingSubtask && (
+                <form 
+                  onSubmit={handleQuickAdd}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1 mt-0.5"
+                >
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="flex-1 bg-muted border-none rounded px-1 py-0.5 text-[10px] focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="Add subtask..."
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsAddingSubtask(false)
+                        setNewSubtaskTitle("")
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!newSubtaskTitle.trim()) {
+                        setIsAddingSubtask(false)
+                      }
+                    }}
+                  />
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" className="h-6 p-0 hover:bg-transparent flex items-center gap-1.5">
+                <Avatar className="h-5 w-5 border border-background">
+                  <AvatarImage src={task.profiles?.avatar_url || undefined} />
+                  <AvatarFallback className="text-[8px]">{userInitials}</AvatarFallback>
+                </Avatar>
+                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                  {task.profiles?.full_name || task.profiles?.email?.split('@')[0] || "Unassigned"}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Assign To</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onUpdate(task.id, { user_id: null })
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-[10px]">?</AvatarFallback>
+                  </Avatar>
+                  <span>Unassigned</span>
+                </div>
+              </DropdownMenuItem>
+              {members.map((member) => (
+                <DropdownMenuItem 
+                  key={member.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onUpdate(task.id, { user_id: member.id })
                   }}
                 >
                   <div className="flex items-center gap-2">
                     <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-[10px]">?</AvatarFallback>
+                      <AvatarImage src={member.avatar_url || undefined} />
+                      <AvatarFallback className="text-[10px]">
+                        {member.full_name ? member.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : member.email?.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
-                    <span>Unassigned</span>
+                    <span className="truncate">{member.full_name || member.email}</span>
                   </div>
                 </DropdownMenuItem>
-                {members.map((member) => (
-                  <DropdownMenuItem 
-                    key={member.id}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onUpdate(task.id, { user_id: member.id })
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={member.avatar_url || undefined} />
-                        <AvatarFallback className="text-[10px]">
-                          {member.full_name ? member.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : member.email?.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="truncate">{member.full_name || member.email}</span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardContent>
-      )}
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     </Card>
   )
 }

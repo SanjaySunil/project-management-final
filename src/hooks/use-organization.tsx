@@ -19,10 +19,10 @@ interface OrganizationContextType {
 }
 
 const DEFAULT_ORG: Organization = {
-  name: "Acme Inc",
-  website: "https://acme.inc",
-  email: "contact@acme.inc",
-  billing_email: "billing@acme.inc",
+  name: "Organization",
+  website: "",
+  email: "",
+  billing_email: "",
   logo: "",
 }
 
@@ -39,22 +39,24 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     async function fetchOrganization() {
       if (authLoading) return
-      if (!organizationId) {
-        setLoading(false)
-        return
-      }
       
       // Prevent duplicate fetches in StrictMode
-      if (fetchedRef.current === organizationId) return
-      fetchedRef.current = organizationId
+      const fetchKey = organizationId || 'global'
+      if (fetchedRef.current === fetchKey) return
+      fetchedRef.current = fetchKey
 
-      console.log('OrganizationProvider: Fetching org', organizationId)
+      console.log('OrganizationProvider: Fetching org', organizationId || 'global')
       try {
-        const { data, error } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', organizationId)
-          .single()
+        let query = supabase.from('organizations').select('*')
+        
+        if (organizationId) {
+          query = query.eq('id', organizationId)
+        } else {
+          // If no organization_id is set for the user, fetch the first organization (global)
+          query = query.order('created_at', { ascending: true }).limit(1)
+        }
+
+        const { data, error } = await query.maybeSingle()
 
         if (!mounted) return
 

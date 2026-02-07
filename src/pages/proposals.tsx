@@ -19,6 +19,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { updateProjectStatus } from "@/lib/projects"
+import { slugify } from "@/lib/utils"
 
 type Proposal = Tables<"proposals">
 
@@ -170,6 +171,15 @@ export default function ProposalsPage() {
           .update(proposalData)
           .eq("id", editingProposal.id)
         if (error) throw error
+
+        // Update channel name if title changed
+        if (values.title) {
+          await supabase
+            .from("channels")
+            .update({ name: slugify(values.title) })
+            .eq("proposal_id", editingProposal.id)
+        }
+
         toast.success("Proposal updated successfully")
       } else {
         const { data, error } = await supabase

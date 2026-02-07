@@ -95,7 +95,8 @@ export function AssignedTasks({
               projects (
                 name
               )
-            )
+            ),
+            task_attachments (*)
           `)
           .eq("user_id", targetUserId)
           .order("order_index", { ascending: true })
@@ -203,7 +204,8 @@ export function AssignedTasks({
             projects (
               name
             )
-          )
+          ),
+          task_attachments (*)
         `).single()
       } else {
         res = await query.select("*").single()
@@ -211,12 +213,94 @@ export function AssignedTasks({
 
       if (res.error) throw res.error
 
+      const taskId = res.data.id
+
+      // Handle subtasks
+      if (values.subtasks && values.subtasks.length > 0) {
+        const subtasksToInsert = values.subtasks.map((title, index) => ({
+          title,
+          status: "todo",
+          parent_id: taskId,
+          user_id: targetUserId,
+          proposal_id: mode === "project" ? res.data.proposal_id : null,
+          order_index: index
+        }))
+        
+        const { data: createdSubtasks, error: subtasksError } = await (supabase.from as any)(table)
+          .insert(subtasksToInsert)
+          .select(mode === "project" ? `*, proposals(id, title, project_id, projects(name)), task_attachments(*)` : `*`)
+
+        if (subtasksError) throw subtasksError
+        
+        if (createdSubtasks) {
+          const formattedSubtasks = (createdSubtasks as any[]).map(st => ({
+            ...st,
+            profiles: members.find(m => m.id === st.user_id) || null
+          }))
+          setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
+        }
+      }
+
+      // Handle attachments (only for project tasks)
+      if (mode === "project" && values.files && values.files.length > 0 && typeof window !== 'undefined') {
+        const { default: imageCompression } = await import("browser-image-compression")
+        
+        for (const file of values.files as File[]) {
+          let fileToUpload = file
+
+          if (file.type.startsWith('image/')) {
+            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true }
+            try {
+              fileToUpload = await imageCompression(file, options)
+            } catch (error) {
+              console.error("Compression error:", error)
+            }
+          }
+
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+          const filePath = `${taskId}/${fileName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('task-attachments')
+            .upload(filePath, fileToUpload)
+
+          if (uploadError) throw uploadError
+
+          const { data: attachment, error: dbError } = await supabase
+            .from('task_attachments')
+            .insert([{
+              task_id: taskId,
+              user_id: currentUser?.id,
+              file_path: filePath,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: fileToUpload.size
+            }])
+            .select()
+            .single()
+
+          if (dbError) throw dbError
+          
+          setTasks(prev => prev.map(t => {
+            if (t.id === taskId) {
+              return { ...t, task_attachments: [...(t.task_attachments || []), attachment] }
+            }
+            return t
+          }))
+        }
+      }
+
       const newTask = {
         ...res.data,
         profiles: members.find(m => m.id === res.data.user_id) || null
       }
 
-      setTasks(prev => [...prev, newTask as Task])
+      setTasks(prev => {
+        if (prev.some(t => t.id === newTask.id)) return prev
+        return [...prev, newTask as Task]
+      })
+      
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
@@ -302,7 +386,8 @@ export function AssignedTasks({
             projects (
               name
             )
-          )
+          ),
+          task_attachments (*)
         `).single()
       } else {
         res = await query.select("*").single()

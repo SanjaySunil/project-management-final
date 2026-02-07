@@ -57,7 +57,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 
-import { ROLES, type RoleData, canManageRole } from "@/lib/rbac"
+import { ROLES, type RoleData } from "@/lib/rbac"
 
 interface Profile {
   id: string
@@ -149,11 +149,11 @@ export function UsersTable({
       accessorKey: "role",
       header: "Role",
       cell: ({ row }) => {
-        const role = row.original.role || 'viewer'
-        const roleData = allRoles[role] || ROLES[role] || ROLES.viewer
+        const role = row.original.role || 'employee'
+        const roleData = allRoles[role as keyof typeof ROLES] || ROLES.employee
         return (
           <Badge 
-            variant={role === 'admin' ? 'default' : role === 'manager' ? 'secondary' : 'outline'} 
+            variant={role === 'admin' ? 'default' : 'secondary'} 
             className="capitalize"
           >
             {roleData.label}
@@ -191,21 +191,21 @@ export function UsersTable({
               <DropdownMenuItem
                 key={roleKey}
                 onClick={() => onChangeRole(row.original, roleKey)}
-                disabled={!canManageRole(currentUserRole, row.original.role) || row.original.role === roleKey}
+                disabled={currentUserRole !== 'admin' || row.original.role === roleKey}
               >
                 <div className="flex flex-col gap-0.5">
                   <span className="flex items-center gap-2">
                     {row.original.role === roleKey && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                    {allRoles[roleKey].label}
+                    {allRoles[roleKey as keyof typeof ROLES].label}
                   </span>
                   <span className="text-[10px] text-muted-foreground line-clamp-1">
-                    {allRoles[roleKey].description}
+                    {allRoles[roleKey as keyof typeof ROLES].description}
                   </span>
                 </div>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600" onClick={() => onDelete(row.original)} disabled={!canManageRole(currentUserRole, row.original.role)}>
+            <DropdownMenuItem className="text-red-600" onClick={() => onDelete(row.original)} disabled={currentUserRole !== 'admin'}>
               <IconUserMinus className="mr-2 h-4 w-4" />
               Delete User
             </DropdownMenuItem>

@@ -248,7 +248,7 @@ export default function ChatPage() {
     async function fetchData() {
       const projectsQuery = supabase.from("projects").select("id, name").order("name")
       
-      const isAdmin = role === "admin" || role === "manager"
+      const isAdmin = role === "admin"
       if (!isAdmin && user) {
         // Only show projects the user is a member of
         const { data: memberProjects } = await supabase
@@ -426,7 +426,7 @@ export default function ChatPage() {
     if (!newChannelName.trim() || !user) return
 
     const { data, error } = await supabase.from("channels").insert({
-      name: newChannelName.trim().toLowerCase().replace(/\s+/g, "-"),
+      name: slugify(newChannelName),
       project_id: currentProjectId || null,
       created_by: user.id,
     }).select().single()
@@ -449,7 +449,7 @@ export default function ChatPage() {
     const { data, error } = await supabase
       .from("channels")
       .update({
-        name: editChannelName.trim().toLowerCase().replace(/\s+/g, "-"),
+        name: slugify(editChannelName),
         description: editChannelDescription.trim() || null,
       })
       .eq("id", selectedChannel.id)

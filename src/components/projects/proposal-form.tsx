@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DeliverablesManager, type Deliverable } from "./deliverables-manager"
 import type { Tables } from "@/lib/database.types"
+import { useAuth } from "@/hooks/use-auth"
 
 type Proposal = Tables<"proposals">
 
@@ -23,6 +24,8 @@ export function ProposalForm({
   onCancel,
   isSubmitting = false,
 }: ProposalFormProps) {
+  const { role } = useAuth()
+  const isAdmin = role === "admin"
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>(initialDeliverables)
   const [orderSource, setOrderSource] = React.useState<string>(initialData?.order_source || "direct")
   const [amount, setAmount] = React.useState<number>(Number(initialData?.amount) || 0)
@@ -38,16 +41,20 @@ export function ProposalForm({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const values = {
+    const values: any = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      amount: amount,
       status: formData.get("status") as string,
       order_source: orderSource,
-      commission_rate: commissionRate,
-      commission_amount: commissionAmount,
-      net_amount: netAmount,
     }
+
+    if (isAdmin) {
+      values.amount = amount
+      values.commission_rate = commissionRate
+      values.commission_amount = commissionAmount
+      values.net_amount = netAmount
+    }
+
     await onSubmit(values, deliverables)
   }
 
@@ -103,34 +110,39 @@ export function ProposalForm({
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="amount">Gross Amount ($)</Label>
-            <Input
-              id="amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={amount || ""}
-              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-              required
-            />
-          </div>
-          {orderSource === "fiverr" && (
-            <div className="space-y-2">
-              <Label>Commission (20%)</Label>
-              <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted/50 text-sm">
-                -${commissionAmount.toFixed(2)}
+        
+        {isAdmin && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Gross Amount ($)</Label>
+                <Input
+                  id="amount"
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={amount || ""}
+                  onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                  required
+                />
               </div>
+              {orderSource === "fiverr" && (
+                <div className="space-y-2">
+                  <Label>Commission (20%)</Label>
+                  <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted/50 text-sm">
+                    -${commissionAmount.toFixed(2)}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        {orderSource === "fiverr" && (
-          <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 flex justify-between items-center">
-            <span className="text-sm font-medium">Net Revenue</span>
-            <span className="text-lg font-bold text-primary">${netAmount.toFixed(2)}</span>
-          </div>
+            {orderSource === "fiverr" && (
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 flex justify-between items-center">
+                <span className="text-sm font-medium">Net Revenue</span>
+                <span className="text-lg font-bold text-primary">${netAmount.toFixed(2)}</span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

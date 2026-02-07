@@ -1,10 +1,11 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconLayoutKanban } from "@tabler/icons-react"
+import { IconLayoutKanban, IconPlus } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
+import { Button } from "@/components/ui/button"
 import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 import {
   Dialog,
@@ -44,7 +45,8 @@ export default function TasksPage() {
               projects (
                 name
               )
-            )
+            ),
+            task_attachments (*)
           `)
           .order("order_index", { ascending: true }),
         supabase
@@ -149,18 +151,122 @@ export default function TasksPage() {
             projects (
               name
             )
-          )
+          ),
+          task_attachments (*)
         `)
         .single()
 
       if (error) throw error
+
+      const taskId = data.id
+
+      // Handle subtasks
+      if (values.subtasks && values.subtasks.length > 0) {
+        const subtasksToInsert = values.subtasks.map((title, index) => ({
+          title,
+          status: "todo",
+          parent_id: taskId,
+          proposal_id: data.proposal_id,
+          order_index: index
+        }))
+        
+        const { data: createdSubtasks, error: subtasksError } = await supabase
+          .from("tasks")
+          .insert(subtasksToInsert)
+          .select(`
+            *,
+            proposals (
+              id,
+              title,
+              project_id,
+              projects (
+                name
+              )
+            ),
+            task_attachments (*)
+          `)
+
+        if (subtasksError) throw subtasksError
+        
+        if (createdSubtasks) {
+          const formattedSubtasks = createdSubtasks.map(st => ({
+            ...st,
+            profiles: null
+          }))
+          setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
+        }
+      }
+
+      // Handle attachments
+      if (values.files && values.files.length > 0 && typeof window !== 'undefined') {
+        const { default: imageCompression } = await import("browser-image-compression")
+        
+        for (const file of values.files as File[]) {
+          let fileToUpload = file
+
+          // Compress if it's an image
+          if (file.type.startsWith('image/')) {
+            const options = {
+              maxSizeMB: 1,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true
+            }
+            try {
+              fileToUpload = await imageCompression(file, options)
+            } catch (error) {
+              console.error("Compression error:", error)
+            }
+          }
+
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+          const filePath = `${taskId}/${fileName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('task-attachments')
+            .upload(filePath, fileToUpload)
+
+          if (uploadError) throw uploadError
+
+          const { data: attachment, error: dbError } = await supabase
+            .from('task_attachments')
+            .insert([{
+              task_id: taskId,
+              user_id: (await supabase.auth.getUser()).data.user?.id,
+              file_path: filePath,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: fileToUpload.size
+            }])
+            .select()
+            .single()
+
+          if (dbError) throw dbError
+          
+          // Update the task in state to include the new attachment
+          setTasks(prev => prev.map(t => {
+            if (t.id === taskId) {
+              return {
+                ...t,
+                task_attachments: [...(t.task_attachments || []), attachment]
+              }
+            }
+            return t
+          }))
+        }
+      }
 
       const newTask = {
         ...data,
         profiles: members.find(m => m.id === data.user_id) || null
       }
 
-      setTasks(prev => [...prev, newTask as Task])
+      setTasks(prev => {
+        // If task already exists (e.g. we updated it with attachments), just return prev
+        if (prev.some(t => t.id === newTask.id)) return prev
+        return [...prev, newTask as Task]
+      })
+      
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
@@ -252,7 +358,8 @@ export default function TasksPage() {
             projects (
               name
             )
-          )
+          ),
+          task_attachments (*)
         `)
         .single()
 
@@ -277,13 +384,21 @@ export default function TasksPage() {
       <SEO title="Tasks - Kanban Board" />
       <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-hidden">
         <div className="flex flex-col gap-2 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconLayoutKanban className="h-6 w-6" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <IconLayoutKanban className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
+                <p className="text-sm text-muted-foreground">Manage and track your project tasks across all proposals.</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-              <p className="text-sm text-muted-foreground">Manage and track your project tasks across all proposals.</p>
+            <div className="flex items-center gap-3">
+              <Button onClick={() => handleTaskCreateTrigger("todo")} size="sm">
+                <IconPlus className="mr-2 h-4 w-4" />
+                Add Task
+              </Button>
             </div>
           </div>
         </div>

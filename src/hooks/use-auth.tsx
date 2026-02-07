@@ -11,7 +11,6 @@ interface AuthContextType {
   loading: boolean
   signOut: () => Promise<void>
   checkPermission: (action: string, resource: string) => boolean
-  customRoles: Record<string, RoleData>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -21,41 +20,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [organizationId, setOrganizationId] = useState<string | null>(null)
-  const [customRoles, setCustomRoles] = useState<Record<string, RoleData>>({})
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async (userId: string) => {
-    console.log('AuthProvider: Background fetching profile/roles for', userId)
+    console.log('AuthProvider: Background fetching profile for', userId)
     try {
-      const [profileRes, rolesRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('role, organization_id')
-          .eq('id', userId)
-          .single(),
-        supabase
-          .from('custom_roles')
-          .select('*')
-      ])
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role, organization_id')
+        .eq('id', userId)
+        .single()
 
-      if (profileRes.data) {
-        setRole(profileRes.data.role ?? null)
-        setOrganizationId(profileRes.data.organization_id ?? null)
+      if (data) {
+        setRole(data.role ?? null)
+        setOrganizationId(data.organization_id ?? null)
       }
-
-      if (rolesRes.data) {
-        const rolesMap: Record<string, RoleData> = {}
-        rolesRes.data.forEach(r => {
-          rolesMap[r.slug] = {
-            label: r.name,
-            description: r.description || "",
-            permissions: r.permissions || [],
-            is_system: r.is_system || false
-          }
-        })
-        setCustomRoles(rolesMap)
-      }
-      console.log('AuthProvider: Profile/roles fetched successfully')
+      console.log('AuthProvider: Profile fetched successfully')
     } catch (error) {
       console.error('AuthProvider: Error fetching supplemental data:', error)
     }
@@ -123,7 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setRole(null)
         setOrganizationId(null)
-        setCustomRoles({})
         setLoading(false)
       }
     })
@@ -136,8 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchData])
 
   const checkPermission = useCallback((action: string, resource: string) => {
-    return hasPermission(role, action, resource, customRoles)
-  }, [role, customRoles])
+    return hasPermission(role, action, resource)
+  }, [role])
 
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -151,7 +130,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signOut,
     checkPermission,
-    customRoles,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

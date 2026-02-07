@@ -237,6 +237,7 @@ export type Database = {
           order_index: number
           proposal_id: string | null
           title: string
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -246,6 +247,7 @@ export type Database = {
           order_index?: number
           proposal_id?: string | null
           title: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -255,6 +257,7 @@ export type Database = {
           order_index?: number
           proposal_id?: string | null
           title?: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -620,6 +623,7 @@ export type Database = {
           name: string
           source_repo: string | null
           status: string | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -631,6 +635,7 @@ export type Database = {
           name: string
           source_repo?: string | null
           status?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -642,6 +647,7 @@ export type Database = {
           name?: string
           source_repo?: string | null
           status?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -668,6 +674,7 @@ export type Database = {
           project_id: string | null
           status: string | null
           title: string
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -683,6 +690,7 @@ export type Database = {
           project_id?: string | null
           status?: string | null
           title: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -698,6 +706,7 @@ export type Database = {
           project_id?: string | null
           status?: string | null
           title?: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -742,6 +751,7 @@ export type Database = {
           proposal_id: string | null
           status: string
           title: string
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -754,6 +764,7 @@ export type Database = {
           proposal_id?: string | null
           status?: string
           title: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -766,6 +777,7 @@ export type Database = {
           proposal_id?: string | null
           status?: string
           title?: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -788,6 +800,55 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          task_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

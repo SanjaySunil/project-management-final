@@ -23,7 +23,8 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 
 export default function FinancesPage() {
-  const { user, organizationId } = useAuth()
+  const { user, organizationId, role } = useAuth()
+  const isAdmin = role === "admin"
   const [loading, setLoading] = useState(true)
   const [revenueData, setRevenueData] = useState<any[]>([])
   const [expenseData, setExpenseData] = useState<any[]>([])
@@ -79,8 +80,10 @@ export default function FinancesPage() {
   }
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (isAdmin) {
+      fetchData()
+    }
+  }, [isAdmin])
 
   const handleAddExpense = async (values: any) => {
     try {
@@ -210,6 +213,17 @@ export default function FinancesPage() {
       cell: ({ row }: any) => new Date(row.getValue("date")).toLocaleDateString()
     }
   ]
+
+  if (!isAdmin) {
+    return (
+      <PageContainer>
+        <div className="flex h-[400px] flex-col items-center justify-center gap-2">
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground">You do not have permission to view this page.</p>
+        </div>
+      </PageContainer>
+    )
+  }
 
   return (
     <PageContainer>

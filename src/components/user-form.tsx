@@ -45,7 +45,7 @@ export function UserForm({ onSubmit, onCancel, isLoading, availableRoles }: User
       full_name: "",
       email: "",
       password: "",
-      role: "viewer",
+      role: "employee",
     },
   })
 

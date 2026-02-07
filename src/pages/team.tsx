@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from "react"
-import { useSearchParams } from "react-router-dom"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
 import { supabase } from "@/lib/supabase"
@@ -12,8 +11,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, RefreshCw, Plus } from "lucide-react"
 import { UsersTable } from "@/components/users-table"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { RolesManager } from "@/components/roles-manager"
 import { usePresence } from "@/hooks/use-presence"
 import {
   Dialog,
@@ -26,7 +23,7 @@ import { UserForm, type UserFormValues } from "@/components/user-form"
 import { UserDetailsModal } from "@/components/user-details-modal"
 import { createClient } from "@supabase/supabase-js"
 
-import { ROLES, type RoleData, canManageRole } from "@/lib/rbac"
+import { ROLES, type RoleData, canManageUsers } from "@/lib/rbac"
 
 interface Profile {
   id: string
@@ -40,11 +37,8 @@ interface Profile {
 
 export default function TeamPage() {
   const { user, role, checkPermission, organizationId } = useAuth()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = searchParams.get("tab") || "members"
   const { isOnline } = usePresence()
   const [profiles, setProfiles] = useState<Profile[]>([])
-  const [customRoles, setCustomRoles] = useState<Record<string, RoleData>>({})
   const [loading, setLoading] = useState(true)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null)
@@ -59,58 +53,31 @@ export default function TeamPage() {
   }
 
   const canViewTeam = checkPermission("read", "team")
-  const canCreateMember = checkPermission("create", "team")
-  const canManageRoles = checkPermission("read", "roles")
+  const canCreateMember = canManageUsers(role)
 
   const fetchProfiles = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('role', { ascending: false })
-
-    if (error) throw error
-    setProfiles((data as Profile[]) || [])
-  }, [])
-
-  const fetchCustomRoles = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('custom_roles')
-      .select('*')
-
-    if (error) throw error
-    
-    const rolesMap: Record<string, RoleData> = {}
-    data?.forEach(r => {
-      rolesMap[r.slug] = {
-        label: r.name || r.slug,
-        description: r.description || "",
-        permissions: r.permissions || [],
-        is_system: r.is_system ?? false
-      }
-    })
-    setCustomRoles(rolesMap)
-  }, [])
-
-  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      await Promise.all([
-        fetchProfiles(),
-        fetchCustomRoles()
-      ])
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('role', { ascending: false })
+
+      if (error) throw error
+      setProfiles((data as Profile[]) || [])
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "An unknown error occurred"
       toast.error("Error fetching data: " + message)
     } finally {
       setLoading(false)
     }
-  }, [fetchProfiles, fetchCustomRoles])
+  }, [])
 
   useEffect(() => {
     if (user && canViewTeam) {
-      fetchData()
+      fetchProfiles()
     }
-  }, [user, canViewTeam, fetchData])
+  }, [user, canViewTeam, fetchProfiles])
 
   async function handleAddMember(values: UserFormValues) {
     try {
@@ -154,7 +121,7 @@ export default function TeamPage() {
   }
 
   async function changeRole(profile: Profile, newRole: string) {
-    if (!canManageRole(role, profile.role)) {
+    if (!canManageUsers(role)) {
       toast.error("You don't have permission to change this user's role")
       return
     }
@@ -173,7 +140,7 @@ export default function TeamPage() {
       }
       
       setProfiles(profiles.map(p => p.id === profile.id ? { ...p, role: newRole } : p))
-      const roleLabel = customRoles[newRole]?.label || ROLES[newRole]?.label || newRole
+      const roleLabel = (ROLES as any)[newRole]?.label || newRole
       toast.success(`User role updated to ${roleLabel}`)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "An unknown error occurred"
@@ -182,7 +149,7 @@ export default function TeamPage() {
   }
 
   function handleDelete(profile: Profile) {
-    if (!canManageRole(role, profile.role)) {
+    if (!canManageUsers(role)) {
       toast.error("You don't have permission to delete this user")
       return
     }
@@ -239,19 +206,17 @@ export default function TeamPage() {
     )
   }
 
-  const allRoles = { ...ROLES, ...customRoles }
-
   return (
     <PageContainer>
-      <SEO title="Team Management" description="Manage your team members, roles, and access permissions." />
+      <SEO title="Team Management" description="Manage your team members and roles." />
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Team Management</h1>
-            <p className="text-sm text-muted-foreground">Manage team members, roles and permissions</p>
+            <p className="text-sm text-muted-foreground">Manage team members and their roles</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={fetchData} variant="outline" size="sm">
+            <Button onClick={fetchProfiles} variant="outline" size="sm">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
@@ -264,66 +229,47 @@ export default function TeamPage() {
           </div>
         </div>
 
-        <Tabs 
-          value={activeTab} 
-          onValueChange={(val) => setSearchParams({ tab: val })} 
-          className="w-full"
-        >
-          <div>
-            <TabsList>
-              <TabsTrigger value="members">Team Members</TabsTrigger>
-              {canManageRoles && <TabsTrigger value="roles">Roles & Permissions</TabsTrigger>}
-            </TabsList>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                  <Skeleton className="h-5 w-20 mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              ))
+            ) : (
+              (Object.entries(ROLES) as [string, RoleData][]).map(([key, roleInfo]) => (
+                <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant={key === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                      {roleInfo.label}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
+                </div>
+              ))
+            )}
           </div>
 
-          <TabsContent value="members" className="mt-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-                    <Skeleton className="h-5 w-20 mb-2" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                ))
-              ) : (
-                (Object.entries(allRoles) as [string, RoleData][]).map(([key, roleInfo]) => (
-                  <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant={key === 'admin' ? 'default' : key === 'manager' ? 'secondary' : 'outline'} className="capitalize">
-                        {roleInfo.label}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <UsersTable 
-              data={profiles} 
-              onChangeRole={changeRole} 
-              onDelete={handleDelete}
-              onRowClick={handleUserClick}
-              currentUserRole={role}
-              availableRoles={allRoles}
-              isOnline={isOnline}
-              isLoading={loading}
-            />
-          </TabsContent>
-
-          {canManageRoles && (
-            <TabsContent value="roles" className="mt-6">
-              <RolesManager />
-            </TabsContent>
-          )}
-        </Tabs>
+          <UsersTable 
+            data={profiles} 
+            onChangeRole={changeRole} 
+            onDelete={handleDelete}
+            onRowClick={handleUserClick}
+            currentUserRole={role}
+            availableRoles={ROLES}
+            isOnline={isOnline}
+            isLoading={loading}
+          />
+        </div>
       </div>
 
       <UserDetailsModal 
         user={selectedUser}
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
-        availableRoles={allRoles}
+        availableRoles={ROLES}
         isOnline={isOnline}
       />
 
@@ -339,7 +285,7 @@ export default function TeamPage() {
             onSubmit={handleAddMember} 
             onCancel={() => setAddMemberOpen(false)} 
             isLoading={isCreating}
-            availableRoles={allRoles}
+            availableRoles={ROLES}
           />
         </DialogContent>
       </Dialog>
@@ -354,4 +300,3 @@ export default function TeamPage() {
     </PageContainer>
   )
 }
-

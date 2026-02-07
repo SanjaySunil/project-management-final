@@ -18,6 +18,7 @@ import { type ProjectWithClient } from "./projects-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProjectForm } from "./project-form"
 import { updateProjectStatus } from "@/lib/projects"
+import { slugify } from "@/lib/utils"
 
 type Proposal = Tables<"proposals">
 
@@ -184,6 +185,15 @@ export function ProjectDetailsModal({
           .update(proposalData)
           .eq("id", editingProposal.id)
         if (error) throw error
+
+        // Update channel name if title changed
+        if (values.title) {
+          await supabase
+            .from("channels")
+            .update({ name: slugify(values.title) })
+            .eq("proposal_id", editingProposal.id)
+        }
+
         toast.success("Proposal updated successfully")
       } else {
         const { data, error } = await supabase

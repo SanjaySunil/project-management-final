@@ -303,9 +303,23 @@ export function ProjectsTable({
       cell: ({ row }) => getStatusBadge(row.original.status),
     },
     {
-      accessorKey: "created_at",
-      header: "Created At",
-      cell: ({ row }) => row.original.created_at ? new Date(row.original.created_at).toLocaleDateString() : "N/A",
+      id: "updated_at",
+      header: "Last Updated",
+      accessorFn: (row) => row.updated_at || row.created_at,
+      cell: ({ row }) => {
+        const date = row.original.updated_at || row.original.created_at
+        if (!date) return "N/A"
+        
+        const d = new Date(date)
+        return (
+          <div className="flex flex-col">
+            <span>{d.toLocaleDateString()}</span>
+            <span className="text-[10px] text-muted-foreground">
+              {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )
+      },
     },
     {
       id: "actions",

@@ -10,8 +10,11 @@ import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { IconArrowRight } from "@tabler/icons-react"
 import { Link } from "react-router-dom"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function OverviewPage() {
+  const { role } = useAuth()
+  const isAdmin = role === "admin"
   const [stats, setStats] = useState({
     totalProjects: 0,
     totalClients: 0,
@@ -42,7 +45,7 @@ export default function OverviewPage() {
           supabase.from("proposals").select("amount").in("status", ["active", "complete"]),
           supabase.from("tasks").select("*", { count: "exact", head: true }).neq("status", "complete"),
           supabase.from("audit_logs").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(5),
-          supabase.from("projects").select("*, clients(first_name, last_name)").order("created_at", { ascending: false }).limit(5)
+          supabase.from("projects").select("*, clients(first_name, last_name)").order("updated_at", { ascending: false, nullsFirst: false }).limit(5)
         ])
 
         const totalRevenue = proposalsData?.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) || 0
@@ -126,12 +129,12 @@ export default function OverviewPage() {
       <div className="flex flex-1 flex-col gap-4">
         <SectionCards 
           data={{
-            revenue: stats.totalRevenue,
+            revenue: isAdmin ? stats.totalRevenue : null,
             projects: stats.totalProjects,
             clients: stats.totalClients,
             tasks: stats.activeTasks,
             trends: {
-              revenue: stats.revenueTrend,
+              revenue: isAdmin ? stats.revenueTrend : 0,
               projects: stats.projectsTrend,
               clients: stats.clientsTrend,
               tasks: stats.tasksTrend,
@@ -142,7 +145,7 @@ export default function OverviewPage() {
         
         <div className="grid gap-4 lg:grid-cols-7">
           <div className="lg:col-span-4 flex flex-col gap-4">
-            <ChartAreaInteractive />
+            {isAdmin && <ChartAreaInteractive />}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Recent Projects</CardTitle>

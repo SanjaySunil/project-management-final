@@ -19,24 +19,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
 import { useAuth } from "@/hooks/use-auth"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Send, Hash, MessageSquare } from "lucide-react"
+import { MessageSquare } from "lucide-react"
+import { slugify, getErrorMessage } from "@/lib/utils"
+import { ProposalChat } from "./proposal-chat"
 
 type Proposal = Tables<"proposals">
-
-interface Message {
-  id: string
-  content: string
-  created_at: string
-  user_id: string
-  profiles: {
-    full_name: string | null
-    avatar_url: string | null
-    email: string | null
-  }
-}
 
 interface ProposalDetailsProps {
   projectId: string
@@ -44,7 +32,8 @@ interface ProposalDetailsProps {
 }
 
 export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps) {
-  const { user } = useAuth()
+  const { user, role } = useAuth()
+  const isAdmin = role === "admin"
   
   // Proposal & Deliverables state
   const [proposal, setProposal] = React.useState<Proposal | null>(null)
@@ -52,6 +41,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [activeTab, setActiveTab] = React.useState("kanban")
 
   // Kanban state
   const [tasks, setTasks] = React.useState<Task[]>([])
@@ -62,28 +52,6 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
   const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isTaskSubmitting, setIsTaskSubmitting] = React.useState(false)
-
-  // Chat state
-  const [messages, setMessages] = React.useState<Message[]>([])
-  const [newMessage, setNewMessage] = React.useState("")
-  const [channel, setChannel] = React.useState<Tables<"channels"> | null>(null)
-  const [isChatLoading, setIsChatLoading] = React.useState(false)
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-
-  const scrollToBottom = React.useCallback(() => {
-    if (scrollRef.current) {
-      const scrollElement = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight
-      }
-    }
-  }, [])
-
-  React.useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom()
-    }
-  }, [messages, scrollToBottom])
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -117,7 +85,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
               projects (
                 name
               )
-            )
+            ),
+            task_attachments (*)
           `)
           .eq("proposal_id", proposalId)
           .order("order_index", { ascending: true }),
@@ -143,8 +112,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
     } catch (error: any) {
       console.error("Fetch proposal details error:", error)
-      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
-      toast.error("Failed to fetch proposal details: " + message)
+      toast.error("Failed to fetch proposal details: " + getErrorMessage(error))
     } finally {
       setIsLoading(false)
     }
@@ -168,6 +136,14 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       
       if (error) throw error
 
+      // Update channel name if title changed
+      if (values.title) {
+        await supabase
+          .from("channels")
+          .update({ name: slugify(values.title) })
+          .eq("proposal_id", proposalId)
+      }
+
       // Save deliverables
       await supabase.from("deliverables").delete().eq("proposal_id", proposalId)
 
@@ -186,8 +162,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       fetchData()
     } catch (error: any) {
       console.error("Save proposal error:", error)
-      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
-      toast.error("Failed to save proposal: " + message)
+      toast.error("Failed to save proposal: " + getErrorMessage(error))
     } finally {
       setIsSubmitting(false)
     }
@@ -231,12 +206,95 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           status: creatingStatus,
           order_index: tasks.filter(t => t.status === creatingStatus).length
         }])
-        .select(`*, proposals(id, title, project_id, projects(name))`)
+        .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
         .single()
 
       if (error) throw error
+      
+      const taskId = data.id
+
+      // Handle subtasks
+      if (values.subtasks && values.subtasks.length > 0) {
+        const subtasksToInsert = values.subtasks.map((title, index) => ({
+          title,
+          status: "todo",
+          parent_id: taskId,
+          proposal_id: proposalId,
+          order_index: index
+        }))
+        
+        const { data: createdSubtasks, error: subtasksError } = await supabase
+          .from("tasks")
+          .insert(subtasksToInsert)
+          .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
+
+        if (subtasksError) throw subtasksError
+        
+        if (createdSubtasks) {
+          const formattedSubtasks = createdSubtasks.map(st => ({
+            ...st,
+            profiles: null
+          }))
+          setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
+        }
+      }
+
+      // Handle attachments
+      if (values.files && values.files.length > 0 && typeof window !== 'undefined') {
+        const { default: imageCompression } = await import("browser-image-compression")
+        
+        for (const file of values.files as File[]) {
+          let fileToUpload = file
+
+          if (file.type.startsWith('image/')) {
+            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true }
+            try {
+              fileToUpload = await imageCompression(file, options)
+            } catch (error) {
+              console.error("Compression error:", error)
+            }
+          }
+
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+          const filePath = `${taskId}/${fileName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('task-attachments')
+            .upload(filePath, fileToUpload)
+
+          if (uploadError) throw uploadError
+
+          const { data: attachment, error: dbError } = await supabase
+            .from('task_attachments')
+            .insert([{
+              task_id: taskId,
+              user_id: user?.id,
+              file_path: filePath,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: fileToUpload.size
+            }])
+            .select()
+            .single()
+
+          if (dbError) throw dbError
+          
+          setTasks(prev => prev.map(t => {
+            if (t.id === taskId) {
+              return { ...t, task_attachments: [...(t.task_attachments || []), attachment] }
+            }
+            return t
+          }))
+        }
+      }
+
       const newTask = { ...data, profiles: members.find(m => m.id === data.user_id) || null }
-      setTasks(prev => [...prev, newTask as Task])
+      setTasks(prev => {
+        if (prev.some(t => t.id === newTask.id)) return prev
+        return [...prev, newTask as Task]
+      })
+      
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
@@ -287,7 +345,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           proposal_id: proposalId,
           order_index: tasks.filter(t => t.parent_id === parentId).length
         }])
-        .select(`*, proposals(id, title, project_id, projects(name))`)
+        .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
         .single()
 
       if (error) throw error
@@ -316,7 +374,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
   // --- Chat Actions ---
   React.useEffect(() => {
-    if (!proposalId || !proposal) return
+    if (!proposalId || !proposal || activeTab !== "messages") return
 
     async function setupChat() {
       setIsChatLoading(true)
@@ -339,7 +397,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         const { data: newChannel, error: createError } = await supabase
           .from("channels")
           .insert({
-            name: `proposal-${proposal?.title.toLowerCase().replace(/\s+/g, "-")}`,
+            name: slugify(proposal?.title || ""),
             project_id: projectId,
             proposal_id: proposalId,
             created_by: user?.id
@@ -368,6 +426,24 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
       if (channelData) {
         setChannel(channelData)
+
+        // Sync channel name if it doesn't match proposal title
+        const expectedName = slugify(proposal?.title || "")
+        if (channelData.name !== expectedName) {
+          const { error: updateError } = await supabase
+            .from("channels")
+            .update({ name: expectedName })
+            .eq("id", channelData.id)
+          
+          if (updateError) {
+            console.error("Channel update error:", updateError)
+            toast.error("Could not sync channel name: " + updateError.message)
+          } else {
+            const updatedChannel = { ...channelData, name: expectedName }
+            setChannel(updatedChannel)
+            channelData = updatedChannel
+          }
+        }
 
         // Fetch messages
         const { data: messagesData, error: messagesError } = await supabase
@@ -417,7 +493,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     }
 
     setupChat()
-  }, [proposalId, proposal, projectId, user?.id])
+  }, [proposalId, proposal, projectId, user?.id, activeTab])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -502,23 +578,25 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
             <h1 className="text-2xl font-bold tracking-tight">{proposal.title}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-right mr-4">
-              <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Total Amount</p>
-              <div className="flex flex-col items-end">
-                <p className="text-2xl font-bold">${proposal.amount?.toLocaleString()}</p>
-                {proposal.order_source === "fiverr" && (
-                  <p className="text-xs text-muted-foreground">
-                    Net: <span className="font-medium text-primary">${proposal.net_amount?.toLocaleString()}</span>
-                  </p>
-                )}
+            {isAdmin && (
+              <div className="text-right mr-4">
+                <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Total Amount</p>
+                <div className="flex flex-col items-end">
+                  <p className="text-2xl font-bold">${proposal.amount?.toLocaleString()}</p>
+                  {proposal.order_source === "fiverr" && (
+                    <p className="text-xs text-muted-foreground">
+                      Net: <span className="font-medium text-primary">${proposal.net_amount?.toLocaleString()}</span>
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             {getStatusBadge(proposal.status)}
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="kanban" className="flex-1 flex flex-col gap-4 min-h-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col gap-4 min-h-0">
         <div className="px-4 lg:px-6 shrink-0">
           <TabsList className="w-fit">
             <TabsTrigger value="overview" className="gap-2">
@@ -560,7 +638,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
                     <p className="text-sm font-medium text-muted-foreground">Order Source</p>
                     <p className="capitalize">{proposal.order_source === "fiverr" ? "Fiverr" : "Direct (Bank Transfer)"}</p>
                   </div>
-                  {proposal.order_source === "fiverr" && (
+                  {isAdmin && proposal.order_source === "fiverr" && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Commission (20%)</p>
                       <p className="text-destructive">-${proposal.commission_amount?.toLocaleString()}</p>
@@ -615,54 +693,13 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         </TabsContent>
 
         <TabsContent value="messages" className="flex-1 min-h-0 flex flex-col px-4 lg:px-6 pb-4 lg:pb-6 mt-2">
-          <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
-            <div className="flex h-12 items-center px-4 border-b bg-muted/30">
-              <Hash className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span className="font-bold text-sm">#{channel?.name || "proposal-chat"}</span>
-            </div>
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-              <div className="space-y-4">
-                {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mb-2 opacity-20" />
-                    <p>No messages yet. Start the conversation!</p>
-                  </div>
-                ) : (
-                  messages.map((m) => (
-                    <div key={m.id} className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={m.profiles?.avatar_url || ""} />
-                        <AvatarFallback className="text-xs">
-                          {(m.profiles?.full_name || m.profiles?.email || "U").charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs">{m.profiles?.full_name || m.profiles?.email?.split("@")[0]}</span>
-                          <span className="text-[10px] text-muted-foreground">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.content}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-            <div className="p-4 border-t">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <textarea
-                  placeholder="Type a message..."
-                  className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }}
-                />
-                <Button type="submit" size="icon" disabled={!newMessage.trim() || isChatLoading}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
-          </div>
+          {proposal && (
+            <ProposalChat 
+              projectId={projectId} 
+              proposalId={proposalId} 
+              proposalTitle={proposal.title} 
+            />
+          )}
         </TabsContent>
       </Tabs>
 

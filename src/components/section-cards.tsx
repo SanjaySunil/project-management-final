@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 
 interface SectionCardsProps {
   data?: {
-    revenue: number
+    revenue: number | null
     projects: number
     clients: number
     tasks: number
@@ -48,15 +48,15 @@ export function SectionCards({ data, loading }: SectionCardsProps) {
   }
 
   const cards = [
-    {
+    ...(data?.revenue !== null ? [{
       title: "Total Revenue",
-      value: data ? formatCurrency(data.revenue) : "$0.00",
+      value: data ? formatCurrency(data.revenue || 0) : "$0.00",
       description: "From active & complete proposals",
       trend: data?.trends.revenue || 0,
       icon: <IconCurrencyDollar className="size-4 text-muted-foreground" />,
       footer: "Updated just now",
       href: "/dashboard/finances"
-    },
+    }] : []),
     {
       title: "Active Projects",
       value: data ? data.projects.toString() : "0",

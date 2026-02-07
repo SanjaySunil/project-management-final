@@ -166,11 +166,6 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
           permission: { action: "read", resource: "organizations" },
         },
         {
-          title: "Roles & Permissions",
-          url: "/dashboard/team?tab=roles",
-          permission: { action: "read", resource: "roles" },
-        },
-        {
           title: "Audit Logs",
           url: "/dashboard/audit-logs",
           permission: { action: "read", resource: "audit_logs" },
@@ -203,7 +198,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const teams = [
     {
-      name: organization?.name || "Acme Inc",
+      name: organization?.name || "Organization",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
     },

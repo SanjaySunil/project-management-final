@@ -71,17 +71,24 @@ export default function ProjectsPage() {
           )
         `)
       
-      // Filter by assigned projects if not admin or manager
-      const isAdmin = role === "admin" || role === "manager"
+      // Filter by assigned projects if not admin
+      const isAdmin = role === "admin"
       if (!isAdmin) {
         query = query.filter("project_members.user_id", "eq", user.id)
       }
 
-      const { data, error } = await query.order("created_at", { ascending: false })
+      const { data, error } = await query.order("updated_at", { ascending: false, nullsFirst: false })
 
       if (error) throw error
       
       const projectsWithSync = (data as any) || []
+      
+      // If any projects have null updated_at, fall back to created_at sorting
+      projectsWithSync.sort((a: any, b: any) => {
+        const dateA = new Date(a.updated_at || a.created_at).getTime()
+        const dateB = new Date(b.updated_at || b.created_at).getTime()
+        return dateB - dateA
+      })
       
       // Update statuses in background/parallel to ensure consistency
       // Note: In a real production app with many projects, you'd do this 
