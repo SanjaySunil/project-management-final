@@ -94,6 +94,65 @@ export default function TasksPage() {
     fetchInitialData()
   }, [fetchInitialData])
 
+  React.useEffect(() => {
+    const channel = supabase
+      .channel("tasks-all-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const { data, error } = await supabase
+              .from("tasks")
+              .select(`
+                *,
+                proposals (
+                  id,
+                  title,
+                  project_id,
+                  projects (
+                    name
+                  )
+                ),
+                task_attachments (*)
+              `)
+              .eq("id", payload.new.id)
+              .single()
+
+            if (!error && data) {
+              const newTask = {
+                ...data,
+                profiles: members.find(m => m.id === data.user_id) || null
+              }
+              setTasks(prev => {
+                if (prev.some(t => t.id === newTask.id)) return prev
+                return [...prev, newTask as Task]
+              })
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const updatedTask = payload.new as Task
+            setTasks(prev => prev.map(t => {
+              if (t.id === updatedTask.id) {
+                return {
+                  ...t,
+                  ...updatedTask,
+                  profiles: members.find(m => m.id === updatedTask.user_id) || null
+                }
+              }
+              return t
+            }))
+          } else if (payload.eventType === "DELETE") {
+            setTasks(prev => prev.filter(t => t.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [members])
+
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
       // If user_id is changed, we need to update the profiles object locally as well

@@ -135,6 +135,85 @@ export function AssignedTasks({
     fetchTasks()
   }, [fetchTasks])
 
+  React.useEffect(() => {
+    if (!targetUserId) return
+
+    const table = mode === "project" ? "tasks" : "personal_tasks"
+    const channel = supabase
+      .channel(`assigned-tasks-${table}-${targetUserId}`)
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: table,
+          filter: `user_id=eq.${targetUserId}`
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            let data, error
+            if (mode === "project") {
+              const res = await supabase
+                .from("tasks")
+                .select(`
+                  *,
+                  proposals (
+                    id,
+                    title,
+                    project_id,
+                    projects (
+                      name
+                    )
+                  ),
+                  task_attachments (*)
+                `)
+                .eq("id", payload.new.id)
+                .single()
+              data = res.data
+              error = res.error
+            } else {
+              const res = await (supabase.from as any)("personal_tasks")
+                .select("*")
+                .eq("id", payload.new.id)
+                .single()
+              data = res.data
+              error = res.error
+            }
+
+            if (!error && data) {
+              const newTask = {
+                ...data,
+                profiles: members.find(m => m.id === data.user_id) || null
+              }
+              setTasks(prev => {
+                if (prev.some(t => t.id === newTask.id)) return prev
+                return [...prev, newTask as Task]
+              })
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const updatedTask = payload.new as any
+            setTasks(prev => prev.map(t => {
+              if (t.id === updatedTask.id) {
+                return {
+                  ...t,
+                  ...updatedTask,
+                  profiles: members.find(m => m.id === updatedTask.user_id) || null
+                }
+              }
+              return t
+            }))
+          } else if (payload.eventType === "DELETE") {
+            setTasks(prev => prev.filter(t => t.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [targetUserId, mode, members])
+
   const filteredTasks = React.useMemo(() => {
     if (statusFilter === "all") return tasks
     if (statusFilter === "active") return tasks.filter(t => t.status !== "complete")

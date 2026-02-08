@@ -124,6 +124,72 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     }
   }, [fetchData, proposalId])
 
+  React.useEffect(() => {
+    if (!proposalId) return
+
+    const channel = supabase
+      .channel(`proposal-tasks-${proposalId}`)
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "tasks",
+          filter: `proposal_id=eq.${proposalId}`
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const { data, error } = await supabase
+              .from("tasks")
+              .select(`
+                *,
+                proposals (
+                  id,
+                  title,
+                  project_id,
+                  projects (
+                    name
+                  )
+                ),
+                task_attachments (*)
+              `)
+              .eq("id", payload.new.id)
+              .single()
+
+            if (!error && data) {
+              const newTask = {
+                ...data,
+                profiles: members.find(m => m.id === data.user_id) || null
+              }
+              setTasks(prev => {
+                if (prev.some(t => t.id === newTask.id)) return prev
+                return [...prev, newTask as Task]
+              })
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const updatedTask = payload.new as Task
+            setTasks(prev => prev.map(t => {
+              if (t.id === updatedTask.id) {
+                return {
+                  ...t,
+                  ...updatedTask,
+                  profiles: members.find(m => m.id === updatedTask.user_id) || null
+                }
+              }
+              return t
+            }))
+          } else if (payload.eventType === "DELETE") {
+            setTasks(prev => prev.filter(t => t.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [proposalId, members])
+
   // --- Proposal Actions ---
   const handleProposalSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
     try {
