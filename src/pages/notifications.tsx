@@ -27,6 +27,7 @@ export default function NotificationsPage() {
     markNotificationsAsRead,
     deleteNotification, 
     deleteNotifications,
+    deleteAllNotifications,
     isLoading 
   } = useNotifications()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -54,16 +55,44 @@ export default function NotificationsPage() {
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return
-    await deleteNotifications(selectedIds)
-    setSelectedIds([])
-    toast.success(`${selectedIds.length} notifications deleted`)
+    const success = await deleteNotifications(selectedIds)
+    if (success) {
+      setSelectedIds([])
+      toast.success(`${selectedIds.length} notifications deleted`)
+    } else {
+      toast.error("Failed to delete notifications")
+    }
+  }
+
+  const handleClearAll = async () => {
+    if (!confirm("Are you sure you want to delete all notifications?")) return
+    const success = await deleteAllNotifications()
+    if (success) {
+      setSelectedIds([])
+      toast.success("All notifications deleted")
+    } else {
+      toast.error("Failed to delete all notifications")
+    }
+  }
+
+  const handleMarkAllAsRead = async () => {
+    const success = await markAllAsRead()
+    if (success) {
+      toast.success("All notifications marked as read")
+    } else {
+      toast.error("Failed to mark all as read")
+    }
   }
 
   const handleBulkMarkAsRead = async () => {
     if (selectedIds.length === 0) return
-    await markNotificationsAsRead(selectedIds)
-    setSelectedIds([])
-    toast.success(`${selectedIds.length} notifications marked as read`)
+    const success = await markNotificationsAsRead(selectedIds)
+    if (success) {
+      setSelectedIds([])
+      toast.success(`${selectedIds.length} notifications marked as read`)
+    } else {
+      toast.error("Failed to mark notifications as read")
+    }
   }
 
   return (
@@ -105,17 +134,30 @@ export default function NotificationsPage() {
                 </Button>
               </div>
             ) : (
-              unreadCount > 0 && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-1.5 text-xs" 
-                  onClick={markAllAsRead}
-                >
-                  <CheckCheck className="h-3.5 w-3.5" />
-                  Mark all as read
-                </Button>
-              )
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 gap-1.5 text-xs" 
+                    onClick={handleMarkAllAsRead}
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Mark all as read
+                  </Button>
+                )}
+                {notifications.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/5" 
+                    onClick={handleClearAll}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear all
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -365,18 +407,37 @@ function NotificationList({
   items: Notification[],
   selectedIds: string[],
   onToggleSelection: (id: string) => void,
-  onMarkAsRead: (id: string) => void,
-  onDelete: (id: string) => void,
+  onMarkAsRead: (id: string) => Promise<boolean | void>,
+  onDelete: (id: string) => Promise<boolean | void>,
   isLoading: boolean
 }) {
   const navigate = useNavigate()
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.is_read) {
-      await onMarkAsRead(notification.id)
+      const success = await onMarkAsRead(notification.id)
+      if (!success) toast.error("Failed to mark as read")
     }
     if (notification.link) {
       navigate(notification.link)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    const success = await onDelete(id)
+    if (success) {
+      toast.success("Notification deleted")
+    } else {
+      toast.error("Failed to delete notification")
+    }
+  }
+
+  const handleMarkAsRead = async (id: string) => {
+    const success = await onMarkAsRead(id)
+    if (success) {
+      toast.success("Notification marked as read")
+    } else {
+      toast.error("Failed to mark as read")
     }
   }
 
@@ -485,7 +546,7 @@ function NotificationList({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => onMarkAsRead(notification.id)}
+                    onClick={() => handleMarkAsRead(notification.id)}
                     title="Mark as read"
                   >
                     <Check className="h-4 w-4" />
@@ -495,7 +556,7 @@ function NotificationList({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => onDelete(notification.id)}
+                  onClick={() => handleDelete(notification.id)}
                   title="Delete"
                 >
                   <Trash2 className="h-4 w-4" />

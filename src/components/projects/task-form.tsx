@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2 } from "@tabler/icons-react"
+import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare } from "@tabler/icons-react"
 import type { Tables } from "@/lib/database.types"
 import type { Task } from "./kanban-board"
 import { supabase } from "@/lib/supabase"
@@ -31,6 +31,7 @@ const taskSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
+  status: z.string().optional(),
   user_id: z.string().nullable().optional(),
   project_id: z.string().nullable().optional(),
   proposal_id: z.string().nullable().optional(),
@@ -41,10 +42,19 @@ const taskSchema = z.object({
 
 export type TaskFormValues = z.infer<typeof taskSchema>
 
+const TASK_STATUSES = [
+  { id: "backlog", title: "Backlog" },
+  { id: "todo", title: "To Do" },
+  { id: "in progress", title: "In Progress" },
+  { id: "in review", title: "In Review" },
+  { id: "complete", title: "Complete" },
+]
+
 interface TaskFormProps {
   onSubmit: (values: TaskFormValues) => void
   onCancel: () => void
   onDelete?: () => void
+  onShare?: () => void
   onSubtaskToggle?: (subtaskId: string, currentStatus: string) => void | Promise<void>
   onAddSubtask?: (title: string) => void | Promise<void>
   isLoading?: boolean
@@ -60,6 +70,7 @@ export function TaskForm({
   onSubmit, 
   onCancel, 
   onDelete,
+  onShare,
   onSubtaskToggle,
   onAddSubtask,
   isLoading, 
@@ -93,6 +104,7 @@ export function TaskForm({
       id: defaultValues?.id,
       title: defaultValues?.title || "",
       description: defaultValues?.description || "",
+      status: defaultValues?.status || "todo",
       user_id: defaultValues?.user_id || null,
       project_id: initialProjectId,
       proposal_id: defaultValues?.proposal_id || null,
@@ -529,6 +541,34 @@ export function TaskForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value || "todo"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {TASK_STATUSES.map((status) => (
+                        <SelectItem key={status.id} value={status.id}>
+                          {status.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             {!hideAssignee && (
               <FormField
                 control={form.control}
@@ -559,7 +599,9 @@ export function TaskForm({
                 )}
               />
             )}
-            
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
             {tasks && tasks.length > 0 && (
               <FormField
                 control={form.control}
@@ -664,7 +706,19 @@ export function TaskForm({
         </div>
 
         <div className="flex justify-between gap-2 pt-4 border-t mt-2">
-          <div>
+          <div className="flex gap-2">
+            {onShare && (
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={onShare}
+                title="Share task"
+              >
+                <IconShare className="size-4" />
+              </Button>
+            )}
             {onDelete && (
               <Button 
                 type="button" 

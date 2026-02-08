@@ -210,29 +210,29 @@ export default function TeamPage() {
     <PageContainer>
       <SEO title="Team Management" description="Manage your team members and roles." />
       <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Team Management</h1>
             <p className="text-sm text-muted-foreground">Manage team members and their roles</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={fetchProfiles} variant="outline" size="sm">
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+            <Button onClick={fetchProfiles} variant="outline" size="sm" className="flex-1 sm:flex-none">
+              <RefreshCw className={`sm:mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
             </Button>
             {canCreateMember && (
-              <Button onClick={() => setAddMemberOpen(true)} size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Member
+              <Button onClick={() => setAddMemberOpen(true)} size="sm" className="flex-1 sm:flex-none">
+                <Plus className="sm:mr-2 h-4 w-4" />
+                <span>Add Member</span>
               </Button>
             )}
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {loading ? (
-              Array.from({ length: 2 }).map((_, i) => (
+              Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
                   <Skeleton className="h-5 w-20 mb-2" />
                   <Skeleton className="h-4 w-full" />

@@ -17,12 +17,22 @@ const getGitVersion = () => {
   }
 }
 
+const getGitCommitMessage = () => {
+  try {
+    return execSync("git log -1 --pretty=%s").toString().trim()
+  } catch (e) {
+    return ""
+  }
+}
+
 const appVersion = getGitVersion()
+const appCommitMessage = getGitCommitMessage()
 
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_COMMIT_MESSAGE__: JSON.stringify(appCommitMessage),
   },
   plugins: [
     react(),

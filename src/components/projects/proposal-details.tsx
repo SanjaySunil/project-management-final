@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
 import { useAuth } from "@/hooks/use-auth"
+import { useSearchParams } from "react-router-dom"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MessageSquare } from "lucide-react"
 import { slugify, getErrorMessage } from "@/lib/utils"
@@ -34,6 +35,8 @@ interface ProposalDetailsProps {
 export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps) {
   const { user, role } = useAuth()
   const isAdmin = role === "admin"
+  const [searchParams, setSearchParams] = useSearchParams()
+  const taskIdParam = searchParams.get("taskId")
   
   // Proposal & Deliverables state
   const [proposal, setProposal] = React.useState<Proposal | null>(null)
@@ -52,6 +55,31 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
   const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isTaskSubmitting, setIsTaskSubmitting] = React.useState(false)
+
+  // Handle deep linking for tasks
+  React.useEffect(() => {
+    if (taskIdParam && tasks.length > 0 && !editingTask) {
+      const task = tasks.find(t => t.id === taskIdParam)
+      if (task) {
+        setEditingTask(task)
+        setIsEditDialogOpen(true)
+        setActiveTab("kanban")
+      }
+    }
+  }, [taskIdParam, tasks, editingTask])
+
+  // Clear taskId from URL when dialog is closed
+  const handleEditDialogChange = (open: boolean) => {
+    setIsEditDialogOpen(open)
+    if (!open) {
+      setEditingTask(null)
+      if (searchParams.has("taskId")) {
+        const newParams = new URLSearchParams(searchParams)
+        newParams.delete("taskId")
+        setSearchParams(newParams)
+      }
+    }
+  }
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -258,7 +286,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
   }
 
   const handleTaskCreate = async (values: TaskFormValues) => {
-    if (!creatingStatus) return
+    if (!creatingStatus && !values.status) return
+    const finalStatus = values.status || creatingStatus || "todo"
     try {
       setIsTaskSubmitting(true)
       const { data, error } = await supabase
@@ -269,8 +298,8 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           user_id: values.user_id === "unassigned" ? null : values.user_id,
           proposal_id: proposalId,
           parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId),
-          status: creatingStatus,
-          order_index: tasks.filter(t => t.status === creatingStatus).length
+          status: finalStatus,
+          order_index: tasks.filter(t => t.status === finalStatus).length
         }])
         .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
         .single()
@@ -382,6 +411,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       const updates = {
         title: values.title,
         description: values.description || null,
+        status: values.status || editingTask.status,
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
@@ -616,6 +646,25 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
               onTaskQuickCreate={handleTaskQuickCreate}
               onTaskEdit={(task) => { setEditingTask(task); setIsEditDialogOpen(true); }}
               onTaskDelete={handleTaskDelete}
+              onShare={(task) => {
+                const shareData = {
+                  title: task.title,
+                  text: task.description || task.title,
+                  url: `${window.location.origin}${window.location.pathname}?taskId=${task.id}`,
+                }
+
+                if (navigator.share && navigator.canShare(shareData)) {
+                  navigator.share(shareData).catch(err => {
+                    if (err.name !== 'AbortError') {
+                      console.error("Error sharing:", err)
+                      toast.error("Failed to share task")
+                    }
+                  })
+                } else {
+                  navigator.clipboard.writeText(shareData.url)
+                  toast.success("Link copied to clipboard")
+                }
+              }}
               isLoading={isLoading}
             />
           </div>
@@ -665,7 +714,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
@@ -674,10 +723,25 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           {editingTask && (
             <TaskForm 
               onSubmit={handleTaskEdit} 
-              onCancel={() => setIsEditDialogOpen(false)} 
+              onCancel={() => handleEditDialogChange(false)} 
               onDelete={() => {
                 handleTaskDelete(editingTask.id)
-                setIsEditDialogOpen(false)
+                handleEditDialogChange(false)
+              }}
+              onShare={() => {
+                const shareData = {
+                  title: editingTask.title,
+                  text: editingTask.description || editingTask.title,
+                  url: `${window.location.origin}${window.location.pathname}?taskId=${editingTask.id}`,
+                }
+                if (navigator.share && navigator.canShare(shareData)) {
+                  navigator.share(shareData).catch(err => {
+                    if (err.name !== 'AbortError') toast.error("Failed to share task")
+                  })
+                } else {
+                  navigator.clipboard.writeText(shareData.url)
+                  toast.success("Link copied to clipboard")
+                }
               }}
               onSubtaskToggle={(id, status) => handleTaskUpdate(id, { status: status === 'complete' ? 'todo' : 'complete' })}
               onAddSubtask={(title) => handleTaskQuickCreate(editingTask.status, editingTask.id, title)}
@@ -688,6 +752,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
                 id: editingTask.id,
                 title: editingTask.title, 
                 description: editingTask.description || "", 
+                status: editingTask.status,
                 user_id: editingTask.user_id, 
                 proposal_id: editingTask.proposal_id,
                 parent_id: editingTask.parent_id

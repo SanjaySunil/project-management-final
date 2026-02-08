@@ -20,13 +20,14 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { Tables } from "@/lib/database.types"
 import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -89,6 +90,7 @@ interface KanbanBoardProps {
   onTaskQuickCreate?: (status: string, parentId: string, title: string) => void | Promise<void>
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
+  onShare?: (task: Task) => void
   hideControls?: boolean
   hideCreate?: boolean
   isLoading?: boolean
@@ -110,6 +112,7 @@ export function KanbanBoard({
   onTaskQuickCreate,
   onTaskEdit,
   onTaskDelete,
+  onShare,
   hideControls = false,
   hideCreate = false,
   isLoading = false
@@ -170,6 +173,34 @@ export function KanbanBoard({
   const getSubtasks = React.useCallback((taskId: string) => {
     return tasks.filter(t => t.parent_id === taskId)
   }, [tasks])
+
+  const handleShare = React.useCallback(async (task: Task) => {
+    if (onShare) {
+      onShare(task)
+      return
+    }
+
+    // Default share implementation if onShare prop is not provided
+    const shareData = {
+      title: task.title,
+      text: task.description || task.title,
+      url: `${window.location.origin}/dashboard/tasks?taskId=${task.id}`,
+    }
+
+    try {
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData)
+      } else {
+        await navigator.clipboard.writeText(shareData.url)
+        toast.success("Link copied to clipboard")
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Error sharing:", err)
+        toast.error("Failed to share task")
+      }
+    }
+  }, [onShare])
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event
@@ -361,6 +392,7 @@ export function KanbanBoard({
                 onTaskEdit={onTaskEdit}
                 onTaskUpdate={onTaskUpdate}
                 onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
+                onShare={handleShare}
                 getSubtasks={getSubtasks}
               />
             ))}
@@ -374,6 +406,7 @@ export function KanbanBoard({
                   onEdit={onTaskEdit}
                   onUpdate={onTaskUpdate}
                   onDelete={() => setIsDeleteDialogOpen(activeTask.id)}
+                  onShare={handleShare}
                   subtasks={getSubtasks(activeTask.id)}
                 />
               ) : null}
@@ -409,10 +442,11 @@ interface KanbanColumnProps {
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
+  onShare: (task: Task) => void
   getSubtasks: (taskId: string) => Task[]
 }
 
-function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskDelete, getSubtasks }: KanbanColumnProps) {
+function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskDelete, onShare, getSubtasks }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: id,
   })
@@ -457,6 +491,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
               onTaskDelete={onTaskDelete}
               onAddSubtask={onAddSubtask}
               onQuickAddSubtask={onQuickAddSubtask}
+              onShare={onShare}
               subtasks={getSubtasks(task.id)}
             />
           ))}
@@ -491,10 +526,11 @@ interface SortableTaskCardProps {
   onTaskDelete: (taskId: string) => void | Promise<void>
   onAddSubtask?: (parentId: string) => void
   onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
+  onShare: (task: Task) => void
   subtasks: Task[]
 }
 
-function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAddSubtask, onQuickAddSubtask, subtasks }: SortableTaskCardProps) {
+function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAddSubtask, onQuickAddSubtask, onShare, subtasks }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -535,6 +571,7 @@ function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAdd
         onDelete={() => onTaskDelete(task.id)}
         onAddSubtask={onAddSubtask}
         onQuickAddSubtask={onQuickAddSubtask}
+        onShare={onShare}
         subtasks={subtasks}
       />
     </div>
@@ -550,10 +587,11 @@ interface TaskCardProps {
   onDelete: () => void
   onAddSubtask?: (parentId: string) => void
   onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
+  onShare: (task: Task) => void
   subtasks: Task[]
 }
 
-function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddSubtask, onQuickAddSubtask, subtasks }: TaskCardProps) {
+function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddSubtask, onQuickAddSubtask, onShare, subtasks }: TaskCardProps) {
   const [isAddingSubtask, setIsAddingSubtask] = React.useState(false)
   const [newSubtaskTitle, setNewSubtaskTitle] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -619,6 +657,17 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                   <IconPlus className="size-3" />
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onShare(task)
+                }}
+              >
+                <IconShare className="size-3" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
