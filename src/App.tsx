@@ -23,6 +23,7 @@ import AccountPage from "@/pages/account"
 import OrganizationPage from "@/pages/organization"
 import NotificationsPage from "@/pages/notifications"
 import FinancesPage from "@/pages/finances"
+import TicketsPage from "@/pages/tickets"
 import { Toaster } from "@/components/ui/sonner"
 import ReloadPrompt from "@/components/reload-prompt"
 import { PWAInstallModal } from "@/components/pwa-install-modal"
@@ -66,6 +67,7 @@ export function App() {
               <Route path="finances" element={<FinancesPage />} />
               <Route path="team" element={<TeamPage />} />
               <Route path="audit-logs" element={<AuditLogsPage />} />
+              <Route path="tickets" element={<TicketsPage />} />
               <Route path="account" element={<AccountPage />} />
               <Route path="organization" element={<OrganizationPage />} />
               <Route path="notifications" element={<NotificationsPage />} />

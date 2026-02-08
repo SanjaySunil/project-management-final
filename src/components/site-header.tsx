@@ -11,6 +11,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Link, useLocation } from "react-router-dom"
 import { ModeToggle } from "./mode-toggle"
 import { NotificationsButton } from "./notifications-button"
+import { TicketButton } from "./tickets/ticket-button"
 import React from "react"
 
 const routeMap: Record<string, string> = {
@@ -114,6 +115,7 @@ export function SiteHeader() {
         </Breadcrumb>
       </div>
       <div className="flex items-center gap-2 px-4 lg:px-6">
+        <TicketButton />
         <ModeToggle />
         <NotificationsButton />
       </div>

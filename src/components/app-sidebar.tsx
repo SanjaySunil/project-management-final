@@ -15,6 +15,7 @@ import {
   MessageCircle,
   ShieldCheck,
   Settings2,
+  Ticket,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -163,6 +164,12 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
           title: "Audit Logs",
           url: "/dashboard/audit-logs",
           permission: { action: "read", resource: "audit_logs" },
+        },
+        {
+          title: "Tickets",
+          url: "/dashboard/tickets",
+          icon: Ticket,
+          permission: { action: "read", resource: "tickets" },
         },
       ],
     },
