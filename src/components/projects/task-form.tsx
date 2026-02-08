@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare } from "@tabler/icons-react"
+import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket } from "@tabler/icons-react"
 import type { Tables } from "@/lib/database.types"
 import type { Task } from "./kanban-board"
 import { supabase } from "@/lib/supabase"
@@ -32,6 +32,7 @@ const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   status: z.string().optional(),
+  type: z.string().optional(),
   user_id: z.string().nullable().optional(),
   project_id: z.string().nullable().optional(),
   proposal_id: z.string().nullable().optional(),
@@ -105,6 +106,7 @@ export function TaskForm({
       title: defaultValues?.title || "",
       description: defaultValues?.description || "",
       status: defaultValues?.status || "todo",
+      type: defaultValues?.type || "feature",
       user_id: defaultValues?.user_id || null,
       project_id: initialProjectId,
       proposal_id: defaultValues?.proposal_id || null,
@@ -115,11 +117,6 @@ export function TaskForm({
   })
 
   const selectedProjectId = form.watch("project_id")
-
-  // Filter tasks that could be a parent (no recursion for now, just top-level)
-  const potentialParents = React.useMemo(() => {
-    return tasks.filter(t => !t.parent_id && t.id !== defaultValues?.id)
-  }, [tasks, defaultValues?.id])
 
   // Get current subtasks
   const currentSubtasks = React.useMemo(() => {
@@ -146,6 +143,10 @@ export function TaskForm({
       proposal.id === defaultValues?.proposal_id
     )
   }, [selectedProjectId, proposals, defaultValues?.proposal_id])
+
+  const potentialParents = React.useMemo(() => {
+    return tasks.filter(t => t.id !== defaultValues?.id && !t.parent_id)
+  }, [tasks, defaultValues?.id])
 
   const { user } = useAuth()
   const [isUploading, setIsUploading] = React.useState(false)
@@ -541,6 +542,41 @@ export function TaskForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Work Type</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value || "feature"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="feature">
+                        <div className="flex items-center gap-2">
+                          <IconRocket className="size-4 text-blue-600" />
+                          <span>Feature</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="bug">
+                        <div className="flex items-center gap-2">
+                          <IconBug className="size-4 text-destructive" />
+                          <span>Bug</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <FormField
               control={form.control}
               name="status"

@@ -20,11 +20,12 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import type { Tables } from "@/lib/database.types"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -61,6 +62,7 @@ export type Task = {
   title: string
   description: string | null
   status: string
+  type: string | null
   order_index: number | null
   user_id: string | null
   parent_id: string | null
@@ -637,6 +639,36 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
             />
           </div>
         )}
+
+        <div className="flex items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <button className="focus:outline-none">
+                {task.type === 'bug' ? (
+                  <Badge variant="destructive" className="h-4 px-1 text-[9px] gap-0.5 flex items-center uppercase font-bold tracking-wider">
+                    <IconBug className="size-2.5" />
+                    Bug
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-transparent uppercase font-bold tracking-wider">
+                    <IconRocket className="size-2.5" />
+                    Feature
+                  </Badge>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-32">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { type: 'feature' }) }}>
+                <IconRocket className="size-3.5 mr-2 text-blue-600" />
+                <span>Feature</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { type: 'bug' }) }}>
+                <IconBug className="size-3.5 mr-2 text-destructive" />
+                <span>Bug</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         
         <div className="flex items-start justify-between gap-2">
           <h4 className="text-sm font-semibold leading-tight line-clamp-3">

@@ -30,12 +30,23 @@ export async function updateProjectStatus(projectId: string) {
       newStatus = "completed";
     }
 
-    const { error: projectError } = await supabase
+    // Get current project status to avoid unnecessary updates
+    const { data: project, error: fetchError } = await supabase
       .from("projects")
-      .update({ status: newStatus })
-      .eq("id", projectId);
+      .select("status")
+      .eq("id", projectId)
+      .single();
 
-    if (projectError) throw projectError;
+    if (fetchError) throw fetchError;
+
+    if (project.status !== newStatus) {
+      const { error: projectError } = await supabase
+        .from("projects")
+        .update({ status: newStatus })
+        .eq("id", projectId);
+
+      if (projectError) throw projectError;
+    }
     
     return newStatus;
   } catch (error) {

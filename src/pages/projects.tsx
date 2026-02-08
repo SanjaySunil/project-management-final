@@ -16,7 +16,6 @@ import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
 import { ProjectDetailsModal } from "@/components/projects/project-details-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { updateProjectStatus } from "@/lib/projects"
 import type { Tables } from "@/lib/database.types"
 
 export default function ProjectsPage() {
@@ -90,14 +89,6 @@ export default function ProjectsPage() {
         return dateB - dateA
       })
       
-      // Update statuses in background/parallel to ensure consistency
-      // Note: In a real production app with many projects, you'd do this 
-      // via a database trigger or cron job instead of client-side.
-      await Promise.all(projectsWithSync.map(async (p: any) => {
-        const syncedStatus = await updateProjectStatus(p.id)
-        p.status = syncedStatus
-      }))
-
       setProjects(projectsWithSync)
     } catch (error: any) {
       toast.error("Failed to fetch projects: " + error.message)

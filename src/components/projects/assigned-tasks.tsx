@@ -289,6 +289,7 @@ export function AssignedTasks({
       const payload: any = {
         title: values.title,
         description: values.description,
+        type: values.type || 'feature',
         user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
         status: finalStatus,
         order_index: tasks.filter(t => t.status === finalStatus).length,
@@ -432,6 +433,7 @@ export function AssignedTasks({
         title: values.title,
         description: values.description || null,
         status: values.status || editingTask.status,
+        type: values.type || editingTask.type || 'feature',
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null)
       }
@@ -475,6 +477,7 @@ export function AssignedTasks({
       const payload: any = {
         title,
         status,
+        type: parentTask?.type || 'feature',
         parent_id: parentId,
         user_id: targetUserId,
         order_index: tasks.filter(t => t.parent_id === parentId).length
@@ -757,6 +760,7 @@ export function AssignedTasks({
                 title: editingTask.title,
                 description: editingTask.description || "",
                 status: editingTask.status,
+                type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id,
                 proposal_id: editingTask.proposal_id,
                 parent_id: editingTask.parent_id,

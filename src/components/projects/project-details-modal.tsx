@@ -16,6 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { type ProjectWithClient } from "./projects-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import { ProjectForm } from "./project-form"
 import { updateProjectStatus } from "@/lib/projects"
 import { slugify } from "@/lib/utils"
@@ -317,6 +318,12 @@ export function ProjectDetailsModal({
                 >
                   Project Overview
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="documents" 
+                  className="h-12 rounded-none data-[state=active]:bg-transparent shadow-none"
+                >
+                  Documents
+                </TabsTrigger>
               </TabsList>
             </div>
             
@@ -346,6 +353,38 @@ export function ProjectDetailsModal({
                   onCancel={() => onOpenChange(false)}
                   isLoading={isSavingProject}
                 />
+              </TabsContent>
+
+              <TabsContent value="documents" className="mt-0">
+                <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/10">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-6 w-6"
+                    >
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold">Meeting Notes & Documents</h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+                    Access project documentation and take notes from your client meetings.
+                  </p>
+                  <Button onClick={() => {
+                    navigate(`/dashboard/projects/${project?.id}/documents`)
+                    onOpenChange(false)
+                  }}>
+                    Go to Documents
+                  </Button>
+                </div>
               </TabsContent>
             </div>
           </Tabs>

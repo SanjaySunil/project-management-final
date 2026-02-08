@@ -11,6 +11,7 @@ import ClientOverviewPage from "@/pages/client-overview"
 import ClientProjectsPage from "@/pages/client-projects"
 import ProjectsPage from "@/pages/projects"
 import ProjectOverviewPage from "@/pages/project-overview"
+import ProjectDocumentsPage from "@/pages/project-documents"
 import ProposalsPage from "@/pages/proposals"
 import ProposalOverviewPage from "@/pages/proposal-overview"
 import TasksPage from "@/pages/tasks"
@@ -57,6 +58,7 @@ export function App() {
               <Route path="projects" element={<ProjectsPage />} />
               <Route path="projects/:projectId" element={<ProjectOverviewPage />} />
               <Route path="projects/:projectId/overview" element={<ProjectOverviewPage />} />
+              <Route path="projects/:projectId/documents" element={<ProjectDocumentsPage />} />
               <Route path="projects/:projectId/proposals" element={<ProposalsPage />} />
               <Route path="projects/:projectId/proposals/:proposalId" element={<ProposalOverviewPage />} />
               <Route path="projects/:projectId/chat" element={<ChatPage />} />

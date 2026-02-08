@@ -22,6 +22,8 @@ import {
 import { UserForm, type UserFormValues } from "@/components/user-form"
 import { UserDetailsModal } from "@/components/user-details-modal"
 import { createClient } from "@supabase/supabase-js"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { TeamWorkload } from "@/components/team-workload"
 
 import { ROLES, type RoleData, canManageUsers } from "@/lib/rbac"
 
@@ -229,40 +231,51 @@ export default function TeamPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-                  <Skeleton className="h-5 w-20 mb-2" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              ))
-            ) : (
-              (Object.entries(ROLES) as [string, RoleData][]).map(([key, roleInfo]) => (
-                <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant={key === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                      {roleInfo.label}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
-                </div>
-              ))
-            )}
-          </div>
+        <Tabs defaultValue="management" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="management">Team Management</TabsTrigger>
+            <TabsTrigger value="workload">Team Workload</TabsTrigger>
+          </TabsList>
 
-          <UsersTable 
-            data={profiles} 
-            onChangeRole={changeRole} 
-            onDelete={handleDelete}
-            onRowClick={handleUserClick}
-            currentUserRole={role}
-            availableRoles={ROLES}
-            isOnline={isOnline}
-            isLoading={loading}
-          />
-        </div>
+          <TabsContent value="management" className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                    <Skeleton className="h-5 w-20 mb-2" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                ))
+              ) : (
+                (Object.entries(ROLES) as [string, RoleData][]).map(([key, roleInfo]) => (
+                  <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={key === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                        {roleInfo.label}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <UsersTable 
+              data={profiles} 
+              onChangeRole={changeRole} 
+              onDelete={handleDelete}
+              onRowClick={handleUserClick}
+              currentUserRole={role}
+              availableRoles={ROLES}
+              isOnline={isOnline}
+              isLoading={loading}
+            />
+          </TabsContent>
+
+          <TabsContent value="workload">
+            <TeamWorkload />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <UserDetailsModal 

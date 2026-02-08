@@ -295,6 +295,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         .insert([{
           title: values.title,
           description: values.description,
+          type: values.type || 'feature',
           user_id: values.user_id === "unassigned" ? null : values.user_id,
           proposal_id: proposalId,
           parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId),
@@ -412,6 +413,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         title: values.title,
         description: values.description || null,
         status: values.status || editingTask.status,
+        type: values.type || editingTask.type || 'feature',
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
@@ -434,11 +436,13 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
   const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
     try {
+      const parentTask = tasks.find(t => t.id === parentId)
       const { data, error } = await supabase
         .from("tasks")
         .insert([{
           title,
           status,
+          type: parentTask?.type || 'feature',
           parent_id: parentId,
           proposal_id: proposalId,
           order_index: tasks.filter(t => t.parent_id === parentId).length
@@ -753,6 +757,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
                 title: editingTask.title, 
                 description: editingTask.description || "", 
                 status: editingTask.status,
+                type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id, 
                 proposal_id: editingTask.proposal_id,
                 parent_id: editingTask.parent_id

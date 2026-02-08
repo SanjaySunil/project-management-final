@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { updateProjectStatus } from "@/lib/projects"
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams()
@@ -43,14 +42,6 @@ export default function ProjectOverviewPage() {
 
       if (error) throw error
       
-      // Sync status
-      if (data && projectId) {
-        const currentStatus = await updateProjectStatus(projectId)
-        if (currentStatus !== data.status) {
-          data.status = currentStatus
-        }
-      }
-
       setProject(data)
     } catch (error: any) {
       toast.error("Failed to fetch project details: " + error.message)
@@ -137,6 +128,11 @@ export default function ProjectOverviewPage() {
               <Button asChild className="w-full justify-start gap-2" variant="outline">
                 <Link to={`/dashboard/projects/${projectId}/proposals`}>
                   <IconFileText className="h-4 w-4" /> View Proposals
+                </Link>
+              </Button>
+              <Button asChild className="w-full justify-start gap-2" variant="outline">
+                <Link to={`/dashboard/projects/${projectId}/documents`}>
+                  <IconFileText className="h-4 w-4" /> View Documents
                 </Link>
               </Button>
             </CardContent>

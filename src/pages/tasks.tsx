@@ -226,6 +226,7 @@ export default function TasksPage() {
         .insert([{
           title: values.title,
           description: values.description,
+          type: values.type || 'feature',
           user_id: values.user_id === "unassigned" ? null : values.user_id,
           proposal_id: values.proposal_id === "none" ? null : values.proposal_id,
           parent_id: (values.parent_id === "none" ? null : values.parent_id) || creatingParentId,
@@ -380,6 +381,7 @@ export default function TasksPage() {
         title: values.title,
         description: values.description || null,
         status: values.status || editingTask.status,
+        type: values.type || editingTask.type || 'feature',
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
         proposal_id: values.proposal_id === "none" ? null : (values.proposal_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
@@ -438,6 +440,7 @@ export default function TasksPage() {
         .insert([{
           title,
           status,
+          type: parentTask?.type || 'feature',
           parent_id: parentId,
           proposal_id: parentTask?.proposal_id || null,
           order_index: tasks.filter(t => t.parent_id === parentId).length
@@ -580,6 +583,7 @@ export default function TasksPage() {
                 title: editingTask.title,
                 description: editingTask.description || "",
                 status: editingTask.status,
+                type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id,
                 proposal_id: editingTask.proposal_id,
                 parent_id: editingTask.parent_id,
