@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
 
@@ -19,30 +19,42 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const lastFetchId = useRef(0)
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return
 
+    const fetchId = ++lastFetchId.current
     setIsLoading(true)
-    const { data, error } = await supabase.from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50)
-
-    if (!error && data) {
-      setNotifications(data as Notification[])
-      
-      // Get actual unread count
-      const { count } = await supabase
-        .from("notifications")
-        .select("*", { count: 'exact', head: true })
+    
+    try {
+      const { data, error } = await supabase.from("notifications")
+        .select("*")
         .eq("user_id", user.id)
-        .eq("is_read", false)
-      
-      setUnreadCount(count || 0)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (fetchId !== lastFetchId.current) return
+
+      if (!error && data) {
+        setNotifications(data as Notification[])
+        
+        // Get actual unread count
+        const { count } = await supabase
+          .from("notifications")
+          .select("*", { count: 'exact', head: true })
+          .eq("user_id", user.id)
+          .eq("is_read", false)
+        
+        if (fetchId === lastFetchId.current) {
+          setUnreadCount(count || 0)
+        }
+      }
+    } finally {
+      if (fetchId === lastFetchId.current) {
+        setIsLoading(false)
+      }
     }
-    setIsLoading(false)
   }, [user])
 
   useEffect(() => {
@@ -52,6 +64,14 @@ export function useNotifications() {
       await fetchNotifications()
     }
     init()
+
+    let timeout: ReturnType<typeof setTimeout>
+    const debouncedFetch = () => {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        fetchNotifications()
+      }, 500)
+    }
 
     const channel = supabase
       .channel(`notifications:${user.id}`)
@@ -64,13 +84,14 @@ export function useNotifications() {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
-          fetchNotifications()
+          debouncedFetch()
         }
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
+      clearTimeout(timeout)
     }
   }, [user, fetchNotifications])
 
@@ -105,6 +126,7 @@ export function useNotifications() {
 
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
     setUnreadCount(0)
+    lastFetchId.current++
     return true
   }
 
@@ -125,6 +147,7 @@ export function useNotifications() {
       }
       return prev.filter((n) => n.id !== id)
     })
+    lastFetchId.current++
     return true
   }
 
@@ -144,6 +167,7 @@ export function useNotifications() {
       setUnreadCount(count => Math.max(0, count - deletedUnreadCount))
       return prev.filter((n) => !ids.includes(n.id))
     })
+    lastFetchId.current++
     return true
   }
 
@@ -160,6 +184,7 @@ export function useNotifications() {
 
     setNotifications([])
     setUnreadCount(0)
+    lastFetchId.current++
     return true
   }
 
@@ -181,6 +206,7 @@ export function useNotifications() {
       const markedReadCount = notifications.filter(n => ids.includes(n.id) && !n.is_read).length
       return Math.max(0, prev - markedReadCount)
     })
+    lastFetchId.current++
     return true
   }
 
