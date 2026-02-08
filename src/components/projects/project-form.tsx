@@ -28,7 +28,6 @@ const projectSchema = z.object({
   name: z.string().min(2, "Project name must be at least 2 characters"),
   description: z.string().optional(),
   source_repo: z.string().optional().nullable(),
-  deployment_repo: z.string().optional().nullable(),
   status: z.string().min(1, "Status is required"),
   client_id: z.string().min(1, "Please select a client"),
   member_ids: z.array(z.string()),
@@ -41,7 +40,6 @@ interface ProjectFormProps {
     name: string
     description: string | null
     source_repo: string | null
-    deployment_repo: string | null
     status: string | null
     client_id: string | null
     member_ids: string[]
@@ -75,7 +73,6 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
       name: initialValues?.name || "",
       description: initialValues?.description || "",
       source_repo: (initialValues?.source_repo || "").replace("arehsoft/", ""),
-      deployment_repo: (initialValues?.deployment_repo || "").replace("sanjaysunil/", ""),
       status: initialValues?.status || "active",
       client_id: initialValues?.client_id || "",
       member_ids: initialValues?.member_ids || [],
@@ -86,7 +83,6 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
     const finalValues = {
       ...values,
       source_repo: values.source_repo ? `arehsoft/${values.source_repo.replace("arehsoft/", "")}` : null,
-      deployment_repo: values.deployment_repo ? `sanjaysunil/${values.deployment_repo.replace("sanjaysunil/", "")}` : null,
     }
     onSubmit(finalValues)
   }
@@ -150,28 +146,6 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
                   <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">arehsoft/</span>
                   <Input 
                     placeholder="repo-name" 
-                    {...field} 
-                    value={field.value || ''} 
-                    className="rounded-l-none"
-                  />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="deployment_repo"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Deployment Repository (GitHub)</FormLabel>
-              <FormControl>
-                <div className="flex items-center">
-                  <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">sanjaysunil/</span>
-                  <Input 
-                    placeholder="repo-name-deploy" 
                     {...field} 
                     value={field.value || ''} 
                     className="rounded-l-none"

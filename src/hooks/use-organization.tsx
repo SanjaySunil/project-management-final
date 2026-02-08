@@ -66,7 +66,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           console.error('OrganizationProvider: Error fetching organization:', error)
         } else if (data) {
           console.log('OrganizationProvider: Org data received')
-          setOrganization(data)
+          setOrganization(data as unknown as Organization)
         }
       } catch (err) {
         console.error('OrganizationProvider: Unexpected error:', err)
@@ -100,7 +100,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
 
     try {
-      const { id, ...dataToUpdate } = updates
+      const dataToUpdate = { ...updates }
+      delete (dataToUpdate as any).id
       const { data, error } = await supabase
         .from('organizations')
         .update(dataToUpdate)
@@ -110,7 +111,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
       if (error) throw error
       if (data) {
-        setOrganization(data)
+        setOrganization(data as unknown as Organization)
         toast.success("Organization updated successfully")
       }
     } catch (err: any) {

@@ -265,11 +265,13 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
           if (uploadError) throw uploadError
 
+          if (!user) throw new Error("Not authenticated")
+
           const { data: attachment, error: dbError } = await supabase
             .from('task_attachments')
             .insert([{
               task_id: taskId,
-              user_id: user?.id,
+              user_id: user.id,
               file_path: filePath,
               file_name: file.name,
               file_type: file.type,
@@ -370,145 +372,6 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
       toast.error("Failed to delete task: " + message)
     }
-  }
-
-  // --- Chat Actions ---
-  React.useEffect(() => {
-    if (!proposalId || !proposal || activeTab !== "messages") return
-
-    async function setupChat() {
-      setIsChatLoading(true)
-      // Find or create channel for this proposal
-      const { data: initialChannelData, error: channelError } = await supabase
-        .from("channels")
-        .select("*")
-        .eq("proposal_id", proposalId)
-        .maybeSingle()
-
-      if (channelError) {
-        toast.error("Failed to load chat channel")
-        setIsChatLoading(false)
-        return
-      }
-
-      let channelData = initialChannelData
-      if (!channelData) {
-        // Create channel
-        const { data: newChannel, error: createError } = await supabase
-          .from("channels")
-          .insert({
-            name: slugify(proposal?.title || ""),
-            project_id: projectId,
-            proposal_id: proposalId,
-            created_by: user?.id
-          })
-          .select()
-          .single()
-        
-        if (createError) {
-          // If another request created it in the meantime, try fetching it again
-          if (createError.code === "23505") {
-            const { data: existingChannel } = await supabase
-              .from("channels")
-              .select("*")
-              .eq("proposal_id", proposalId)
-              .single()
-            channelData = existingChannel
-          } else {
-            toast.error("Failed to create chat channel")
-            setIsChatLoading(false)
-            return
-          }
-        } else {
-          channelData = newChannel
-        }
-      }
-
-      if (channelData) {
-        setChannel(channelData)
-
-        // Sync channel name if it doesn't match proposal title
-        const expectedName = slugify(proposal?.title || "")
-        if (channelData.name !== expectedName) {
-          const { error: updateError } = await supabase
-            .from("channels")
-            .update({ name: expectedName })
-            .eq("id", channelData.id)
-          
-          if (updateError) {
-            console.error("Channel update error:", updateError)
-            toast.error("Could not sync channel name: " + updateError.message)
-          } else {
-            const updatedChannel = { ...channelData, name: expectedName }
-            setChannel(updatedChannel)
-            channelData = updatedChannel
-          }
-        }
-
-        // Fetch messages
-        const { data: messagesData, error: messagesError } = await supabase
-          .from("messages")
-          .select(`*, profiles:user_id (full_name, avatar_url, email)`)
-          .eq("channel_id", channelData.id)
-          .order("created_at", { ascending: true })
-
-        if (messagesError) {
-          toast.error("Failed to load messages")
-        } else {
-          setMessages((messagesData as unknown as Message[]) || [])
-        }
-      }
-      setIsChatLoading(false)
-
-      // Subscribe to new messages
-      if (channelData) {
-        const subscription = supabase
-          .channel(`proposal_chat:${channelData.id}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "messages",
-              filter: `channel_id=eq.${channelData.id}`,
-            },
-            async (payload) => {
-              const { data, error } = await supabase
-                .from("messages")
-                .select(`*, profiles:user_id (full_name, avatar_url, email)`)
-                .eq("id", payload.new.id)
-                .single()
-
-              if (!error && data) {
-                setMessages((prev) => [...prev, data as unknown as Message])
-              }
-            }
-          )
-          .subscribe()
-
-        return () => {
-          supabase.removeChannel(subscription)
-        }
-      }
-    }
-
-    setupChat()
-  }, [proposalId, proposal, projectId, user?.id, activeTab])
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newMessage.trim() || !channel || !user) return
-
-    const content = newMessage.trim()
-    setNewMessage("")
-
-    const { error } = await supabase.from("messages").insert({
-      content,
-      channel_id: channel.id,
-      user_id: user.id,
-    })
-
-    if (error) toast.error("Failed to send message")
   }
 
   const getStatusBadge = (status: string | null) => {

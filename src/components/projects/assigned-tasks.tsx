@@ -267,11 +267,13 @@ export function AssignedTasks({
 
           if (uploadError) throw uploadError
 
+          if (!currentUser) throw new Error("Not authenticated")
+
           const { data: attachment, error: dbError } = await supabase
             .from('task_attachments')
             .insert([{
               task_id: taskId,
-              user_id: currentUser?.id,
+              user_id: currentUser.id,
               file_path: filePath,
               file_name: file.name,
               file_type: file.type,

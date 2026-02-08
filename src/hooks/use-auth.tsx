@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { hasPermission, type RoleData } from '@/lib/rbac'
+import { hasPermission } from '@/lib/rbac'
 
 interface AuthContextType {
   session: Session | null

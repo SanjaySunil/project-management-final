@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, slugify } from "@/lib/utils"
 import { usePresence } from "@/hooks/use-presence"
 import { useNotifications } from "@/hooks/use-notifications"
 import { MentionTextarea } from "@/components/mention-textarea"

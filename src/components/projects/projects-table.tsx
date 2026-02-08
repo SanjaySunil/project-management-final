@@ -173,37 +173,23 @@ export function ProjectsTable({
     },
     {
       id: "repos",
-      header: "GitHub Repos",
+      header: "GitHub Repo",
       cell: ({ row }) => {
         const source = row.original.source_repo
-        const deployment = row.original.deployment_repo
         
-        if (!source && !deployment) return <span className="text-muted-foreground text-xs italic">N/A</span>
+        if (!source) return <span className="text-muted-foreground text-xs italic">N/A</span>
         
         return (
           <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-            {source && (
-              <a 
-                href={`https://github.com/${source}`} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-              >
-                <IconBrandGithub className="h-3 w-3" />
-                <span className="truncate max-w-[100px]">Src: {source.split('/').pop()}</span>
-              </a>
-            )}
-            {deployment && (
-              <a 
-                href={`https://github.com/${deployment}`} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-              >
-                <IconBrandGithub className="h-3 w-3" />
-                <span className="truncate max-w-[100px]">Dep: {deployment.split('/').pop()}</span>
-              </a>
-            )}
+            <a 
+              href={`https://github.com/${source}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+            >
+              <IconBrandGithub className="h-3 w-3" />
+              <span className="truncate max-w-[100px]">{source.split('/').pop()}</span>
+            </a>
           </div>
         )
       },

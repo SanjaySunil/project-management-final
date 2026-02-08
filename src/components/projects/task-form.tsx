@@ -75,7 +75,6 @@ export function TaskForm({
   const subtaskInputRef = React.useRef<HTMLInputElement>(null)
 
   const [localSubtasks, setLocalSubtasks] = React.useState<string[]>([])
-  const [localFiles, setLocalFiles] = React.useState<File[]>([])
   const [previews, setPreviews] = React.useState<{name: string, url: string}[]>([])
 
   // Find initial project from proposal if provided
@@ -214,7 +213,6 @@ export function TaskForm({
     } else {
       // Local storage for new task
       const newFiles = Array.from(files)
-      setLocalFiles(prev => [...prev, ...newFiles])
       
       const newPreviews = newFiles.map(file => ({
         name: file.name,
@@ -253,12 +251,10 @@ export function TaskForm({
   }
 
   const handleRemoveLocalFile = (index: number) => {
-    const fileToRemove = localFiles[index]
     if (previews[index].url) {
       URL.revokeObjectURL(previews[index].url)
     }
     
-    setLocalFiles(prev => prev.filter((_, i) => i !== index))
     setPreviews(prev => prev.filter((_, i) => i !== index))
     
     const currentFiles = form.getValues("files") || []

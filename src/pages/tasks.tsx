@@ -15,8 +15,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function TasksPage() {
+  const { user } = useAuth()
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
@@ -228,11 +230,13 @@ export default function TasksPage() {
 
           if (uploadError) throw uploadError
 
+          if (!user) throw new Error("Not authenticated")
+
           const { data: attachment, error: dbError } = await supabase
             .from('task_attachments')
             .insert([{
               task_id: taskId,
-              user_id: (await supabase.auth.getUser()).data.user?.id,
+              user_id: user.id,
               file_path: filePath,
               file_name: file.name,
               file_type: file.type,
