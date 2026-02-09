@@ -65,9 +65,31 @@ export default function ProjectsPage() {
           )
         `)
       
-      // Filter by assigned projects if not admin
-      const isAdmin = role === "admin"
-      if (!isAdmin) {
+      // Filter by role
+      if (role === "client") {
+        // Find the client record for this user
+        const { data: clientData, error: clientError } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+        
+        if (clientError) {
+          console.error("Failed to fetch client record:", clientError)
+          setProjects([])
+          setIsLoading(false)
+          return
+        }
+
+        if (clientData) {
+          query = query.eq("client_id", clientData.id)
+        } else {
+          setProjects([])
+          setIsLoading(false)
+          return
+        }
+      } else if (role !== "admin") {
+        // Employee sees projects they are members of
         query = query.filter("project_members.user_id", "eq", user.id)
       }
 

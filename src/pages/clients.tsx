@@ -27,11 +27,12 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useAuth } from "@/hooks/use-auth"
 import { Input } from "@/components/ui/input"
+import { createClient } from "@supabase/supabase-js"
 
 type Client = Tables<"clients">
 
 export default function ClientsPage() {
-  const { checkPermission } = useAuth()
+  const { checkPermission, organizationId } = useAuth()
   const [clients, setClients] = React.useState<Client[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -112,16 +113,47 @@ export default function ClientsPage() {
   }
 
   const handleSubmit = async (values: any) => {
+    const { enable_login, password, ...clientValues } = values
+
     try {
+      if (enable_login && password && !editingClient?.user_id) {
+        // Create auth user
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+        const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: {
+            persistSession: false
+          }
+        })
+
+        const { data: authData, error: signUpError } = await tempSupabase.auth.signUp({
+          email: values.email,
+          password: password,
+          options: {
+            data: {
+              full_name: `${values.first_name} ${values.last_name || ""}`.trim(),
+              role: 'client',
+              organization_id: organizationId
+            }
+          }
+        })
+
+        if (signUpError) throw signUpError
+        if (authData.user) {
+          clientValues.user_id = authData.user.id
+        }
+      }
+
       if (editingClient) {
         const { error } = await supabase
           .from("clients")
-          .update(values)
+          .update(clientValues)
           .eq("id", editingClient.id)
         if (error) throw error
         toast.success("Client updated successfully")
       } else {
-        const { error } = await supabase.from("clients").insert([values])
+        const { error } = await supabase.from("clients").insert([clientValues])
         if (error) throw error
         toast.success("Client added successfully")
       }

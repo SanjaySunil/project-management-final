@@ -45,10 +45,13 @@ export function AssignedTasks({
   hideHeader = false,
   defaultStatusFilter = "active"
 }: AssignedTasksProps) {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, role } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const taskIdParam = searchParams.get("taskId")
-  const targetUserId = userId || currentUser?.id
+  
+  // If client, force targetUserId to be the currentUser.id
+  const targetUserId = (role === "client") ? currentUser?.id : (userId || currentUser?.id)
+  
   const [mode, setMode] = React.useState<"project" | "personal">("project")
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])

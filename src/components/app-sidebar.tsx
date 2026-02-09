@@ -227,6 +227,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const filterByPermission = (items: SidebarItem[]): SidebarItem[] => {
     console.log('Sidebar: Filtering items', items.map(i => i.title));
     return items.filter(item => {
+      // Hide "My Tasks" for clients
+      if (item.title === "My Tasks" && role === "client") {
+        return false
+      }
+
       // Check if item is hidden in organization settings
       if (organization?.sidebar_settings) {
         const isHidden = organization.sidebar_settings[item.title] === false;

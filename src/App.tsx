@@ -26,6 +26,63 @@ import TicketsPage from "@/pages/tickets"
 import { Toaster } from "@/components/ui/sonner"
 import ReloadPrompt from "@/components/reload-prompt"
 import { PWAInstallModal } from "@/components/pwa-install-modal"
+import { FullScreenLoader } from "@/components/full-screen-loader"
+import { useAuth } from "@/hooks/use-auth"
+import { useOrganization } from "@/hooks/use-organization"
+
+function AppRoutes() {
+  const { loading: authLoading } = useAuth()
+  const { loading: orgLoading } = useOrganization()
+
+  if (authLoading || orgLoading) {
+    return <FullScreenLoader />
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/dashboard/overview" replace />} />
+        <Route path="overview" element={<OverviewPage />} />
+        <Route path="chat" element={<ChatPage />} />
+        <Route path="chat/dms" element={<ChatPage />} />
+        <Route path="chat/dms/:channelId" element={<ChatPage />} />
+        <Route path="chat/:channelId" element={<ChatPage />} />
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="clients/:clientId/overview" element={<ClientOverviewPage />} />
+        <Route path="clients/:clientId/projects" element={<ClientProjectsPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<Navigate to="proposals" replace />} />
+        <Route path="projects/:projectId/overview" element={<Navigate to="../proposals" replace />} />
+        <Route path="projects/:projectId/documents" element={<ProjectOverviewPage />} />
+        <Route path="projects/:projectId/proposals" element={<ProjectOverviewPage />} />
+        <Route path="projects/:projectId/proposals/:proposalId" element={<ProposalOverviewPage />} />
+        <Route path="projects/:projectId/chat" element={<ChatPage />} />
+        <Route path="projects/:projectId/chat/:channelId" element={<ChatPage />} />
+        <Route path="tasks" element={<TasksPage />} />
+        <Route path="tasks/assigned" element={<AssignedTasksPage />} />
+        <Route path="credentials" element={<CredentialsPage />} />
+        <Route path="finances" element={<FinancesPage />} />
+        <Route path="team" element={<TeamPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
+        <Route path="tickets" element={<TicketsPage />} />
+        <Route path="account" element={<AccountPage />} />
+        <Route path="organization" element={<OrganizationPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+      </Route>
+
+      <Route path="/" element={<Navigate to="/dashboard/overview" replace />} />
+    </Routes>
+  )
+}
 
 export function App() {
   return (
@@ -33,54 +90,13 @@ export function App() {
       <Router>
         <AuthProvider>
           <OrganizationProvider>
-            <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard/overview" replace />} />
-              <Route path="overview" element={<OverviewPage />} />
-              <Route path="chat" element={<ChatPage />} />
-              <Route path="chat/dms" element={<ChatPage />} />
-              <Route path="chat/dms/:channelId" element={<ChatPage />} />
-              <Route path="chat/:channelId" element={<ChatPage />} />
-              <Route path="clients" element={<ClientsPage />} />
-              <Route path="clients/:clientId/overview" element={<ClientOverviewPage />} />
-              <Route path="clients/:clientId/projects" element={<ClientProjectsPage />} />
-              <Route path="projects" element={<ProjectsPage />} />
-              <Route path="projects/:projectId" element={<Navigate to="proposals" replace />} />
-              <Route path="projects/:projectId/overview" element={<Navigate to="../proposals" replace />} />
-              <Route path="projects/:projectId/documents" element={<ProjectOverviewPage />} />
-              <Route path="projects/:projectId/proposals" element={<ProjectOverviewPage />} />
-              <Route path="projects/:projectId/proposals/:proposalId" element={<ProposalOverviewPage />} />
-              <Route path="projects/:projectId/chat" element={<ChatPage />} />
-              <Route path="projects/:projectId/chat/:channelId" element={<ChatPage />} />
-              <Route path="tasks" element={<TasksPage />} />
-              <Route path="tasks/assigned" element={<AssignedTasksPage />} />
-              <Route path="credentials" element={<CredentialsPage />} />
-              <Route path="finances" element={<FinancesPage />} />
-              <Route path="team" element={<TeamPage />} />
-              <Route path="audit-logs" element={<AuditLogsPage />} />
-              <Route path="tickets" element={<TicketsPage />} />
-              <Route path="account" element={<AccountPage />} />
-              <Route path="organization" element={<OrganizationPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-            </Route>
-
-            <Route path="/" element={<Navigate to="/dashboard/overview" replace />} />
-          </Routes>
-          <Toaster />
-          <ReloadPrompt />
-          <PWAInstallModal />
-        </OrganizationProvider>
-      </AuthProvider>
-    </Router>
+            <AppRoutes />
+            <Toaster />
+            <ReloadPrompt />
+            <PWAInstallModal />
+          </OrganizationProvider>
+        </AuthProvider>
+      </Router>
     </ThemeProvider>
   )
 }

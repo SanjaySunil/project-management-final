@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'employee';
+export type Role = 'admin' | 'employee' | 'client';
 
 export interface RoleData {
   label: string;
@@ -28,6 +28,18 @@ export const ROLES: Record<Role, RoleData> = {
       'organizations:read',
     ],
   },
+  client: {
+    label: 'Client',
+    description: 'Access to their own projects, tasks, and proposals.',
+    permissions: [
+      'dashboard:read',
+      'projects:read',
+      'tasks:read',
+      'deliverables:read',
+      'proposals:read',
+      'chat:*',
+    ],
+  },
 };
 
 export function hasPermission(
@@ -42,7 +54,11 @@ export function hasPermission(
   }
   
   // Normalize role
-  const role = (userRole.toLowerCase() === 'admin' ? 'admin' : 'employee') as Role;
+  let role: Role = 'employee';
+  const lowerRole = userRole.toLowerCase();
+  if (lowerRole === 'admin') role = 'admin';
+  else if (lowerRole === 'client') role = 'client';
+  
   const roleData = ROLES[role];
   
   if (!roleData) {

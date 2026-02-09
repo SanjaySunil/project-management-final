@@ -6,6 +6,8 @@ import type { Tables } from "@/lib/database.types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClientForm } from "./client-form"
 import { LiveTime } from "./live-time"
+import { createClient } from "@supabase/supabase-js"
+import { useAuth } from "@/hooks/use-auth"
 
 type Client = Tables<"clients">
 
@@ -16,6 +18,7 @@ interface ClientOverviewProps {
 }
 
 export function ClientOverview({ clientId, onUpdate, onCancel }: ClientOverviewProps) {
+  const { organizationId } = useAuth()
   const [client, setClient] = React.useState<Client | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [isUpdating, setIsUpdating] = React.useState(false)
@@ -45,11 +48,43 @@ export function ClientOverview({ clientId, onUpdate, onCancel }: ClientOverviewP
   }, [clientId, fetchClient])
 
   const handleUpdate = async (values: any) => {
+    const { enable_login, password, ...clientValues } = values
+    
     try {
       setIsUpdating(true)
+
+      if (enable_login && password && !client?.user_id) {
+        // Create auth user
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+        const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: {
+            persistSession: false
+          }
+        })
+
+        const { data: authData, error: signUpError } = await tempSupabase.auth.signUp({
+          email: values.email,
+          password: password,
+          options: {
+            data: {
+              full_name: `${values.first_name} ${values.last_name || ""}`.trim(),
+              role: 'client',
+              organization_id: organizationId
+            }
+          }
+        })
+
+        if (signUpError) throw signUpError
+        if (authData.user) {
+          clientValues.user_id = authData.user.id
+        }
+      }
+
       const { error } = await supabase
         .from("clients")
-        .update(values)
+        .update(clientValues)
         .eq("id", clientId)
 
       if (error) throw error

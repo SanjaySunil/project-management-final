@@ -248,8 +248,20 @@ export default function ChatPage() {
     async function fetchData() {
       const projectsQuery = supabase.from("projects").select("id, name").order("name")
       
-      const isAdmin = role === "admin"
-      if (!isAdmin && user) {
+      if (role === "client" && user) {
+        // Find projects where this user is the client
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+        
+        if (clientData) {
+          projectsQuery.eq("client_id", clientData.id)
+        } else {
+          projectsQuery.eq("id", "00000000-0000-0000-0000-000000000000")
+        }
+      } else if (role === "employee" && user) {
         // Only show projects the user is a member of
         const { data: memberProjects } = await supabase
           .from("project_members")
@@ -274,7 +286,12 @@ export default function ChatPage() {
       }
 
       if (!profilesRes.error && profilesRes.data) {
-        setMembers(profilesRes.data as Profile[])
+        // For clients, filter profiles to only show non-clients (admins/employees)
+        if (role === "client") {
+          setMembers((profilesRes.data as Profile[]).filter(p => p.role !== 'client'))
+        } else {
+          setMembers(profilesRes.data as Profile[])
+        }
       }
     }
     fetchData()
@@ -286,10 +303,44 @@ export default function ChatPage() {
       // Only show loading if we don't have channels yet or project changed
       if (channels.length === 0) setIsLoading(true)
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("channels")
         .select("*")
         .order("name")
+      
+      // If client, restrict channels
+      if (role === "client" && user) {
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+        
+        if (clientData) {
+          const { data: clientProjects } = await supabase
+            .from("projects")
+            .select("id")
+            .eq("client_id", clientData.id)
+          
+          const projectIds = clientProjects?.map(p => p.id) || []
+          
+          // Filter: project_id is null (global) OR project_id is in clientProjects
+          // Supabase doesn't support complex OR in filter directly without .or() string
+          let orString = "project_id.is.null"
+          if (projectIds.length > 0) {
+            orString += `,project_id.in.(${projectIds.join(",")})`
+          }
+          // Also include DM channels they are part of
+          orString += `,name.ilike.%${user.id}%`
+          
+          query = query.or(orString)
+        } else {
+          // If no client record, only show DMs for this user
+          query = query.ilike("name", `%${user.id}%`)
+        }
+      }
+      
+      const { data, error } = await query
       
       if (error) {
         toast.error("Failed to load channels")

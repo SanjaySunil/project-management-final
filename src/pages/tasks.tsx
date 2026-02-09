@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useSearchParams } from "react-router-dom"
 
 export default function TasksPage() {
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const taskIdParam = searchParams.get("taskId")
   const [tasks, setTasks] = React.useState<Task[]>([])
@@ -38,34 +38,97 @@ export default function TasksPage() {
     try {
       setIsLoading(true)
       
-      const [tasksRes, membersRes, proposalsRes, projectsRes] = await Promise.all([
-        supabase
-          .from("tasks")
-          .select(`
-            *,
-            proposals (
+      let clientId: string | null = null
+      if (role === "client") {
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("user_id", user?.id)
+          .single()
+        clientId = clientData?.id || null
+        
+        if (!clientId) {
+          setTasks([])
+          setMembers([])
+          setProposals([])
+          setProjects([])
+          setIsLoading(false)
+          return
+        }
+      }
+
+      let tasksQuery = supabase
+        .from("tasks")
+        .select(`
+          *,
+          proposals (
+            id,
+            title,
+            project_id,
+            projects (
               id,
-              title,
-              project_id,
-              projects (
-                name
-              )
-            ),
-            task_attachments (*)
-          `)
-          .order("order_index", { ascending: true }),
+              name,
+              client_id
+            )
+          ),
+          task_attachments (*)
+        `)
+      
+      let proposalsQuery = supabase.from("proposals").select("*")
+      let projectsQuery = supabase.from("projects").select("*")
+
+      if (clientId) {
+        // Filter by client_id
+        // For tasks, we need to join through proposals and projects
+        // This is tricky with Supabase filter on joined tables. 
+        // We might need to get project IDs first.
+        const { data: clientProjects } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("client_id", clientId)
+        
+        const projectIds = clientProjects?.map(p => p.id) || []
+        
+        if (projectIds.length > 0) {
+          const { data: clientProposals } = await supabase
+            .from("proposals")
+            .select("id")
+            .in("project_id", projectIds)
+          
+          const proposalIds = clientProposals?.map(p => p.id) || []
+          
+          if (proposalIds.length > 0) {
+            tasksQuery = tasksQuery.in("proposal_id", proposalIds)
+            proposalsQuery = proposalsQuery.in("id", proposalIds)
+          } else {
+            // No proposals, so no tasks
+            setTasks([])
+            setProposals([])
+            setProjects([])
+            setIsLoading(false)
+            return
+          }
+          projectsQuery = projectsQuery.in("id", projectIds)
+        } else {
+          // No projects, so no tasks
+          setTasks([])
+          setProposals([])
+          setProjects([])
+          setIsLoading(false)
+          return
+        }
+      }
+
+      const [tasksRes, membersRes, proposalsRes, projectsRes] = await Promise.all([
+        tasksQuery.order("order_index", { ascending: true }),
         supabase
           .from("profiles")
           .select("*")
           .order("full_name", { ascending: true }),
-        supabase
-          .from("proposals")
-          .select("*")
+        proposalsQuery
           .order("order_index", { ascending: true })
           .order("title", { ascending: true }),
-        supabase
-          .from("projects")
-          .select("*")
+        projectsQuery
           .order("name", { ascending: true })
       ])
 

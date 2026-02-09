@@ -28,21 +28,6 @@ import {
   CommandDialog,
 } from "@/components/ui/command"
 
-const clientSchema = z.object({
-  first_name: z.string().min(2, "First name must be at least 2 characters"),
-  last_name: z.string().optional().or(z.literal("")),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  country: z.string().optional(),
-  state: z.string().optional(),
-  city: z.string().optional(),
-  timezone: z.string().optional(),
-  notes: z.string().optional(),
-})
-
-type ClientFormValues = z.infer<typeof clientSchema>
-
 interface ClientFormProps {
   initialValues?: Partial<{
     first_name: string
@@ -55,8 +40,9 @@ interface ClientFormProps {
     city: string | null
     timezone: string | null
     notes: string | null
+    user_id: string | null
   }>
-  onSubmit: (values: ClientFormValues) => void
+  onSubmit: (values: any) => void
   onCancel: () => void
   isLoading?: boolean
 }
@@ -117,6 +103,8 @@ const STATE_TIMEZONES: Record<string, string> = {
   "wyoming": "America/Denver",
 }
 
+import { Switch } from "@/components/ui/switch"
+
 export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: ClientFormProps) {
   const [countriesList, setCountriesList] = React.useState<any[]>([])
   const [statesList, setStatesList] = React.useState<any[]>([])
@@ -126,6 +114,40 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
   const [isCountryPickerOpen, setIsCountryPickerOpen] = React.useState(false)
   const [isStatePickerOpen, setIsStatePickerOpen] = React.useState(false)
   const [isCityPickerOpen, setIsCityPickerOpen] = React.useState(false)
+
+  const clientSchema = React.useMemo(() => z.object({
+    first_name: z.string().min(2, "First name must be at least 2 characters"),
+    last_name: z.string().optional().or(z.literal("")),
+    email: z.string().email("Invalid email address").optional().or(z.literal("")),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    country: z.string().optional(),
+    state: z.string().optional(),
+    city: z.string().optional(),
+    timezone: z.string().optional(),
+    notes: z.string().optional(),
+    enable_login: z.boolean().default(false),
+    password: z.string().optional().or(z.literal("")),
+  }).refine((data) => {
+    if (data.enable_login && !data.email) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Email is required when login access is enabled",
+    path: ["email"],
+  }).refine((data) => {
+    if (data.enable_login && !data.password && !initialValues?.user_id) {
+      return false;
+    }
+    if (data.enable_login && data.password && data.password.length < 6) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Password must be at least 6 characters",
+    path: ["password"],
+  }), [initialValues?.user_id])
 
   React.useEffect(() => {
     GetCountries().then((result) => {
@@ -164,8 +186,12 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
       city: initialValues?.city || "",
       timezone: initialValues?.timezone || "",
       notes: initialValues?.notes || "",
+      enable_login: !!initialValues?.user_id,
+      password: "",
     },
   })
+
+  const watchEnableLogin = form.watch("enable_login")
 
   return (
     <Form {...form}>
@@ -204,7 +230,7 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email (Optional)</FormLabel>
+                <FormLabel>Email {watchEnableLogin ? <span className="text-destructive">*</span> : "(Optional)"}</FormLabel>
                 <FormControl>
                   <Input placeholder="john.doe@example.com" {...field} />
                 </FormControl>
@@ -226,6 +252,53 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
             )}
           />
         </div>
+
+        <div className="rounded-lg border p-4 space-y-4">
+          <FormField
+            control={form.control}
+            name="enable_login"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <FormLabel>Enable Login Access</FormLabel>
+                  <div className="text-xs text-muted-foreground">
+                    Allow the client to log in and view their projects.
+                  </div>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={!!initialValues?.user_id}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          {watchEnableLogin && !initialValues?.user_id && (
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {watchEnableLogin && initialValues?.user_id && (
+            <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+              Login access is enabled for this client.
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}

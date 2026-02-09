@@ -35,6 +35,7 @@ interface ProposalDetailsProps {
 export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps) {
   const { user, role } = useAuth()
   const isAdmin = role === "admin"
+  const isClient = role === "client"
   const [searchParams, setSearchParams] = useSearchParams()
   const taskIdParam = searchParams.get("taskId")
   
@@ -85,6 +86,30 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     try {
       setIsLoading(true)
       
+      // If client, verify project ownership
+      if (isClient && user) {
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+        
+        if (!clientData) {
+          throw new Error("Client record not found")
+        }
+
+        const { data: projectData } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("id", projectId)
+          .eq("client_id", clientData.id)
+          .single()
+        
+        if (!projectData) {
+          throw new Error("You do not have access to this project")
+        }
+      }
+
       // Fetch proposal
       const { data: proposalData, error: proposalError } = await supabase
         .from("proposals")
@@ -576,11 +601,13 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
         <TabsContent value="overview" className="flex-1 overflow-y-auto px-4 lg:px-6">
           <div className="flex flex-col gap-6 pb-6">
-            <div className="flex justify-end">
-              <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
-                <IconEdit className="h-4 w-4" /> Edit Proposal
-              </Button>
-            </div>
+            {!isClient && (
+              <div className="flex justify-end">
+                <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
+                  <IconEdit className="h-4 w-4" /> Edit Proposal
+                </Button>
+              </div>
+            )}
             <div className="grid gap-6 md:grid-cols-3">
               <Card className="md:col-span-2">
                 <CardHeader><CardTitle>Description</CardTitle></CardHeader>
