@@ -132,7 +132,7 @@ export function CredentialsTable({
           try {
             const parsed = JSON.parse(row.original.value)
             displayValue = `${parsed.email} | ${parsed.password}`
-          } catch (e) {
+          } catch {
             // fallback to raw value if not valid JSON
           }
         }

@@ -49,14 +49,14 @@ export function CredentialDetailsModal({
   const renderValue = () => {
     let email = ""
     let password = ""
-    let isEmailPassword = credential.type === "Email Password"
+    const isEmailPassword = credential.type === "Email Password"
 
     if (isEmailPassword) {
       try {
         const parsed = JSON.parse(credential.value)
         email = parsed.email || ""
         password = parsed.password || ""
-      } catch (e) {
+      } catch {
         // fallback
       }
     }

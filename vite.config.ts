@@ -8,10 +8,10 @@ import { VitePWA } from "vite-plugin-pwa"
 const getGitVersion = () => {
   try {
     return execSync("git describe --tags --always --dirty").toString().trim()
-  } catch (e) {
+  } catch {
     try {
       return execSync("git rev-parse --short HEAD").toString().trim()
-    } catch (e2) {
+    } catch {
       return "v0.0.0"
     }
   }
@@ -20,7 +20,7 @@ const getGitVersion = () => {
 const getGitCommitMessage = () => {
   try {
     return execSync("git log -1 --pretty=%s").toString().trim()
-  } catch (e) {
+  } catch {
     return ""
   }
 }

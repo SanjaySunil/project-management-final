@@ -250,7 +250,7 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
                 </SelectContent>
               </Select>
               <p className="text-[0.8rem] text-muted-foreground">
-                {!!initialValues?.name 
+                {initialValues?.name 
                   ? "Project status is automatically updated based on proposals." 
                   : "Initial status for the new project."}
               </p>

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useLocation, useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
@@ -19,7 +19,6 @@ interface ClientProjectsTabProps {
 }
 
 export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
-  const location = useLocation()
   const navigate = useNavigate()
   const { user, role } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])

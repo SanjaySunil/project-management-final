@@ -100,7 +100,7 @@ export function LiveTime({ timezone, country, state, city, baseTime }: LiveTimeP
           timeZone: resolvedTimezone!,
         })
         setTime(formatter.format(now))
-      } catch (e) {
+      } catch {
         setTime("-")
       }
     }

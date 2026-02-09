@@ -48,7 +48,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-export const overviewSchema = z.object({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const overviewSchema = z.object({
   id: z.number(),
   header: z.string(),
   type: z.string(),

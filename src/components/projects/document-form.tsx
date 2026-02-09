@@ -110,7 +110,7 @@ export function DocumentForm({
               <div key={index} className="flex items-start gap-3 group">
                 <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-3" />
                 <textarea
-                  ref={el => inputRefs.current[index] = el}
+                  ref={(el) => { inputRefs.current[index] = el; }}
                   value={note}
                   onChange={(e) => handleNoteChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
