@@ -269,7 +269,6 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
                   <Switch
                     checked={field.value}
                     onCheckedChange={field.onChange}
-                    disabled={!!initialValues?.user_id}
                   />
                 </FormControl>
               </FormItem>
@@ -292,11 +291,15 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
             />
           )}
 
-          {watchEnableLogin && initialValues?.user_id && (
+          {watchEnableLogin && initialValues?.user_id ? (
             <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
               Login access is enabled for this client.
             </div>
-          )}
+          ) : !watchEnableLogin && initialValues?.user_id ? (
+            <div className="text-sm text-destructive bg-destructive/10 p-2 rounded font-medium">
+              Warning: Disabling this will revoke the client's access to all their projects.
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

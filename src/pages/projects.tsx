@@ -19,7 +19,7 @@ import type { Tables } from "@/lib/database.types"
 
 export default function ProjectsPage() {
   const navigate = useNavigate()
-  const { user, role } = useAuth()
+  const { user, role, loading: authLoading } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])
   const [profiles, setProfiles] = React.useState<Tables<"profiles">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -43,7 +43,7 @@ export default function ProjectsPage() {
   }, [])
 
   const fetchProjects = React.useCallback(async () => {
-    if (!user) return
+    if (!user || authLoading) return
     
     try {
       setIsLoading(true)
@@ -66,7 +66,8 @@ export default function ProjectsPage() {
         `)
       
       // Filter by role
-      if (role === "client") {
+      const normalizedRole = role?.toLowerCase()
+      if (normalizedRole === "client") {
         // Find the client record for this user
         const { data: clientData, error: clientError } = await supabase
           .from("clients")
@@ -88,7 +89,7 @@ export default function ProjectsPage() {
           setIsLoading(false)
           return
         }
-      } else if (role !== "admin") {
+      } else if (normalizedRole !== "admin") {
         // Employee sees projects they are members of
         query = query.filter("project_members.user_id", "eq", user.id)
       }
@@ -112,7 +113,7 @@ export default function ProjectsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, role])
+  }, [user, role, authLoading])
 
   React.useEffect(() => {
     fetchProjects()

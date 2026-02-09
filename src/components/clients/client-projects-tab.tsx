@@ -20,7 +20,7 @@ interface ClientProjectsTabProps {
 
 export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   const navigate = useNavigate()
-  const { user, role } = useAuth()
+  const { user, role, loading: authLoading } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -29,7 +29,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
 
   const fetchProjects = React.useCallback(async () => {
-    if (!user) return
+    if (!user || authLoading) return
     
     try {
       setIsLoading(true)
@@ -51,7 +51,8 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
         `)
         .eq("client_id", clientId)
       
-      const isAdmin = role === "admin"
+      const normalizedRole = role?.toLowerCase()
+      const isAdmin = normalizedRole === "admin"
       if (!isAdmin) {
         query = query.filter("project_members.user_id", "eq", user.id)
       }
@@ -74,7 +75,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [clientId, user, role])
+  }, [clientId, user, role, authLoading])
 
   React.useEffect(() => {
     if (clientId) {

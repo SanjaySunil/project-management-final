@@ -65,7 +65,7 @@ export default function ChatPage() {
   const { projectId: routeProjectId, channelId: routeChannelId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, role, checkPermission } = useAuth()
+  const { user, role, checkPermission, loading: authLoading } = useAuth()
   const { isOnline } = usePresence()
   const { notifications, markAsRead } = useNotifications()
   const isMobile = useIsMobile()
@@ -245,10 +245,12 @@ export default function ChatPage() {
 
   // Fetch initial data
   useEffect(() => {
+    if (authLoading || !user) return
+
     async function fetchData() {
       const projectsQuery = supabase.from("projects").select("id, name").order("name")
       
-      if (role === "client" && user) {
+      if (role === "client") {
         // Find projects where this user is the client
         const { data: clientData } = await supabase
           .from("clients")
@@ -261,7 +263,7 @@ export default function ChatPage() {
         } else {
           projectsQuery.eq("id", "00000000-0000-0000-0000-000000000000")
         }
-      } else if (role === "employee" && user) {
+      } else if (role === "employee") {
         // Only show projects the user is a member of
         const { data: memberProjects } = await supabase
           .from("project_members")
@@ -295,10 +297,12 @@ export default function ChatPage() {
       }
     }
     fetchData()
-  }, [user, role])
+  }, [user, role, authLoading])
 
   // Fetch channels based on current project context
   useEffect(() => {
+    if (authLoading || !user) return
+
     async function fetchChannels() {
       // Only show loading if we don't have channels yet or project changed
       if (channels.length === 0) setIsLoading(true)
@@ -309,7 +313,7 @@ export default function ChatPage() {
         .order("name")
       
       // If client, restrict channels
-      if (role === "client" && user) {
+      if (role === "client") {
         const { data: clientData } = await supabase
           .from("clients")
           .select("id")
@@ -352,7 +356,7 @@ export default function ChatPage() {
     }
 
     fetchChannels()
-  }, [currentProjectId, isDMMode])
+  }, [currentProjectId, isDMMode, user, role, authLoading])
 
   // Sync selected channel with route
   useEffect(() => {

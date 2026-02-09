@@ -8,9 +8,14 @@ interface AuthContextType {
   user: User | null
   role: string | null
   organizationId: string | null
+  pin: string | null
+  isPinVerified: boolean
   loading: boolean
   signOut: () => Promise<void>
   checkPermission: (action: string, resource: string) => boolean
+  verifyPin: (pin: string) => Promise<boolean>
+  setPin: (pin: string, isInitial?: boolean) => Promise<void>
+  logPinAttempt: (pin: string, type: string, success: boolean) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -20,14 +25,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [pin, setPinState] = useState<string | null>(null)
+  const [isPinVerified, setIsPinVerified] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const logPinAttempt = useCallback(async (pinEntered: string, type: string, success: boolean) => {
+    if (!user) return
+    try {
+      await supabase.from('pin_logs').insert({
+        user_id: user.id,
+        pin_entered: pinEntered,
+        attempt_type: type,
+        is_success: success
+      })
+    } catch (error) {
+      console.error('Error logging pin attempt:', error)
+    }
+  }, [user])
 
   const fetchData = useCallback(async (userId: string) => {
     console.log('AuthProvider: Background fetching profile for', userId)
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('role, organization_id')
+        .select('role, organization_id, pin')
         .eq('id', userId)
         .single()
 
@@ -39,8 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data) {
         console.log('AuthProvider: Setting role to', data.role)
-        setRole(data.role ?? null)
+        setRole(data.role?.toLowerCase() ?? null)
         setOrganizationId(data.organization_id ?? null)
+        setPinState(data.pin ?? null)
       } else {
         console.warn('AuthProvider: No profile data found for user')
       }
@@ -80,8 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(initialSession?.user ?? null)
         
         if (initialSession) {
-          // Trigger data fetch but DON'T await it if it's blocking the app
-          fetchData(initialSession.user.id)
+          // Await profile data fetch during initialization
+          await fetchData(initialSession.user.id)
         }
       } catch (error) {
         console.error('AuthProvider: Fatal initialization error:', error)
@@ -112,6 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setRole(null)
         setOrganizationId(null)
+        setPinState(null)
+        setIsPinVerified(false)
         setLoading(false)
       }
     })
@@ -131,14 +155,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  const verifyPin = async (enteredPin: string) => {
+    const success = enteredPin === pin
+    await logPinAttempt(enteredPin, 'verification', success)
+    if (success) {
+      setIsPinVerified(true)
+    }
+    return success
+  }
+
+  const setPin = async (newPin: string, isInitial: boolean = false) => {
+    if (!user) return
+    const { error } = await supabase
+      .from('profiles')
+      .update({ pin: newPin })
+      .eq('id', user.id)
+
+    if (error) {
+      await logPinAttempt(newPin, isInitial ? 'setup' : 'update', false)
+      throw error
+    }
+    
+    await logPinAttempt(newPin, isInitial ? 'setup' : 'update', true)
+    setPinState(newPin)
+    setIsPinVerified(true)
+  }
+
   const value = {
     session,
     user,
     role,
     organizationId,
+    pin,
+    isPinVerified,
     loading,
     signOut,
     checkPermission,
+    verifyPin,
+    setPin,
+    logPinAttempt
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

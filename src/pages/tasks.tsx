@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useSearchParams } from "react-router-dom"
 
 export default function TasksPage() {
-  const { user, role } = useAuth()
+  const { user, role, loading: authLoading } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const taskIdParam = searchParams.get("taskId")
   const [tasks, setTasks] = React.useState<Task[]>([])
@@ -35,6 +35,8 @@ export default function TasksPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const fetchInitialData = React.useCallback(async () => {
+    if (!user || authLoading) return
+
     try {
       setIsLoading(true)
       
@@ -154,7 +156,7 @@ export default function TasksPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [user, role, authLoading])
 
   React.useEffect(() => {
     fetchInitialData()

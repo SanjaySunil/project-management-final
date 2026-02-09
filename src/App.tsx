@@ -17,6 +17,7 @@ import AssignedTasksPage from "@/pages/tasks-assigned"
 import CredentialsPage from "@/pages/credentials"
 import TeamPage from "@/pages/team"
 import AuditLogsPage from "@/pages/audit-logs"
+import PinLogsPage from "@/pages/pin-logs"
 import ChatPage from "@/pages/chat"
 import AccountPage from "@/pages/account"
 import OrganizationPage from "@/pages/organization"
@@ -73,6 +74,7 @@ function AppRoutes() {
         <Route path="finances" element={<FinancesPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="audit-logs" element={<AuditLogsPage />} />
+        <Route path="pin-logs" element={<PinLogsPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="organization" element={<OrganizationPage />} />

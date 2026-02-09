@@ -9,16 +9,19 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Loader2 } from "lucide-react"
+import { Loader2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 
 export default function AccountPage() {
-  const { user } = useAuth()
+  const { user, role, setPin } = useAuth()
   const [fullName, setFullName] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [newPin, setNewPin] = useState("")
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false)
 
   useEffect(() => {
     if (user?.user_metadata?.full_name) {
@@ -85,6 +88,26 @@ export default function AccountPage() {
     }
   }
 
+  const handleUpdatePin = async () => {
+    if (newPin.length !== 4) {
+      toast.error("PIN must be 4 digits")
+      return
+    }
+
+    try {
+      setIsUpdatingPin(true)
+      await setPin(newPin)
+      toast.success("PIN updated successfully")
+      setNewPin("")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update PIN")
+    } finally {
+      setIsUpdatingPin(false)
+    }
+  }
+
+  const needsPin = role === 'employee'
+
   return (
     <PageContainer>
       <SEO title="Account Settings" description="Manage your personal profile and security settings." />
@@ -135,42 +158,80 @@ export default function AccountPage() {
               </Button>
             </CardContent>
           </Card>
-          <Card className="col-span-3">
-            <CardHeader>
-              <CardTitle>Account Security</CardTitle>
-              <CardDescription>
-                Manage your security preferences and password.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="password">New Password</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input 
-                  id="confirm-password" 
-                  type="password" 
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
-              <Button 
-                variant="outline" 
-                onClick={handleUpdatePassword} 
-                disabled={isUpdatingPassword}
-              >
-                {isUpdatingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Password
-              </Button>
-            </CardContent>
-          </Card>
+          
+          <div className="col-span-3 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Security</CardTitle>
+                <CardDescription>
+                  Manage your security preferences and password.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="password">New Password</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Input 
+                    id="confirm-password" 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={handleUpdatePassword} 
+                  disabled={isUpdatingPassword}
+                  className="w-full"
+                >
+                  {isUpdatingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update Password
+                </Button>
+              </CardContent>
+            </Card>
+
+            {needsPin && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Security PIN</CardTitle>
+                  <CardDescription>
+                    Update your 4-digit security PIN for page refreshes.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 flex flex-col items-center">
+                  <InputOTP
+                    maxLength={4}
+                    value={newPin}
+                    onChange={(val) => setNewPin(val)}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleUpdatePin} 
+                    disabled={isUpdatingPin || newPin.length !== 4}
+                    className="w-full"
+                  >
+                    {isUpdatingPin && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Update Security PIN
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </PageContainer>

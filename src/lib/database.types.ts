@@ -548,6 +548,7 @@ export type Database = {
           full_name: string | null
           id: string
           organization_id: string | null
+          pin: string | null
           role: string | null
           updated_at: string | null
           username: string | null
@@ -558,6 +559,7 @@ export type Database = {
           full_name?: string | null
           id: string
           organization_id?: string | null
+          pin?: string | null
           role?: string | null
           updated_at?: string | null
           username?: string | null
@@ -568,6 +570,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           organization_id?: string | null
+          pin?: string | null
           role?: string | null
           updated_at?: string | null
           username?: string | null

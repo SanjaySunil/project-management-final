@@ -166,6 +166,11 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
           permission: { action: "read", resource: "audit_logs" },
         },
         {
+          title: "PIN Logs",
+          url: "/dashboard/pin-logs",
+          permission: { action: "read", resource: "pin_logs" },
+        },
+        {
           title: "Tickets",
           url: "/dashboard/tickets",
           icon: Ticket,
