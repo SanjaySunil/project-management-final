@@ -50,11 +50,27 @@ export function DocumentsTable({
     {
       accessorKey: "content",
       header: "Preview",
-      cell: ({ row }) => (
-        <div className="max-w-[400px] truncate text-muted-foreground text-sm">
-          {row.original.content || "No content"}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const content = row.original.content || ""
+        const lines = content.split("\n").filter(l => l.trim() !== "")
+        return (
+          <div className="max-w-[400px] truncate text-muted-foreground text-sm">
+            {lines.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {lines.slice(0, 2).map((line, i) => (
+                  <div key={i} className="flex items-center gap-2 truncate">
+                    <div className="h-1 w-1 rounded-full bg-muted-foreground shrink-0" />
+                    <span className="truncate">{line}</span>
+                  </div>
+                ))}
+                {lines.length > 2 && <span className="text-xs ml-3">+{lines.length - 2} more...</span>}
+              </div>
+            ) : (
+              "No content"
+            )}
+          </div>
+        )
+      },
     },
     {
       accessorKey: "created_at",

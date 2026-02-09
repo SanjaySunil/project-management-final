@@ -1,20 +1,30 @@
 import * as React from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom"
 import { toast } from "sonner"
-import { IconArrowLeft, IconBriefcase, IconFileText, IconUsers } from "@tabler/icons-react"
+import { IconArrowLeft, IconBriefcase, IconFileText } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ProjectProposalsTab } from "@/components/projects/project-proposals-tab"
+import { ProjectDocumentsTab } from "@/components/projects/project-documents-tab"
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [project, setProject] = React.useState<any>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+
+  // Get active tab from URL or default to proposals
+  const pathParts = location.pathname.split('/')
+  const lastPart = pathParts[pathParts.length - 1]
+  const [activeTab, setActiveTab] = React.useState(
+    ["proposals", "documents"].includes(lastPart) ? lastPart : "proposals"
+  )
 
   const fetchProjectDetails = React.useCallback(async () => {
     if (!projectId) return
@@ -56,6 +66,22 @@ export default function ProjectOverviewPage() {
     }
   }, [fetchProjectDetails, projectId])
 
+  // Sync active tab with URL
+  React.useEffect(() => {
+    const pathParts = location.pathname.split('/')
+    const lastPart = pathParts[pathParts.length - 1]
+    if (["proposals", "documents"].includes(lastPart)) {
+      setActiveTab(lastPart)
+    } else if (lastPart === projectId) {
+      setActiveTab("proposals")
+    }
+  }, [location.pathname, projectId])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    navigate(`/dashboard/projects/${projectId}/${value}`)
+  }
+
   if (isLoading) {
     return (
       <PageContainer>
@@ -91,7 +117,7 @@ export default function ProjectOverviewPage() {
       <div className="flex flex-1 flex-col gap-6">
         <div className="flex flex-col gap-2">
           <Button asChild variant="ghost" className="w-fit -ml-2 h-8 text-muted-foreground">
-            <Link to="/dashboard/projects" state={{ openProposalsFor: projectId }}>
+            <Link to="/dashboard/projects">
               <IconArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
             </Link>
           </Button>
@@ -108,83 +134,25 @@ export default function ProjectOverviewPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Description</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                {project.description || "No description provided."}
-              </p>
-            </CardContent>
-          </Card>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col gap-4">
+          <TabsList className="w-fit">
+            <TabsTrigger value="proposals" className="gap-2">
+              <IconFileText className="h-4 w-4" /> Proposals
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="gap-2">
+              <IconFileText className="h-4 w-4" /> Documents
+            </TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <Button asChild className="w-full justify-start gap-2" variant="outline">
-                <Link to={`/dashboard/projects/${projectId}/proposals`}>
-                  <IconFileText className="h-4 w-4" /> View Proposals
-                </Link>
-              </Button>
-              <Button asChild className="w-full justify-start gap-2" variant="outline">
-                <Link to={`/dashboard/projects/${projectId}/documents`}>
-                  <IconFileText className="h-4 w-4" /> View Documents
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Client Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-muted-foreground">Client Name</p>
-                <p className="font-semibold">
-                  {project.clients?.first_name} {project.clients?.last_name}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <IconUsers className="h-5 w-5" /> Team Members
-                </CardTitle>
-              </div>
-              <CardDescription>Members assigned to this project.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4">
-                {project.project_members?.length > 0 ? (
-                  project.project_members.map((member: any) => (
-                    <div key={member.user_id} className="flex items-center gap-3 bg-muted/50 p-2 rounded-lg pr-4">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.profiles?.avatar_url || ""} />
-                        <AvatarFallback>
-                          {member.profiles?.full_name?.charAt(0) || member.profiles?.email?.charAt(0) || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <p className="text-sm font-medium leading-none">{member.profiles?.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{member.profiles?.email}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground py-4">No members assigned yet.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="mt-2">
+            <TabsContent value="proposals" className="m-0 border-none p-0">
+              <ProjectProposalsTab projectId={projectId as string} />
+            </TabsContent>
+            <TabsContent value="documents" className="m-0 border-none p-0">
+              <ProjectDocumentsTab projectId={projectId as string} />
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </PageContainer>
   )

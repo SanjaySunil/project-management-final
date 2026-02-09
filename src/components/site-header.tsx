@@ -86,11 +86,18 @@ export function SiteHeader() {
               const last = index === breadcrumbs.length - 1
               
               // If it's an ID that isn't the last segment, and it's for projects/clients,
-              // make sure it links to overview.
+              // make sure it links to the appropriate tab.
               let to = crumb.to
               if (crumb.isID && !last) {
-                if (!to.endsWith("/overview")) {
-                  to += "/overview"
+                const parent = rawPathnames[index - 1]
+                if (parent === "projects") {
+                  if (!to.endsWith("/proposals")) {
+                    to += "/proposals"
+                  }
+                } else if (parent === "clients") {
+                  if (!to.endsWith("/overview")) {
+                    to += "/overview"
+                  }
                 }
               }
 

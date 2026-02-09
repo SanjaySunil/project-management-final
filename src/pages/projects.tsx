@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog"
 import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
-import { ProjectDetailsModal } from "@/components/projects/project-details-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { Tables } from "@/lib/database.types"
 
@@ -30,9 +29,6 @@ export default function ProjectsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
   
-  const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
-  const [selectedProject, setSelectedProject] = React.useState<ProjectWithClient | null>(null)
-
   const fetchProfiles = React.useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -102,20 +98,6 @@ export default function ProjectsPage() {
     fetchProfiles()
   }, [fetchProjects, fetchProfiles])
 
-  // Handle opening proposals modal from state (e.g. when navigating back from a proposal)
-  React.useEffect(() => {
-    if (!isLoading && projects.length > 0 && location.state?.openProposalsFor) {
-      const projectId = location.state.openProposalsFor
-      const project = projects.find(p => p.id === projectId)
-      if (project) {
-        setSelectedProject(project)
-        setDetailsModalOpen(true)
-        // Clear the state so it doesn't re-open on refresh
-        navigate(location.pathname, { replace: true, state: {} })
-      }
-    }
-  }, [isLoading, projects, location.state, navigate, location.pathname])
-
   const handleAddProject = () => {
     setEditingProject(null)
     setIsDialogOpen(true)
@@ -132,8 +114,7 @@ export default function ProjectsPage() {
   }
 
   const handleViewDetails = (project: ProjectWithClient) => {
-    setSelectedProject(project)
-    setDetailsModalOpen(true)
+    navigate(`/dashboard/projects/${project.id}/proposals`)
   }
 
   const handleAssignMembers = async (projectId: string, memberIds: string[]) => {
@@ -257,16 +238,6 @@ export default function ProjectsPage() {
           />
         </div>
       </div>
-
-      <ProjectDetailsModal 
-        project={selectedProject}
-        open={detailsModalOpen}
-        onOpenChange={setDetailsModalOpen}
-        onProjectUpdated={() => {
-          fetchProjects()
-          setDetailsModalOpen(false)
-        }}
-      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">

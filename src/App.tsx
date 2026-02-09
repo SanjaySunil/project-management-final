@@ -11,8 +11,6 @@ import ClientOverviewPage from "@/pages/client-overview"
 import ClientProjectsPage from "@/pages/client-projects"
 import ProjectsPage from "@/pages/projects"
 import ProjectOverviewPage from "@/pages/project-overview"
-import ProjectDocumentsPage from "@/pages/project-documents"
-import ProposalsPage from "@/pages/proposals"
 import ProposalOverviewPage from "@/pages/proposal-overview"
 import TasksPage from "@/pages/tasks"
 import AssignedTasksPage from "@/pages/tasks-assigned"
@@ -56,10 +54,10 @@ export function App() {
               <Route path="clients/:clientId/overview" element={<ClientOverviewPage />} />
               <Route path="clients/:clientId/projects" element={<ClientProjectsPage />} />
               <Route path="projects" element={<ProjectsPage />} />
-              <Route path="projects/:projectId" element={<ProjectOverviewPage />} />
-              <Route path="projects/:projectId/overview" element={<ProjectOverviewPage />} />
-              <Route path="projects/:projectId/documents" element={<ProjectDocumentsPage />} />
-              <Route path="projects/:projectId/proposals" element={<ProposalsPage />} />
+              <Route path="projects/:projectId" element={<Navigate to="proposals" replace />} />
+              <Route path="projects/:projectId/overview" element={<Navigate to="../proposals" replace />} />
+              <Route path="projects/:projectId/documents" element={<ProjectOverviewPage />} />
+              <Route path="projects/:projectId/proposals" element={<ProjectOverviewPage />} />
               <Route path="projects/:projectId/proposals/:proposalId" element={<ProposalOverviewPage />} />
               <Route path="projects/:projectId/chat" element={<ChatPage />} />
               <Route path="projects/:projectId/chat/:channelId" element={<ChatPage />} />

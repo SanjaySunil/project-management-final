@@ -185,10 +185,10 @@ export function ProjectsTable({
               href={`https://github.com/${source}`} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+              className="flex items-center gap-1 text-sm text-primary hover:underline"
             >
-              <IconBrandGithub className="h-3 w-3" />
-              <span className="truncate max-w-[100px]">{source.split('/').pop()}</span>
+              <IconBrandGithub className="h-4 w-4" />
+              <span className="truncate max-w-[150px]">{source.split('/').pop()}</span>
             </a>
           </div>
         )

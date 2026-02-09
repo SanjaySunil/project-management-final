@@ -1,11 +1,7 @@
 import * as React from "react"
-import { useParams, Link } from "react-router-dom"
 import { toast } from "sonner"
-import { IconArrowLeft } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
-import { PageContainer } from "@/components/page-container"
-import { SEO } from "@/components/seo"
 import { DocumentsTable } from "@/components/projects/documents-table"
 import { DocumentForm } from "@/components/projects/document-form"
 import {
@@ -16,13 +12,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 
 type Document = Tables<"documents">
 
-export default function ProjectDocumentsPage() {
-  const { projectId } = useParams()
+interface ProjectDocumentsTabProps {
+  projectId: string
+}
+
+export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   const { user } = useAuth()
   const [documents, setDocuments] = React.useState<Document[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -38,7 +36,7 @@ export default function ProjectDocumentsPage() {
       const { data, error } = await supabase
         .from("documents")
         .select("*")
-        .eq("project_id", projectId as string)
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -94,7 +92,7 @@ export default function ProjectDocumentsPage() {
 
       const documentData = {
         ...values,
-        project_id: projectId as string,
+        project_id: projectId,
         user_id: user?.id
       }
 
@@ -123,33 +121,21 @@ export default function ProjectDocumentsPage() {
   }
 
   return (
-    <PageContainer>
-      <SEO title="Project Documents" description="Manage meeting notes and documents for this project." />
-      <div className="flex flex-1 flex-col gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={`/dashboard/projects/${projectId}/overview`}>
-              <IconArrowLeft className="mr-2 h-4 w-4" />
-              Back to Overview
-            </Link>
-          </Button>
-        </div>
-        
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Project Documents</h1>
-          <p className="text-muted-foreground">
-            Create and manage meeting notes and project documentation.
-          </p>
-        </div>
-
-        <DocumentsTable 
-          data={documents} 
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onAdd={handleAdd}
-          isLoading={isLoading}
-        />
+    <div className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-xl font-semibold tracking-tight">Project Documents</h2>
+        <p className="text-sm text-muted-foreground">
+          Create and manage meeting notes and project documentation.
+        </p>
       </div>
+
+      <DocumentsTable 
+        data={documents} 
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onAdd={handleAdd}
+        isLoading={isLoading}
+      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
@@ -178,6 +164,6 @@ export default function ProjectDocumentsPage() {
         title="Delete Document"
         description="Are you sure you want to delete this document? This action cannot be undone."
       />
-    </PageContainer>
+    </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom"
+import { IconArrowLeft } from "@tabler/icons-react"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,13 @@ export default function ProposalOverviewPage() {
     <PageContainer className="p-0 lg:p-0 min-h-0 overflow-hidden">
       <SEO title="Proposal Details" />
       <div className="flex flex-1 flex-col gap-2 min-h-0 overflow-hidden pt-4 lg:pt-6">
+        <div className="px-4 lg:px-6">
+          <Button asChild variant="ghost" className="w-fit -ml-2 h-8 text-muted-foreground">
+            <Link to={`/dashboard/projects/${projectId}/proposals`}>
+              <IconArrowLeft className="mr-2 h-4 w-4" /> Back to Proposals
+            </Link>
+          </Button>
+        </div>
         <ProposalDetails projectId={projectId} proposalId={proposalId} />
       </div>
     </PageContainer>

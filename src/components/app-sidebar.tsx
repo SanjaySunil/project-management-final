@@ -265,7 +265,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           isActive: true,
           items: [
             { title: "Proposals", url: `/dashboard/projects/${projectId}/proposals` },
-            { title: "Overview", url: `/dashboard/projects/${projectId}/overview` },
+            { title: "Documents", url: `/dashboard/projects/${projectId}/documents` },
             { title: "Project Chat", url: `/dashboard/projects/${projectId}/chat` },
             { title: "← All Projects", url: "/dashboard/projects" }
           ]

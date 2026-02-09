@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog"
 import { ProjectForm } from "@/components/projects/project-form"
 import { ProjectsTable, type ProjectWithClient } from "@/components/projects/projects-table"
-import { ProjectProposalsModal } from "@/components/projects/project-proposals-modal"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 interface ClientProjectsTabProps {
@@ -29,9 +28,6 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   const [editingProject, setEditingProject] = React.useState<ProjectWithClient | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
-
-  const [proposalsModalOpen, setProposalsModalOpen] = React.useState(false)
-  const [selectedProjectForProposals, setSelectedProjectForProposals] = React.useState<ProjectWithClient | null>(null)
 
   const fetchProjects = React.useCallback(async () => {
     if (!user) return
@@ -87,20 +83,6 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
     }
   }, [fetchProjects, clientId])
 
-  // Handle opening proposals modal from state (e.g. when navigating back from a proposal)
-  React.useEffect(() => {
-    if (!isLoading && projects.length > 0 && location.state?.openProposalsFor) {
-      const projectId = location.state.openProposalsFor
-      const project = projects.find(p => p.id === projectId)
-      if (project) {
-        setSelectedProjectForProposals(project)
-        setProposalsModalOpen(true)
-        // Clear the state so it doesn't re-open on refresh
-        navigate(location.pathname, { replace: true, state: {} })
-      }
-    }
-  }, [isLoading, projects, location.state, navigate, location.pathname])
-
   const handleAddProject = () => {
     setEditingProject(null)
     setIsDialogOpen(true)
@@ -117,8 +99,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   }
 
   const handleViewProposals = (project: ProjectWithClient) => {
-    setSelectedProjectForProposals(project)
-    setProposalsModalOpen(true)
+    navigate(`/dashboard/projects/${project.id}`)
   }
 
   const confirmDeleteProject = async () => {
@@ -208,12 +189,6 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
           disablePadding={true}
         />
       </div>
-
-      <ProjectProposalsModal 
-        project={selectedProjectForProposals}
-        open={proposalsModalOpen}
-        onOpenChange={setProposalsModalOpen}
-      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">

@@ -1,11 +1,7 @@
 import * as React from "react"
-import { useParams, Link } from "react-router-dom"
 import { toast } from "sonner"
-import { ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
-import { PageContainer } from "@/components/page-container"
-import { SEO } from "@/components/seo"
 import { ProposalsTable } from "@/components/projects/proposals-table"
 import { ProposalForm } from "@/components/projects/proposal-form"
 import type { Deliverable } from "@/components/projects/deliverables-manager"
@@ -17,14 +13,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Button } from "@/components/ui/button"
 import { updateProjectStatus } from "@/lib/projects"
 import { slugify } from "@/lib/utils"
 
 type Proposal = Tables<"proposals">
 
-export default function ProposalsPage() {
-  const { projectId } = useParams()
+interface ProjectProposalsTabProps {
+  projectId: string
+}
+
+export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
   const [proposals, setProposals] = React.useState<Proposal[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -40,7 +38,7 @@ export default function ProposalsPage() {
       const { data, error } = await supabase
         .from("proposals")
         .select("*")
-        .eq("project_id", projectId as string)
+        .eq("project_id", projectId)
         .order("order_index", { ascending: true })
         .order("created_at", { ascending: false })
 
@@ -54,12 +52,10 @@ export default function ProposalsPage() {
   }, [projectId])
 
   const handleReorder = async (newData: Proposal[]) => {
-    // Optimistic update
     const oldData = [...proposals]
     setProposals(newData)
 
     try {
-      // Update each proposal's order_index individually to avoid issues with upsert
       const updatePromises = newData.map((proposal, index) => 
         supabase
           .from("proposals")
@@ -118,9 +114,7 @@ export default function ProposalsPage() {
 
       if (error) throw error
       
-      if (projectId) {
-        await updateProjectStatus(projectId)
-      }
+      await updateProjectStatus(projectId)
       
       toast.success("Proposal status updated")
       fetchProposals()
@@ -141,9 +135,7 @@ export default function ProposalsPage() {
       const { error } = await supabase.from("proposals").delete().eq("id", proposalToDelete)
       if (error) throw error
       
-      if (projectId) {
-        await updateProjectStatus(projectId)
-      }
+      await updateProjectStatus(projectId)
       
       toast.success("Proposal deleted successfully")
       fetchProposals()
@@ -162,7 +154,7 @@ export default function ProposalsPage() {
 
       const proposalData = {
         ...values,
-        project_id: projectId as string,
+        project_id: projectId,
       }
 
       if (editingProposal?.id) {
@@ -172,7 +164,6 @@ export default function ProposalsPage() {
           .eq("id", editingProposal.id)
         if (error) throw error
 
-        // Update channel name if title changed
         if (values.title) {
           await supabase
             .from("channels")
@@ -195,9 +186,7 @@ export default function ProposalsPage() {
         toast.success("Proposal added successfully")
       }
 
-      // Save deliverables
       if (proposalId) {
-        // Delete existing deliverables for this proposal
         const { error: deleteError } = await supabase
           .from("deliverables")
           .delete()
@@ -205,7 +194,6 @@ export default function ProposalsPage() {
         
         if (deleteError) throw deleteError
 
-        // Insert new deliverables
         if (updatedDeliverables.length > 0) {
           const deliverablesToInsert = updatedDeliverables.map((d, index) => ({
             proposal_id: proposalId,
@@ -222,9 +210,7 @@ export default function ProposalsPage() {
         }
       }
 
-      if (projectId) {
-        await updateProjectStatus(projectId)
-      }
+      await updateProjectStatus(projectId)
 
       setIsDialogOpen(false)
       fetchProposals()
@@ -236,27 +222,16 @@ export default function ProposalsPage() {
   }
 
   return (
-    <PageContainer>
-      <SEO title="Project Proposals" description="Create and manage business proposals and deliverables for this project." />
-      <div className="flex flex-1 flex-col gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard/projects">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Projects
-            </Link>
-          </Button>
-        </div>
-        <ProposalsTable 
-          data={proposals} 
-          projectId={projectId as string}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onStatusChange={handleStatusChange}
-          onDataChange={handleReorder}
-          isLoading={isLoading}
-        />
-      </div>
+    <div className="flex flex-1 flex-col gap-4">
+      <ProposalsTable 
+        data={proposals} 
+        projectId={projectId}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onStatusChange={handleStatusChange}
+        onDataChange={handleReorder}
+        isLoading={isLoading}
+      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -286,6 +261,6 @@ export default function ProposalsPage() {
         title="Delete Proposal"
         description="Are you sure you want to delete this proposal? This action cannot be undone."
       />
-    </PageContainer>
+    </div>
   )
 }
