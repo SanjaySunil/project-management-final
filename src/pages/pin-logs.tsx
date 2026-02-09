@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, RefreshCw, Calendar, User, ShieldCheck, X, CheckCircle2, XCircle, Trash2 } from "lucide-react"
+import { AlertCircle, RefreshCw, ShieldCheck, X, CheckCircle2, XCircle, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Input } from "@/components/ui/input"
@@ -45,7 +45,7 @@ interface PinLog {
 }
 
 export default function PinLogsPage() {
-  const { user, role, checkPermission } = useAuth()
+  const { user, role } = useAuth()
   const [logs, setLogs] = useState<PinLog[]>([])
   const [loading, setLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)

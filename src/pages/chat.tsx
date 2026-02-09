@@ -59,6 +59,7 @@ interface Profile {
   avatar_url: string | null
   email: string | null
   username: string | null
+  role: string | null
 }
 
 export default function ChatPage() {
@@ -248,6 +249,7 @@ export default function ChatPage() {
     if (authLoading || !user) return
 
     async function fetchData() {
+      if (!user) return
       const projectsQuery = supabase.from("projects").select("id, name").order("name")
       
       if (role === "client") {
@@ -304,6 +306,7 @@ export default function ChatPage() {
     if (authLoading || !user) return
 
     async function fetchChannels() {
+      if (!user) return
       // Only show loading if we don't have channels yet or project changed
       if (channels.length === 0) setIsLoading(true)
       

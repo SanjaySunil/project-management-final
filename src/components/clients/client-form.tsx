@@ -105,6 +105,23 @@ const STATE_TIMEZONES: Record<string, string> = {
 
 import { Switch } from "@/components/ui/switch"
 
+const clientSchema = z.object({
+  first_name: z.string().min(2, "First name must be at least 2 characters"),
+  last_name: z.string().optional().or(z.literal("")),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  country: z.string().optional(),
+  state: z.string().optional(),
+  city: z.string().optional(),
+  timezone: z.string().optional(),
+  notes: z.string().optional(),
+  enable_login: z.boolean(),
+  password: z.string().optional().or(z.literal("")),
+})
+
+type ClientFormValues = z.infer<typeof clientSchema>
+
 export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: ClientFormProps) {
   const [countriesList, setCountriesList] = React.useState<any[]>([])
   const [statesList, setStatesList] = React.useState<any[]>([])
@@ -115,20 +132,7 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
   const [isStatePickerOpen, setIsStatePickerOpen] = React.useState(false)
   const [isCityPickerOpen, setIsCityPickerOpen] = React.useState(false)
 
-  const clientSchema = React.useMemo(() => z.object({
-    first_name: z.string().min(2, "First name must be at least 2 characters"),
-    last_name: z.string().optional().or(z.literal("")),
-    email: z.string().email("Invalid email address").optional().or(z.literal("")),
-    phone: z.string().optional(),
-    address: z.string().optional(),
-    country: z.string().optional(),
-    state: z.string().optional(),
-    city: z.string().optional(),
-    timezone: z.string().optional(),
-    notes: z.string().optional(),
-    enable_login: z.boolean().default(false),
-    password: z.string().optional().or(z.literal("")),
-  }).refine((data) => {
+  const schema = React.useMemo(() => clientSchema.refine((data) => {
     if (data.enable_login && !data.email) {
       return false;
     }
@@ -174,7 +178,7 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
   }, [initialValues?.country, initialValues?.state])
 
   const form = useForm<ClientFormValues>({
-    resolver: zodResolver(clientSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       first_name: initialValues?.first_name || "",
       last_name: initialValues?.last_name || "",

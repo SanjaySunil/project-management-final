@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,7 @@ export function PinWall() {
           try {
             await setPin(pinValue, true)
             toast.success('PIN set successfully')
-          } catch (error) {
+          } catch {
             toast.error('Failed to set PIN')
           }
         } else {

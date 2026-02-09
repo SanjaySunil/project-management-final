@@ -451,6 +451,41 @@ export type Database = {
           },
         ]
       }
+      pin_logs: {
+        Row: {
+          attempt_type: string
+          created_at: string
+          id: string
+          is_success: boolean
+          pin_entered: string
+          user_id: string
+        }
+        Insert: {
+          attempt_type: string
+          created_at?: string
+          id?: string
+          is_success: boolean
+          pin_entered: string
+          user_id: string
+        }
+        Update: {
+          attempt_type?: string
+          created_at?: string
+          id?: string
+          is_success?: boolean
+          pin_entered?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pin_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           billing_email: string | null
