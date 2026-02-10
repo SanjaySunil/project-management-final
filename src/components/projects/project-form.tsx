@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { useAuth } from "@/hooks/use-auth"
 
 const projectSchema = z.object({
   name: z.string().min(2, "Project name must be at least 2 characters"),
@@ -63,6 +64,8 @@ interface ProfileOption {
 }
 
 export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: ProjectFormProps) {
+  const { role } = useAuth()
+  const isClient = role === 'client'
   const [clients, setClients] = React.useState<ClientOption[]>([])
   const [profiles, setProfiles] = React.useState<ProfileOption[]>([])
   const [isFetchingData, setIsFetchingData] = React.useState(true)
@@ -121,166 +124,154 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Project Name <span className="text-destructive">*</span></FormLabel>
-              <FormControl>
-                <Input placeholder="Website Redesign" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {isClient && (
+          <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm mb-4">
+            You do not have permission to edit projects.
+          </div>
+        )}
+        <fieldset disabled={isClient || isLoading || isFetchingData} className="space-y-4 border-none p-0">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Project Name <span className="text-destructive">*</span></FormLabel>
+                <FormControl>
+                  <Input placeholder="Website Redesign" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="source_repo"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Source Repository (GitHub)</FormLabel>
-              <FormControl>
-                <div className="flex items-center">
-                  <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">arehsoft/</span>
-                  <Input 
-                    placeholder="repo-name" 
-                    {...field} 
-                    value={field.value || ''} 
-                    className="rounded-l-none"
+          <FormField
+            control={form.control}
+            name="source_repo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Source Repository (GitHub)</FormLabel>
+                <FormControl>
+                  <div className="flex items-center">
+                    <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">arehsoft/</span>
+                    <Input 
+                      placeholder="repo-name" 
+                      {...field} 
+                      value={field.value || ''} 
+                      className="rounded-l-none"
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="client_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Client <span className="text-destructive">*</span></FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={isFetchingData ? "Loading..." : "Select a client"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.first_name} {client.last_name || ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="member_ids"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Team Members</FormLabel>
+                <FormControl>
+                  <MultiSelect
+                    placeholder="Select team members..."
+                    options={profiles.map(p => ({
+                      label: p.full_name || p.email || p.id,
+                      value: p.id,
+                      avatar_url: p.avatar_url
+                    }))}
+                    selected={field.value}
+                    onChange={field.onChange}
                   />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="client_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Client <span className="text-destructive">*</span></FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder={isFetchingData ? "Loading..." : "Select a client"} />
-                  </SelectTrigger>
                 </FormControl>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.first_name} {client.last_name || ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-                        <FormField
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select 
+                  onValueChange={field.onChange} 
+                  defaultValue={field.value}
+                  disabled={!!initialValues?.name}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="on-hold">On Hold</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[0.8rem] text-muted-foreground">
+                  {initialValues?.name 
+                    ? "Project status is automatically updated based on phases." 
+                    : "Initial status for the new project."}
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-                          control={form.control}
-
-                          name="member_ids"
-
-                          render={({ field }) => (
-
-                            <FormItem>
-
-                              <FormLabel>Team Members</FormLabel>
-
-                              <FormControl>
-
-                                <MultiSelect
-
-                                  placeholder="Select team members..."
-
-                                  options={profiles.map(p => ({
-
-                                    label: p.full_name || p.email || p.id,
-
-                                    value: p.id,
-
-                                    avatar_url: p.avatar_url
-
-                                  }))}
-
-                                  selected={field.value}
-
-                                  onChange={field.onChange}
-
-                                />
-
-                              </FormControl>
-
-                              <FormMessage />
-
-                            </FormItem>
-
-                          )}
-
-                        />
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status</FormLabel>
-              <Select 
-                onValueChange={field.onChange} 
-                defaultValue={field.value}
-                disabled={!!initialValues?.name}
-              >
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description (Optional)</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
+                  <Textarea placeholder="Project details and goals..." {...field} />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="on-hold">On Hold</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-[0.8rem] text-muted-foreground">
-                {initialValues?.name 
-                  ? "Project status is automatically updated based on proposals." 
-                  : "Initial status for the new project."}
-              </p>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description (Optional)</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Project details and goals..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isLoading || isFetchingData}>
-            {isLoading ? "Saving..." : (initialValues?.name ? "Save Changes" : "Save Project")}
-          </Button>
-        </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            {!isClient && (
+              <Button type="submit" disabled={isLoading || isFetchingData}>
+                {isLoading ? "Saving..." : (initialValues?.name ? "Save Changes" : "Save Project")}
+              </Button>
+            )}
+          </div>
+        </fieldset>
       </form>
     </Form>
   )

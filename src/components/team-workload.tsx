@@ -33,7 +33,7 @@ interface WorkloadData {
   profiles: any[]
   tasks: any[]
   projects: any[]
-  proposals: any[]
+  phases: any[]
 }
 
 export function TeamWorkload() {
@@ -49,19 +49,19 @@ export function TeamWorkload() {
           { data: profiles },
           { data: tasks },
           { data: projects },
-          { data: proposals }
+          { data: phases }
         ] = await Promise.all([
-          supabase.from('profiles').select('*'),
+          supabase.from('profiles').select('*').neq('role', 'client'),
           supabase.from('tasks').select('*'),
           supabase.from('projects').select('*'),
-          supabase.from('proposals').select('*')
+          supabase.from('phases').select('*')
         ])
 
         setData({
           profiles: profiles || [],
           tasks: tasks || [],
           projects: projects || [],
-          proposals: proposals || []
+          phases: phases || []
         })
       } catch (err: any) {
         setError(err.message)
@@ -91,9 +91,9 @@ export function TeamWorkload() {
     if (!data) return []
 
     return data.projects.map(project => {
-      const projectProposals = data.proposals.filter(p => p.project_id === project.id)
-      const proposalIds = projectProposals.map(p => p.id)
-      const projectTasks = data.tasks.filter(task => proposalIds.includes(task.proposal_id))
+      const projectPhases = data.phases.filter(p => p.project_id === project.id)
+      const phaseIds = projectPhases.map(p => p.id)
+      const projectTasks = data.tasks.filter(task => phaseIds.includes(task.phase_id))
       
       return {
         name: project.name,

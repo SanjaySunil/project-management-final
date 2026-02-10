@@ -5,13 +5,13 @@ import { ThemeProvider } from "next-themes"
 import { ProtectedRoute } from "@/components/protected-route"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import LoginPage from "@/pages/login"
-import OverviewPage from "@/pages/overview"
 import ClientsPage from "@/pages/clients"
 import ClientOverviewPage from "@/pages/client-overview"
 import ClientProjectsPage from "@/pages/client-projects"
 import ProjectsPage from "@/pages/projects"
+import ProposalsPage from "@/pages/proposals"
 import ProjectOverviewPage from "@/pages/project-overview"
-import ProposalOverviewPage from "@/pages/proposal-overview"
+import PhaseOverviewPage from "@/pages/phase-overview"
 import TasksPage from "@/pages/tasks"
 import AssignedTasksPage from "@/pages/tasks-assigned"
 import CredentialsPage from "@/pages/credentials"
@@ -32,12 +32,15 @@ import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
 
 function AppRoutes() {
-  const { loading: authLoading } = useAuth()
+  const { loading: authLoading, role } = useAuth()
   const { loading: orgLoading } = useOrganization()
 
   if (authLoading || orgLoading) {
     return <FullScreenLoader />
   }
+
+  const isClient = role === "client"
+  const defaultDashboardPath = isClient ? "/dashboard/proposals" : "/dashboard/projects"
 
   return (
     <Routes>
@@ -51,8 +54,12 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard/overview" replace />} />
-        <Route path="overview" element={<OverviewPage />} />
+        <Route 
+          index 
+          element={
+            <Navigate to={defaultDashboardPath} replace />
+          } 
+        />
         <Route path="chat" element={<ChatPage />} />
         <Route path="chat/dms" element={<ChatPage />} />
         <Route path="chat/dms/:channelId" element={<ChatPage />} />
@@ -61,11 +68,12 @@ function AppRoutes() {
         <Route path="clients/:clientId/overview" element={<ClientOverviewPage />} />
         <Route path="clients/:clientId/projects" element={<ClientProjectsPage />} />
         <Route path="projects" element={<ProjectsPage />} />
-        <Route path="projects/:projectId" element={<Navigate to="proposals" replace />} />
-        <Route path="projects/:projectId/overview" element={<Navigate to="../proposals" replace />} />
+        <Route path="proposals" element={<ProposalsPage />} />
+        <Route path="projects/:projectId" element={<Navigate to="phases" replace />} />
+        <Route path="projects/:projectId/overview" element={<Navigate to="../phases" replace />} />
         <Route path="projects/:projectId/documents" element={<ProjectOverviewPage />} />
-        <Route path="projects/:projectId/proposals" element={<ProjectOverviewPage />} />
-        <Route path="projects/:projectId/proposals/:proposalId" element={<ProposalOverviewPage />} />
+        <Route path="projects/:projectId/phases" element={<ProjectOverviewPage />} />
+        <Route path="projects/:projectId/phases/:phaseId" element={<PhaseOverviewPage />} />
         <Route path="projects/:projectId/chat" element={<ChatPage />} />
         <Route path="projects/:projectId/chat/:channelId" element={<ChatPage />} />
         <Route path="tasks" element={<TasksPage />} />
@@ -81,7 +89,12 @@ function AppRoutes() {
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>
 
-      <Route path="/" element={<Navigate to="/dashboard/overview" replace />} />
+      <Route 
+        path="/" 
+        element={
+          <Navigate to={defaultDashboardPath} replace />
+        } 
+      />
     </Routes>
   )
 }

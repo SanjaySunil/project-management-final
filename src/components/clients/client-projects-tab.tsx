@@ -98,12 +98,19 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
     setDeleteConfirmOpen(true)
   }
 
-  const handleViewProposals = (project: ProjectWithClient) => {
+  const handleViewPhases = (project: ProjectWithClient) => {
     navigate(`/dashboard/projects/${project.id}`)
   }
 
   const confirmDeleteProject = async () => {
     if (!projectToDelete) return
+
+    if (role === 'client') {
+      toast.error("Clients are not authorized to delete projects")
+      setDeleteConfirmOpen(false)
+      setProjectToDelete(null)
+      return
+    }
 
     try {
       const { error } = await supabase.from("projects").delete().eq("id", projectToDelete)
@@ -119,6 +126,11 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   }
 
   const handleSubmit = async (values: any) => {
+    if (role === 'client') {
+      toast.error("Clients are not authorized to create or edit projects")
+      return
+    }
+
     const { member_ids, ...projectValues } = values
     
     try {
@@ -185,7 +197,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
           onEdit={handleEditProject}
           onDelete={handleDeleteProject}
           onAdd={handleAddProject}
-          onViewProposals={handleViewProposals}
+          onViewPhases={handleViewPhases}
           disablePadding={true}
         />
       </div>

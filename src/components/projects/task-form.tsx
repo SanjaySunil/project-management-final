@@ -35,7 +35,7 @@ const taskSchema = z.object({
   type: z.string().optional(),
   user_id: z.string().nullable().optional(),
   project_id: z.string().nullable().optional(),
-  proposal_id: z.string().nullable().optional(),
+  phase_id: z.string().nullable().optional(),
   parent_id: z.string().nullable().optional(),
   subtasks: z.array(z.string()).optional(),
   files: z.array(z.any()).optional(),
@@ -60,7 +60,7 @@ interface TaskFormProps {
   onAddSubtask?: (title: string) => void | Promise<void>
   isLoading?: boolean
   members: Tables<"profiles">[]
-  proposals?: Tables<"proposals">[]
+  phases?: Tables<"phases">[]
   projects?: Tables<"projects">[]
   tasks?: Task[]
   defaultValues?: Partial<TaskFormValues>
@@ -76,7 +76,7 @@ export function TaskForm({
   onAddSubtask,
   isLoading, 
   members, 
-  proposals = [],
+  phases = [],
   projects = [],
   tasks = [],
   defaultValues,
@@ -89,15 +89,15 @@ export function TaskForm({
   const [localSubtasks, setLocalSubtasks] = React.useState<string[]>([])
   const [previews, setPreviews] = React.useState<{name: string, url: string}[]>([])
 
-  // Find initial project from proposal if provided
+  // Find initial project from phase if provided
   const initialProjectId = React.useMemo(() => {
     if (defaultValues?.project_id) return defaultValues.project_id
-    if (defaultValues?.proposal_id && proposals) {
-      const proposal = proposals.find(p => p.id === defaultValues.proposal_id)
-      return proposal?.project_id || null
+    if (defaultValues?.phase_id && phases) {
+      const phase = phases.find(p => p.id === defaultValues.phase_id)
+      return phase?.project_id || null
     }
     return null
-  }, [defaultValues?.project_id, defaultValues?.proposal_id, proposals])
+  }, [defaultValues?.project_id, defaultValues?.phase_id, phases])
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -109,7 +109,7 @@ export function TaskForm({
       type: defaultValues?.type || "feature",
       user_id: defaultValues?.user_id || null,
       project_id: initialProjectId,
-      proposal_id: defaultValues?.proposal_id || null,
+      phase_id: defaultValues?.phase_id || null,
       parent_id: defaultValues?.parent_id || null,
       subtasks: [],
       files: [],
@@ -132,21 +132,17 @@ export function TaskForm({
     )
   }, [projects, initialProjectId, selectedProjectId])
 
-  const filteredProposals = React.useMemo(() => {
-    let base = proposals
+  const filteredPhases = React.useMemo(() => {
+    let base = phases
     if (selectedProjectId && selectedProjectId !== "none") {
-      base = proposals.filter(p => p.project_id === selectedProjectId)
+      base = phases.filter(p => p.project_id === selectedProjectId)
     }
     
-    return base.filter(proposal => 
-      proposal.status?.toLowerCase() === "active" || 
-      proposal.id === defaultValues?.proposal_id
+    return base.filter(phase => 
+      phase.status?.toLowerCase() === "active" || 
+      phase.id === defaultValues?.phase_id
     )
-  }, [selectedProjectId, proposals, defaultValues?.proposal_id])
-
-  const potentialParents = React.useMemo(() => {
-    return tasks.filter(t => t.id !== defaultValues?.id && !t.parent_id)
-  }, [tasks, defaultValues?.id])
+  }, [selectedProjectId, phases, defaultValues?.phase_id])
 
   const { user } = useAuth()
   const [isUploading, setIsUploading] = React.useState(false)
@@ -637,39 +633,6 @@ export function TaskForm({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {tasks && tasks.length > 0 && (
-              <FormField
-                control={form.control}
-                name="parent_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Parent Task</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a parent" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {potentialParents.map((parent) => (
-                          <SelectItem key={parent.id} value={parent.id}>
-                            <span className="truncate max-w-[150px]">{parent.title}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-          </div>
-          
           <div className="grid grid-cols-2 gap-4 pb-2">
             {projects.length > 0 && (
               <FormField
@@ -681,8 +644,8 @@ export function TaskForm({
                     <Select 
                       onValueChange={(val) => {
                         field.onChange(val)
-                        // Reset proposal when project changes
-                        form.setValue("proposal_id", "none")
+                        // Reset phase when project changes
+                        form.setValue("phase_id", "none")
                       }} 
                       value={field.value || "none"}
                     >
@@ -708,27 +671,27 @@ export function TaskForm({
               />
             )}
 
-            {proposals && proposals.length > 0 && (
+            {phases && phases.length > 0 && (
               <FormField
                 control={form.control}
-                name="proposal_id"
+                name="phase_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Proposal</FormLabel>
+                    <FormLabel>Phase</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
                       value={field.value || "none"}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select proposal" />
+                          <SelectValue placeholder="Select phase" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {filteredProposals.map((proposal) => (
-                          <SelectItem key={proposal.id} value={proposal.id}>
-                            <span className="truncate max-w-[150px]">{proposal.title}</span>
+                        {filteredPhases.map((phase) => (
+                          <SelectItem key={phase.id} value={phase.id}>
+                            <span className="truncate max-w-[150px]">{phase.title}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -15,8 +15,15 @@ interface AuthContextType {
   checkPermission: (action: string, resource: string) => boolean
   verifyPin: (pin: string) => Promise<boolean>
   setPin: (pin: string, isInitial?: boolean) => Promise<void>
+  resetPin: (password: string) => Promise<void>
   logPinAttempt: (pin: string, type: string, success: boolean) => Promise<void>
+  isPinBlacklisted: (pin: string) => boolean
 }
+
+const PIN_BLACKLIST = [
+  '1970', '2819', '2008', '0609', '9575', '1234', '0000', '5755', '0908', '1111',
+  '0317', '2021', '6767', '2807', '6969', '2022', '2023', '2020', '2024', '2025'
+]
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -28,6 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pin, setPinState] = useState<string | null>(null)
   const [isPinVerified, setIsPinVerified] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const isPinBlacklisted = useCallback((pinToCheck: string) => {
+    if (!pinToCheck) return false
+    const sanitizedPin = pinToCheck.toString().trim()
+    return PIN_BLACKLIST.includes(sanitizedPin)
+  }, [])
 
   const logPinAttempt = useCallback(async (pinEntered: string, type: string, success: boolean) => {
     if (!user) return
@@ -44,19 +57,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user])
 
   const fetchData = useCallback(async (userId: string) => {
-    console.log('AuthProvider: Background fetching profile for', userId)
+    console.log('AuthProvider: Starting fetchData for', userId)
+    
     try {
+      console.log('AuthProvider: Executing profiles query...')
       const { data, error } = await supabase
         .from('profiles')
         .select('role, organization_id, pin')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error('AuthProvider: Error fetching profile:', error)
       }
 
-      console.log('AuthProvider: Profile data received:', data)
+      console.log('AuthProvider: Profiles query result:', data)
 
       if (data) {
         console.log('AuthProvider: Setting role to', data.role)
@@ -64,79 +79,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganizationId(data.organization_id ?? null)
         setPinState(data.pin ?? null)
       } else {
-        console.warn('AuthProvider: No profile data found for user')
+        console.warn('AuthProvider: No profile found for user ID', userId)
       }
-      console.log('AuthProvider: Profile fetching sequence complete')
-    } catch (error) {
-      console.error('AuthProvider: Unexpected error fetching supplemental data:', error)
+    } catch (error: any) {
+      console.error('AuthProvider: Unexpected error in fetchData:', error)
+    } finally {
+      console.log('AuthProvider: fetchData complete')
     }
   }, [])
 
+  const handleSession = useCallback(async (currentSession: Session | null, source: string) => {
+    console.log(`AuthProvider: handleSession from ${source}, session exists:`, !!currentSession)
+    
+    setSession(currentSession)
+    setUser(currentSession?.user ?? null)
+    
+    if (currentSession?.user) {
+      console.log('AuthProvider: User detected, starting fetchData (non-blocking)...')
+      // Don't await fetchData here if we want to ensure loading is set to false eventually
+      // But we DO want the role before we say we are finished loading.
+      // Let's use a timeout-wrapped promise.
+      const fetchDataWithTimeout = async () => {
+        try {
+          // Give the connection a moment to stabilize if needed
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await fetchData(currentSession.user.id);
+        } catch (e) {
+          console.error('AuthProvider: Error in fetchData promise:', e);
+        } finally {
+          console.log(`AuthProvider: handleSession ${source} - setting loading to false`);
+          setLoading(false);
+        }
+      };
+      
+      fetchDataWithTimeout();
+    } else {
+      setRole(null)
+      setOrganizationId(null)
+      setPinState(null)
+      setIsPinVerified(false)
+      console.log(`AuthProvider: handleSession ${source} (no user) - setting loading to false`)
+      setLoading(false)
+    }
+  }, [fetchData])
+
   useEffect(() => {
     let mounted = true
-    let timeoutFinished = false
+    let initialized = false
 
-    // Safety timeout: 3 seconds is plenty for a local storage lookup
+    // Safety timeout: 5 seconds is plenty for a local storage lookup
     const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('AuthProvider: Loading safety trigger (3s timeout)')
-        timeoutFinished = true
+      if (mounted && !initialized) {
+        console.warn('AuthProvider: Initialization safety trigger (5s timeout)')
         setLoading(false)
       }
-    }, 3000)
+    }, 5000)
 
     async function initialize() {
-      console.log('AuthProvider: Initializing session check...')
+      if (initialized || !mounted) return
+      console.log('AuthProvider: Initializing...')
       try {
-        // Immediate check of the local session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession()
+        if (error) throw error
         
-        if (error) {
-          console.error('AuthProvider: getSession error:', error)
-        }
-
-        if (!mounted || timeoutFinished) return
-
-        console.log('AuthProvider: Session found:', !!initialSession)
-        setSession(initialSession)
-        setUser(initialSession?.user ?? null)
-        
-        if (initialSession) {
-          // Await profile data fetch during initialization
-          await fetchData(initialSession.user.id)
+        if (!initialized && mounted) {
+          initialized = true
+          await handleSession(initialSession, 'initialize')
         }
       } catch (error) {
-        console.error('AuthProvider: Fatal initialization error:', error)
-      } finally {
-        if (mounted && !timeoutFinished) {
-          console.log('AuthProvider: Ending loading state')
-          setLoading(false)
-          clearTimeout(timeout)
-        }
+        console.error('AuthProvider: Initialization error:', error)
+        if (mounted) setLoading(false)
       }
     }
 
     initialize()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('AuthProvider: Auth state changed event:', event)
+      console.log('AuthProvider: Auth state change:', event)
       if (!mounted) return
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        setSession(currentSession)
-        setUser(currentSession?.user ?? null)
-        if (currentSession?.user) {
-          fetchData(currentSession.user.id)
+        if (!initialized) {
+          initialized = true
+          await handleSession(currentSession, 'onAuthStateChange_INITIAL')
+        } else if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+          await handleSession(currentSession, 'onAuthStateChange_UPDATE')
         }
-        setLoading(false)
       } else if (event === 'SIGNED_OUT') {
-        setSession(null)
-        setUser(null)
-        setRole(null)
-        setOrganizationId(null)
-        setPinState(null)
-        setIsPinVerified(false)
-        setLoading(false)
+        initialized = true
+        await handleSession(null, 'SIGNED_OUT')
       }
     })
 
@@ -145,7 +176,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
       clearTimeout(timeout)
     }
-  }, [fetchData])
+  }, [handleSession])
+
+  // Require PIN re-entry when switching tabs/apps
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isPinVerified) {
+        setIsPinVerified(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isPinVerified])
 
   const checkPermission = useCallback((action: string, resource: string) => {
     return hasPermission(role, action, resource)
@@ -166,19 +211,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setPin = async (newPin: string, isInitial: boolean = false) => {
     if (!user) return
+    
+    const sanitizedPin = newPin.toString().trim()
+    if (isPinBlacklisted(sanitizedPin)) {
+      await logPinAttempt(sanitizedPin, isInitial ? 'setup_blocked' : 'update_blocked', false)
+      throw new Error("You've entered a commonly used passcode, please try another one.")
+    }
+
     const { error } = await supabase
       .from('profiles')
-      .update({ pin: newPin })
+      .update({ pin: sanitizedPin })
       .eq('id', user.id)
 
     if (error) {
-      await logPinAttempt(newPin, isInitial ? 'setup' : 'update', false)
+      await logPinAttempt(sanitizedPin, isInitial ? 'setup_failed' : 'update_failed', false)
       throw error
     }
     
-    await logPinAttempt(newPin, isInitial ? 'setup' : 'update', true)
-    setPinState(newPin)
+    await logPinAttempt(sanitizedPin, isInitial ? 'setup' : 'update', true)
+    setPinState(sanitizedPin)
     setIsPinVerified(true)
+  }
+
+  const resetPin = async (password: string) => {
+    if (!user?.email) throw new Error('No user email found')
+
+    // Verify password by attempting to sign in
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+    })
+
+    if (authError) {
+      await logPinAttempt('', 'reset_failed', false)
+      throw new Error('Invalid password')
+    }
+
+    // Clear PIN in profiles
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ pin: null })
+      .eq('id', user.id)
+
+    if (profileError) {
+      await logPinAttempt('', 'reset_profile_failed', false)
+      throw profileError
+    }
+    
+    await logPinAttempt('', 'reset_success', true)
+    setPinState(null)
+    setIsPinVerified(false)
   }
 
   const value = {
@@ -193,7 +275,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkPermission,
     verifyPin,
     setPin,
-    logPinAttempt
+    resetPin,
+    logPinAttempt,
+    isPinBlacklisted
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

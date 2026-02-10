@@ -4,7 +4,6 @@ import * as React from "react"
 import { useLocation, matchPath } from "react-router-dom"
 import {
   GalleryVerticalEnd,
-  LayoutDashboard,
   CheckSquare,
   Bell,
   Users,
@@ -17,6 +16,7 @@ import {
   Settings2,
   Ticket,
 } from "lucide-react"
+import { IconFileText } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -82,12 +82,6 @@ export function SidebarSkeleton() {
 const sidebarGroups: Record<string, SidebarItem[]> = {
   platform: [
     {
-      title: "Dashboard",
-      url: "/dashboard/overview",
-      icon: LayoutDashboard,
-      permission: { action: "read", resource: "dashboard" },
-    },
-    {
       title: "My Tasks",
       url: "/dashboard/tasks/assigned",
       icon: CheckSquare,
@@ -111,6 +105,11 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       url: "/dashboard/projects",
       icon: Briefcase,
       permission: { action: "read", resource: "projects" },
+    },
+    {
+      title: "Proposals",
+      url: "/dashboard/proposals",
+      icon: IconFileText,
     },
     {
       title: "Finances",
@@ -214,10 +213,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   ]
 
   const projectMatch = matchPath({ path: "/dashboard/projects/:projectId/*" }, location.pathname)
-  const proposalMatch = matchPath({ path: "/dashboard/projects/:projectId/proposals/:proposalId" }, location.pathname)
+  const phaseMatch = matchPath({ path: "/dashboard/projects/:projectId/phases/:phaseId" }, location.pathname)
   
-  const projectId = projectMatch?.params.projectId || proposalMatch?.params.projectId
-  const proposalId = proposalMatch?.params.proposalId
+  const projectId = projectMatch?.params.projectId || phaseMatch?.params.projectId
+  const phaseId = phaseMatch?.params.phaseId
 
   const clientMatch = matchPath({ path: "/dashboard/clients/:clientId/*" }, location.pathname)
   const clientId = clientMatch?.params.clientId
@@ -235,6 +234,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       // Hide "My Tasks" for clients
       if (item.title === "My Tasks" && role === "client") {
         return false
+      }
+
+      // For clients, hide Projects and show Proposals
+      if (role === "client") {
+        if (item.title === "Projects") return false
+      } else {
+        // For others, hide Proposals (they see them inside projects)
+        if (item.title === "Proposals") return false
       }
 
       // Check if item is hidden in organization settings
@@ -269,20 +276,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     
     return items.map((item: SidebarItem) => {
       // Project contextual sub-menu
-      if (item.title === "Projects" && projectId && !proposalId) {
+      if (item.title === "Projects" && projectId && !phaseId) {
+        const projectItems = [
+          { title: "Phases", url: `/dashboard/projects/${projectId}/phases` },
+        ]
+
+        if (role !== "client") {
+          projectItems.push({ title: "Documents", url: `/dashboard/projects/${projectId}/documents` })
+        }
+
+        projectItems.push(
+          { title: "← All Projects", url: "/dashboard/projects" }
+        )
+
         return {
           ...item,
           isActive: true,
-          items: [
-            { title: "Proposals", url: `/dashboard/projects/${projectId}/proposals` },
-            { title: "Documents", url: `/dashboard/projects/${projectId}/documents` },
-            { title: "Project Chat", url: `/dashboard/projects/${projectId}/chat` },
-            { title: "← All Projects", url: "/dashboard/projects" }
-          ]
+          items: projectItems
         }
       }
       
-      // Keep Projects highlighted when inside a project or proposal
+      // Keep Projects highlighted when inside a project or phase
       if (item.title === "Projects" && (projectId || location.pathname.startsWith("/dashboard/projects"))) {
         return { ...item, isActive: true }
       }
@@ -301,6 +315,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       }
 
       if (item.title === "Clients" && location.pathname.startsWith("/dashboard/clients")) {
+        return { ...item, isActive: true }
+      }
+
+      if (item.title === "Proposals" && location.pathname.startsWith("/dashboard/proposals")) {
         return { ...item, isActive: true }
       }
 

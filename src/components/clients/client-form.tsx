@@ -108,7 +108,6 @@ import { Switch } from "@/components/ui/switch"
 const clientSchema = z.object({
   first_name: z.string().min(2, "First name must be at least 2 characters"),
   last_name: z.string().optional().or(z.literal("")),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
   country: z.string().optional(),
@@ -117,7 +116,6 @@ const clientSchema = z.object({
   timezone: z.string().optional(),
   notes: z.string().optional(),
   enable_login: z.boolean(),
-  password: z.string().optional().or(z.literal("")),
 })
 
 type ClientFormValues = z.infer<typeof clientSchema>
@@ -132,26 +130,7 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
   const [isStatePickerOpen, setIsStatePickerOpen] = React.useState(false)
   const [isCityPickerOpen, setIsCityPickerOpen] = React.useState(false)
 
-  const schema = React.useMemo(() => clientSchema.refine((data) => {
-    if (data.enable_login && !data.email) {
-      return false;
-    }
-    return true;
-  }, {
-    message: "Email is required when login access is enabled",
-    path: ["email"],
-  }).refine((data) => {
-    if (data.enable_login && !data.password && !initialValues?.user_id) {
-      return false;
-    }
-    if (data.enable_login && data.password && data.password.length < 6) {
-      return false;
-    }
-    return true;
-  }, {
-    message: "Password must be at least 6 characters",
-    path: ["password"],
-  }), [initialValues?.user_id])
+  const schema = React.useMemo(() => clientSchema, [])
 
   React.useEffect(() => {
     GetCountries().then((result) => {
@@ -182,7 +161,6 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
     defaultValues: {
       first_name: initialValues?.first_name || "",
       last_name: initialValues?.last_name || "",
-      email: initialValues?.email || "",
       phone: initialValues?.phone || "",
       address: initialValues?.address || "",
       country: initialValues?.country || "",
@@ -191,7 +169,6 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
       timezone: initialValues?.timezone || "",
       notes: initialValues?.notes || "",
       enable_login: !!initialValues?.user_id,
-      password: "",
     },
   })
 
@@ -231,19 +208,6 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email {watchEnableLogin ? <span className="text-destructive">*</span> : "(Optional)"}</FormLabel>
-                <FormControl>
-                  <Input placeholder="john.doe@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
             name="phone"
             render={({ field }) => (
               <FormItem>
@@ -278,22 +242,6 @@ export function ClientForm({ initialValues, onSubmit, onCancel, isLoading }: Cli
               </FormItem>
             )}
           />
-
-          {watchEnableLogin && !initialValues?.user_id && (
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
 
           {watchEnableLogin && initialValues?.user_id ? (
             <div className="text-sm text-muted-foreground bg-muted p-2 rounded">

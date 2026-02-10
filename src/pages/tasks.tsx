@@ -24,7 +24,7 @@ export default function TasksPage() {
   const taskIdParam = searchParams.get("taskId")
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
-  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
+  const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
   const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
@@ -40,94 +40,47 @@ export default function TasksPage() {
     try {
       setIsLoading(true)
       
-      let clientId: string | null = null
-      if (role === "client") {
-        const { data: clientData } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("user_id", user?.id)
-          .single()
-        clientId = clientData?.id || null
-        
-        if (!clientId) {
-          setTasks([])
-          setMembers([])
-          setProposals([])
-          setProjects([])
-          setIsLoading(false)
-          return
-        }
-      }
+      const normalizedRole = role?.toLowerCase()
+      const isClient = normalizedRole === "client"
 
       let tasksQuery = supabase
         .from("tasks")
         .select(`
           *,
-          proposals (
+          phases!inner (
             id,
             title,
             project_id,
-            projects (
+            projects!inner (
               id,
               name,
-              client_id
+              client_id,
+              clients!inner (
+                user_id
+              )
             )
           ),
           task_attachments (*)
         `)
       
-      let proposalsQuery = supabase.from("proposals").select("*")
-      let projectsQuery = supabase.from("projects").select("*")
+      let phasesQuery = supabase.from("phases").select("*, projects!inner(clients!inner(user_id))")
+      let projectsQuery = supabase.from("projects").select("*, clients!inner(user_id)")
 
-      if (clientId) {
-        // Filter by client_id
-        // For tasks, we need to join through proposals and projects
-        // This is tricky with Supabase filter on joined tables. 
-        // We might need to get project IDs first.
-        const { data: clientProjects } = await supabase
-          .from("projects")
-          .select("id")
-          .eq("client_id", clientId)
+      if (isClient) {
+        tasksQuery = tasksQuery.eq("phases.projects.clients.user_id", user.id)
         
-        const projectIds = clientProjects?.map(p => p.id) || []
-        
-        if (projectIds.length > 0) {
-          const { data: clientProposals } = await supabase
-            .from("proposals")
-            .select("id")
-            .in("project_id", projectIds)
-          
-          const proposalIds = clientProposals?.map(p => p.id) || []
-          
-          if (proposalIds.length > 0) {
-            tasksQuery = tasksQuery.in("proposal_id", proposalIds)
-            proposalsQuery = proposalsQuery.in("id", proposalIds)
-          } else {
-            // No proposals, so no tasks
-            setTasks([])
-            setProposals([])
-            setProjects([])
-            setIsLoading(false)
-            return
-          }
-          projectsQuery = projectsQuery.in("id", projectIds)
-        } else {
-          // No projects, so no tasks
-          setTasks([])
-          setProposals([])
-          setProjects([])
-          setIsLoading(false)
-          return
-        }
+        // For phases and projects, we need to join through clients table
+        phasesQuery = phasesQuery.eq("projects.clients.user_id", user.id)
+        projectsQuery = projectsQuery.eq("clients.user_id", user.id)
       }
 
-      const [tasksRes, membersRes, proposalsRes, projectsRes] = await Promise.all([
+      const [tasksRes, membersRes, phasesRes, projectsRes] = await Promise.all([
         tasksQuery.order("order_index", { ascending: true }),
         supabase
           .from("profiles")
           .select("*")
           .order("full_name", { ascending: true }),
-        proposalsQuery
+        phasesQuery
           .order("order_index", { ascending: true })
           .order("title", { ascending: true }),
         projectsQuery
@@ -136,7 +89,7 @@ export default function TasksPage() {
 
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
-      if (proposalsRes.error) throw proposalsRes.error
+      if (phasesRes.error) throw phasesRes.error
       if (projectsRes.error) throw projectsRes.error
 
       const fetchedMembers = membersRes.data || []
@@ -147,7 +100,7 @@ export default function TasksPage() {
 
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
-      setProposals(proposalsRes.data || [])
+      setPhases(phasesRes.data || [])
       setProjects(projectsRes.data || [])
     } catch (error: any) {
       console.error("Fetch tasks error:", error)
@@ -198,7 +151,7 @@ export default function TasksPage() {
               .from("tasks")
               .select(`
                 *,
-                proposals (
+                phases (
                   id,
                   title,
                   project_id,
@@ -293,14 +246,14 @@ export default function TasksPage() {
           description: values.description,
           type: values.type || 'feature',
           user_id: values.user_id === "unassigned" ? null : values.user_id,
-          proposal_id: values.proposal_id === "none" ? null : values.proposal_id,
+          phase_id: values.phase_id === "none" ? null : values.phase_id,
           parent_id: (values.parent_id === "none" ? null : values.parent_id) || creatingParentId,
           status: finalStatus,
           order_index: tasks.filter(t => t.status === finalStatus).length
         }])
         .select(`
           *,
-          proposals (
+          phases (
             id,
             title,
             project_id,
@@ -322,7 +275,7 @@ export default function TasksPage() {
           title,
           status: "todo",
           parent_id: taskId,
-          proposal_id: data.proposal_id,
+          phase_id: data.phase_id,
           order_index: index
         }))
         
@@ -331,7 +284,7 @@ export default function TasksPage() {
           .insert(subtasksToInsert)
           .select(`
             *,
-            proposals (
+            phases (
               id,
               title,
               project_id,
@@ -448,7 +401,7 @@ export default function TasksPage() {
         status: values.status || editingTask.status,
         type: values.type || editingTask.type || 'feature',
         user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
-        proposal_id: values.proposal_id === "none" ? null : (values.proposal_id || null),
+        phase_id: values.phase_id === "none" ? null : (values.phase_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
 
@@ -497,7 +450,7 @@ export default function TasksPage() {
 
   const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
     try {
-      // Find parent task to inherit proposal/project if needed
+      // Find parent task to inherit phase/project if needed
       const parentTask = tasks.find(t => t.id === parentId)
       
       const { data, error } = await supabase
@@ -507,12 +460,12 @@ export default function TasksPage() {
           status,
           type: parentTask?.type || 'feature',
           parent_id: parentId,
-          proposal_id: parentTask?.proposal_id || null,
+          phase_id: parentTask?.phase_id || null,
           order_index: tasks.filter(t => t.parent_id === parentId).length
         }])
         .select(`
           *,
-          proposals (
+          phases (
             id,
             title,
             project_id,
@@ -552,7 +505,7 @@ export default function TasksPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-                <p className="text-sm text-muted-foreground">Manage and track your project tasks across all proposals.</p>
+                <p className="text-sm text-muted-foreground">Manage and track your project tasks across all phases.</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -595,7 +548,7 @@ export default function TasksPage() {
             }}
             isLoading={isSubmitting}
             members={members}
-            proposals={proposals}
+            phases={phases}
             projects={projects}
             tasks={tasks}
             defaultValues={{
@@ -640,7 +593,7 @@ export default function TasksPage() {
               onAddSubtask={(title) => handleTaskQuickCreate(editingTask.status, editingTask.id, title)}
               isLoading={isSubmitting}
               members={members}
-              proposals={proposals}
+              phases={phases}
               projects={projects}
               tasks={tasks}
               defaultValues={{
@@ -650,7 +603,7 @@ export default function TasksPage() {
                 status: editingTask.status,
                 type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id,
-                proposal_id: editingTask.proposal_id,
+                phase_id: editingTask.phase_id,
                 parent_id: editingTask.parent_id,
               }}
             />

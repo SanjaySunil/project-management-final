@@ -51,7 +51,7 @@ export function SectionCards({ data, loading }: SectionCardsProps) {
     ...(data?.revenue !== null ? [{
       title: "Total Revenue",
       value: data ? formatCurrency(data.revenue || 0) : "$0.00",
-      description: "From active & complete proposals",
+      description: "From active & complete phases",
       trend: data?.trends.revenue || 0,
       icon: <IconCurrencyDollar className="size-4 text-muted-foreground" />,
       footer: "Updated just now",

@@ -41,12 +41,12 @@ export default function FinancesPage() {
     setLoading(true)
     try {
       const [
-        { data: proposals },
+        { data: phases },
         { data: expenses },
         { data: projectsData }
       ] = await Promise.all([
         supabase
-          .from("proposals")
+          .from("phases")
           .select("*, projects(name, clients(first_name, last_name))")
           .order("created_at", { ascending: false }),
         supabase
@@ -59,10 +59,10 @@ export default function FinancesPage() {
           .order("name")
       ])
 
-      const totalRevenue = proposals?.reduce((acc, p) => acc + (Number(p.net_amount ?? p.amount) || 0), 0) || 0
+      const totalRevenue = phases?.reduce((acc, p) => acc + (Number(p.net_amount ?? p.amount) || 0), 0) || 0
       const totalExpenses = expenses?.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) || 0
       
-      setRevenueData(proposals || [])
+      setRevenueData(phases || [])
       setExpenseData(expenses || [])
       setProjects(projectsData || [])
       
@@ -70,7 +70,7 @@ export default function FinancesPage() {
         totalRevenue,
         totalExpenses,
         netProfit: totalRevenue - totalExpenses,
-        pendingInvoices: proposals?.filter(p => p.status === "sent").length || 0
+        pendingInvoices: phases?.filter(p => p.status === "sent").length || 0
       })
     } catch (error) {
       console.error("Error fetching finance data:", error)
@@ -113,7 +113,7 @@ export default function FinancesPage() {
   const revenueColumns = [
     {
       accessorKey: "title",
-      header: "Proposal/Invoice",
+      header: "Phase/Invoice",
       cell: ({ row }: any) => (
         <div className="flex flex-col">
           <span className="font-medium">{row.getValue("title")}</span>
@@ -363,7 +363,7 @@ export default function FinancesPage() {
               <CardHeader>
                 <CardTitle>Revenue Sources</CardTitle>
                 <CardDescription>
-                  Detailed breakdown of all income from projects and proposals.
+                  Detailed breakdown of all income from projects and phases.
                 </CardDescription>
               </CardHeader>
               <CardContent>

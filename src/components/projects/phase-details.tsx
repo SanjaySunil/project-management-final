@@ -1,12 +1,12 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconFileText, IconEdit, IconLayoutKanban } from "@tabler/icons-react"
+import { IconFileText, IconEdit, IconLayoutKanban, IconGitPullRequest } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ProposalForm } from "@/components/projects/proposal-form"
+import { PhaseForm } from "@/components/projects/phase-form"
 import type { Deliverable } from "@/components/projects/deliverables-manager"
 import {
   Dialog,
@@ -23,29 +23,38 @@ import { useSearchParams } from "react-router-dom"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MessageSquare } from "lucide-react"
 import { slugify, getErrorMessage } from "@/lib/utils"
-import { ProposalChat } from "./proposal-chat"
+import { PhaseChat } from "./phase-chat"
+import { RevisionsManager } from "./revisions-manager"
 
-type Proposal = Tables<"proposals">
+type Phase = Tables<"phases">
 
-interface ProposalDetailsProps {
+interface PhaseDetailsProps {
   projectId: string
-  proposalId: string
+  phaseId: string
 }
 
-export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps) {
+export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   const { user, role } = useAuth()
   const isAdmin = role === "admin"
   const isClient = role === "client"
+  const isStaff = role === "admin" || role === "employee"
   const [searchParams, setSearchParams] = useSearchParams()
   const taskIdParam = searchParams.get("taskId")
   
-  // Proposal & Deliverables state
-  const [proposal, setProposal] = React.useState<Proposal | null>(null)
+  // Phase & Deliverables state
+  const [phase, setPhase] = React.useState<Phase | null>(null)
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState("kanban")
+
+  // Set default tab for client
+  React.useEffect(() => {
+    if (role === 'client' && activeTab !== 'revisions') {
+      setActiveTab('revisions')
+    }
+  }, [role, activeTab])
 
   // Kanban state
   const [tasks, setTasks] = React.useState<Task[]>([])
@@ -59,7 +68,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
 
   // Handle deep linking for tasks
   React.useEffect(() => {
-    if (taskIdParam && tasks.length > 0 && !editingTask) {
+    if (!isClient && taskIdParam && tasks.length > 0 && !editingTask) {
       const task = tasks.find(t => t.id === taskIdParam)
       if (task) {
         setEditingTask(task)
@@ -67,7 +76,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         setActiveTab("kanban")
       }
     }
-  }, [taskIdParam, tasks, editingTask])
+  }, [taskIdParam, tasks, editingTask, isClient])
 
   // Clear taskId from URL when dialog is closed
   const handleEditDialogChange = (open: boolean) => {
@@ -110,28 +119,28 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         }
       }
 
-      // Fetch proposal
-      const { data: proposalData, error: proposalError } = await supabase
-        .from("proposals")
+      // Fetch phase
+      const { data: phaseData, error: phaseError } = await supabase
+        .from("phases")
         .select("*")
-        .eq("id", proposalId)
+        .eq("id", phaseId)
         .single()
 
-      if (proposalError) throw proposalError
-      setProposal(proposalData)
+      if (phaseError) throw phaseError
+      setPhase(phaseData)
 
       // Fetch deliverables, tasks, and members in parallel
       const [deliverablesRes, tasksRes, membersRes] = await Promise.all([
         supabase
           .from("deliverables")
           .select("*")
-          .eq("proposal_id", proposalId)
+          .eq("phase_id", phaseId)
           .order("order_index", { ascending: true }),
         supabase
           .from("tasks")
           .select(`
             *,
-            proposals (
+            phases (
               id,
               title,
               project_id,
@@ -141,7 +150,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
             ),
             task_attachments (*)
           `)
-          .eq("proposal_id", proposalId)
+          .eq("phase_id", phaseId)
           .order("order_index", { ascending: true }),
         supabase
           .from("profiles")
@@ -164,31 +173,31 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       setMembers(fetchedMembers)
 
     } catch (error: any) {
-      console.error("Fetch proposal details error:", error)
-      toast.error("Failed to fetch proposal details: " + getErrorMessage(error))
+      console.error("Fetch phase details error:", error)
+      toast.error("Failed to fetch phase details: " + getErrorMessage(error))
     } finally {
       setIsLoading(false)
     }
-  }, [proposalId])
+  }, [phaseId])
 
   React.useEffect(() => {
-    if (proposalId) {
+    if (phaseId) {
       fetchData()
     }
-  }, [fetchData, proposalId])
+  }, [fetchData, phaseId])
 
   React.useEffect(() => {
-    if (!proposalId) return
+    if (!phaseId) return
 
     const channel = supabase
-      .channel(`proposal-tasks-${proposalId}`)
+      .channel(`phase-tasks-${phaseId}`)
       .on(
         "postgres_changes",
         { 
           event: "*", 
           schema: "public", 
           table: "tasks",
-          filter: `proposal_id=eq.${proposalId}`
+          filter: `phase_id=eq.${phaseId}`
         },
         async (payload) => {
           if (payload.eventType === "INSERT") {
@@ -196,7 +205,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
               .from("tasks")
               .select(`
                 *,
-                proposals (
+                phases (
                   id,
                   title,
                   project_id,
@@ -241,17 +250,17 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [proposalId, members])
+  }, [phaseId, members])
 
-  // --- Proposal Actions ---
-  const handleProposalSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
+  // --- Phase Actions ---
+  const handlePhaseSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
     try {
       setIsSubmitting(true)
 
       const { error } = await supabase
-        .from("proposals")
+        .from("phases")
         .update(values)
-        .eq("id", proposalId)
+        .eq("id", phaseId)
       
       if (error) throw error
 
@@ -260,15 +269,15 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         await supabase
           .from("channels")
           .update({ name: slugify(values.title) })
-          .eq("proposal_id", proposalId)
+          .eq("phase_id", phaseId)
       }
 
       // Save deliverables
-      await supabase.from("deliverables").delete().eq("proposal_id", proposalId)
+      await supabase.from("deliverables").delete().eq("phase_id", phaseId)
 
       if (updatedDeliverables.length > 0) {
         const deliverablesToInsert = updatedDeliverables.map((d, index) => ({
-          proposal_id: proposalId,
+          phase_id: phaseId,
           title: d.title,
           description: d.description,
           order_index: index,
@@ -276,12 +285,12 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
         await supabase.from("deliverables").insert(deliverablesToInsert)
       }
 
-      toast.success("Proposal updated successfully")
+      toast.success("Phase updated successfully")
       setIsDialogOpen(false)
       fetchData()
     } catch (error: any) {
-      console.error("Save proposal error:", error)
-      toast.error("Failed to save proposal: " + getErrorMessage(error))
+      console.error("Save phase error:", error)
+      toast.error("Failed to save phase: " + getErrorMessage(error))
     } finally {
       setIsSubmitting(false)
     }
@@ -322,12 +331,12 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           description: values.description,
           type: values.type || 'feature',
           user_id: values.user_id === "unassigned" ? null : values.user_id,
-          proposal_id: proposalId,
+          phase_id: phaseId,
           parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId),
           status: finalStatus,
           order_index: tasks.filter(t => t.status === finalStatus).length
         }])
-        .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
+        .select(`*, phases(id, title, project_id, projects(name)), task_attachments(*)`)
         .single()
 
       if (error) throw error
@@ -340,14 +349,14 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           title,
           status: "todo",
           parent_id: taskId,
-          proposal_id: proposalId,
+          phase_id: phaseId,
           order_index: index
         }))
         
         const { data: createdSubtasks, error: subtasksError } = await supabase
           .from("tasks")
           .insert(subtasksToInsert)
-          .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
+          .select(`*, phases(id, title, project_id, projects(name)), task_attachments(*)`)
 
         if (subtasksError) throw subtasksError
         
@@ -469,10 +478,10 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           status,
           type: parentTask?.type || 'feature',
           parent_id: parentId,
-          proposal_id: proposalId,
+          phase_id: phaseId,
           order_index: tasks.filter(t => t.parent_id === parentId).length
         }])
-        .select(`*, proposals(id, title, project_id, projects(name)), task_attachments(*)`)
+        .select(`*, phases(id, title, project_id, projects(name)), task_attachments(*)`)
         .single()
 
       if (error) throw error
@@ -510,7 +519,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     }
   }
 
-  if (isLoading && !proposal) {
+  if (isLoading && !phase) {
     return (
       <div className="flex flex-1 flex-col gap-4">
         <div className="flex flex-col gap-2 px-4 lg:px-6">
@@ -533,6 +542,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-24" />
         </div>
         <div className="grid gap-6 md:grid-cols-3 mt-4 px-4 lg:px-6">
           <div className="md:col-span-2 space-y-6">
@@ -545,11 +555,11 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
     )
   }
 
-  if (!proposal) {
+  if (!phase) {
     return (
       <div className="flex flex-1 items-center justify-center p-4 text-center">
         <div>
-          <p className="text-lg font-medium">Proposal not found.</p>
+          <p className="text-lg font-medium">Phase not found.</p>
         </div>
       </div>
     )
@@ -563,23 +573,23 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <IconFileText className="h-6 w-6" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">{proposal.title}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{phase.title}</h1>
           </div>
           <div className="flex items-center gap-3">
             {isAdmin && (
               <div className="text-right mr-4">
                 <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Total Amount</p>
                 <div className="flex flex-col items-end">
-                  <p className="text-2xl font-bold">${proposal.amount?.toLocaleString()}</p>
-                  {proposal.order_source === "fiverr" && (
+                  <p className="text-2xl font-bold">${phase.amount?.toLocaleString()}</p>
+                  {phase.order_source === "fiverr" && (
                     <p className="text-xs text-muted-foreground">
-                      Net: <span className="font-medium text-primary">${proposal.net_amount?.toLocaleString()}</span>
+                      Net: <span className="font-medium text-primary">${phase.net_amount?.toLocaleString()}</span>
                     </p>
                   )}
                 </div>
               </div>
             )}
-            {getStatusBadge(proposal.status)}
+            {getStatusBadge(phase.status)}
           </div>
         </div>
       </div>
@@ -587,139 +597,163 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col gap-4 min-h-0">
         <div className="px-4 lg:px-6 shrink-0">
           <TabsList className="w-fit">
-            <TabsTrigger value="overview" className="gap-2">
-              <IconFileText className="h-4 w-4" /> Overview
+            {isStaff && (
+              <TabsTrigger value="overview" className="gap-2">
+                <IconFileText className="h-4 w-4" /> Overview
+              </TabsTrigger>
+            )}
+            {isStaff && (
+              <TabsTrigger value="kanban" className="gap-2">
+                <IconLayoutKanban className="h-4 w-4" /> Kanban
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="revisions" className="gap-2">
+              <IconGitPullRequest className="h-4 w-4" /> Revisions
             </TabsTrigger>
-            <TabsTrigger value="kanban" className="gap-2">
-              <IconLayoutKanban className="h-4 w-4" /> Kanban
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="gap-2">
-              <MessageSquare className="h-4 w-4" /> Messages
-            </TabsTrigger>
+            {isStaff && (
+              <TabsTrigger value="messages" className="gap-2">
+                <MessageSquare className="h-4 w-4" /> Messages
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
-        <TabsContent value="overview" className="flex-1 overflow-y-auto px-4 lg:px-6">
-          <div className="flex flex-col gap-6 pb-6">
-            {!isClient && (
-              <div className="flex justify-end">
-                <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
-                  <IconEdit className="h-4 w-4" /> Edit Proposal
-                </Button>
-              </div>
-            )}
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card className="md:col-span-2">
-                <CardHeader><CardTitle>Description</CardTitle></CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground whitespace-pre-wrap">
-                    {proposal.description || "No description provided."}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Created On</p>
-                    <p>{proposal.created_at ? new Date(proposal.created_at).toLocaleDateString() : "N/A"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Order Source</p>
-                    <p className="capitalize">{proposal.order_source === "fiverr" ? "Fiverr" : "Direct (Bank Transfer)"}</p>
-                  </div>
-                  {isAdmin && proposal.order_source === "fiverr" && (
+        {isStaff && (
+          <TabsContent value="overview" className="flex-1 overflow-y-auto px-4 lg:px-6">
+            <div className="flex flex-col gap-6 pb-6">
+              {isStaff && (
+                <div className="flex justify-end">
+                  <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
+                    <IconEdit className="h-4 w-4" /> Edit Phase
+                  </Button>
+                </div>
+              )}
+              <div className="grid gap-6 md:grid-cols-3">
+                <Card className="md:col-span-2">
+                  <CardHeader><CardTitle>Description</CardTitle></CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground whitespace-pre-wrap">
+                      {phase.description || "No description provided."}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>Details</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Commission (20%)</p>
-                      <p className="text-destructive">-${proposal.commission_amount?.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Created On</p>
+                      <p>{phase.created_at ? new Date(phase.created_at).toLocaleDateString() : "N/A"}</p>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status</p>
-                    <p className="capitalize">{proposal.status}</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="md:col-span-3">
-                <CardHeader>
-                  <CardTitle>Deliverables</CardTitle>
-                  <CardDescription>Included in this proposal.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {deliverables.length > 0 ? (
-                    <div className="relative space-y-4 before:absolute before:inset-y-0 before:left-[17px] before:w-[2px] before:bg-muted">
-                      {deliverables.map((d, i) => (
-                        <div key={d.id} className="relative pl-10">
-                          <div className="absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border bg-background text-sm font-bold shadow-sm">{i+1}</div>
-                          <div className="flex flex-col gap-1">
-                            <h3 className="font-semibold">{d.title}</h3>
-                            {d.description && <p className="text-sm text-muted-foreground">{d.description}</p>}
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Order Source</p>
+                      <p className="capitalize">{phase.order_source === "fiverr" ? "Fiverr" : "Direct (Bank Transfer)"}</p>
+                    </div>
+                    {isAdmin && phase.order_source === "fiverr" && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Commission (20%)</p>
+                        <p className="text-destructive">-${phase.commission_amount?.toLocaleString()}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Status</p>
+                      <p className="capitalize">{phase.status}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="md:col-span-3">
+                  <CardHeader>
+                    <CardTitle>Deliverables</CardTitle>
+                    <CardDescription>Included in this phase.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {deliverables.length > 0 ? (
+                      <div className="relative space-y-4 before:absolute before:inset-y-0 before:left-[17px] before:w-[2px] before:bg-muted">
+                        {deliverables.map((d, i) => (
+                          <div key={d.id} className="relative pl-10">
+                            <div className="absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border bg-background text-sm font-bold shadow-sm">{i+1}</div>
+                            <div className="flex flex-col gap-1">
+                              <h3 className="font-semibold">{d.title}</h3>
+                              {d.description && <p className="text-sm text-muted-foreground">{d.description}</p>}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">No deliverables added.</div>
-                  )}
-                </CardContent>
-              </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">No deliverables added.</div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
+          </TabsContent>
+        )}
+
+        {isStaff && (
+          <TabsContent value="kanban" className="flex-1 min-h-0">
+            <div className="flex flex-col h-full overflow-hidden">
+              <KanbanBoard 
+                tasks={tasks} 
+                members={members}
+                onTaskUpdate={handleTaskUpdate}
+                onTaskCreate={handleTaskCreateTrigger}
+                onTaskQuickCreate={handleTaskQuickCreate}
+                onTaskEdit={(task) => { setEditingTask(task); setIsEditDialogOpen(true); }}
+                onTaskDelete={handleTaskDelete}
+                onShare={(task) => {
+                  const shareData = {
+                    title: task.title,
+                    text: task.description || task.title,
+                    url: `${window.location.origin}${window.location.pathname}?taskId=${task.id}`,
+                  }
+
+                  if (navigator.share && navigator.canShare(shareData)) {
+                    navigator.share(shareData).catch(err => {
+                      if (err.name !== 'AbortError') {
+                        console.error("Error sharing:", err)
+                        toast.error("Failed to share task")
+                      }
+                    })
+                  } else {
+                    navigator.clipboard.writeText(shareData.url)
+                    toast.success("Link copied to clipboard")
+                  }
+                }}
+                isLoading={isLoading}
+              />
+            </div>
+          </TabsContent>
+        )}
+
+        <TabsContent value="revisions" className="flex-1 overflow-y-auto px-4 lg:px-6">
+          <RevisionsManager 
+            phaseId={phaseId} 
+            projectId={projectId}
+            members={members}
+            tasks={tasks}
+          />
         </TabsContent>
 
-        <TabsContent value="kanban" className="flex-1 min-h-0">
-          <div className="flex flex-col h-full overflow-hidden">
-            <KanbanBoard 
-              tasks={tasks} 
-              members={members}
-              onTaskUpdate={handleTaskUpdate}
-              onTaskCreate={handleTaskCreateTrigger}
-              onTaskQuickCreate={handleTaskQuickCreate}
-              onTaskEdit={(task) => { setEditingTask(task); setIsEditDialogOpen(true); }}
-              onTaskDelete={handleTaskDelete}
-              onShare={(task) => {
-                const shareData = {
-                  title: task.title,
-                  text: task.description || task.title,
-                  url: `${window.location.origin}${window.location.pathname}?taskId=${task.id}`,
-                }
-
-                if (navigator.share && navigator.canShare(shareData)) {
-                  navigator.share(shareData).catch(err => {
-                    if (err.name !== 'AbortError') {
-                      console.error("Error sharing:", err)
-                      toast.error("Failed to share task")
-                    }
-                  })
-                } else {
-                  navigator.clipboard.writeText(shareData.url)
-                  toast.success("Link copied to clipboard")
-                }
-              }}
-              isLoading={isLoading}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="messages" className="flex-1 min-h-0 flex flex-col px-4 lg:px-6 pb-4 lg:pb-6 mt-2">
-          {proposal && (
-            <ProposalChat 
-              projectId={projectId} 
-              proposalId={proposalId} 
-              proposalTitle={proposal.title} 
-            />
-          )}
-        </TabsContent>
+        {isStaff && (
+          <TabsContent value="messages" className="flex-1 min-h-0 flex flex-col px-4 lg:px-6 pb-4 lg:pb-6 mt-2">
+            {phase && (
+              <PhaseChat 
+                projectId={projectId} 
+                phaseId={phaseId} 
+                phaseTitle={phase.title} 
+              />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Dialogs */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Proposal</DialogTitle>
-            <DialogDescription>Update the proposal's information and deliverables.</DialogDescription>
+            <DialogTitle>Edit Phase</DialogTitle>
+            <DialogDescription>Update the phase's information and deliverables.</DialogDescription>
           </DialogHeader>
-          <ProposalForm initialData={proposal} initialDeliverables={deliverables} onSubmit={handleProposalSubmit} onCancel={() => setIsDialogOpen(false)} isSubmitting={isSubmitting} />
+          <PhaseForm initialData={phase} initialDeliverables={deliverables} onSubmit={handlePhaseSubmit} onCancel={() => setIsDialogOpen(false)} isSubmitting={isSubmitting} />
         </DialogContent>
       </Dialog>
 
@@ -786,7 +820,7 @@ export function ProposalDetails({ projectId, proposalId }: ProposalDetailsProps)
                 status: editingTask.status,
                 type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id, 
-                proposal_id: editingTask.proposal_id,
+                phase_id: editingTask.phase_id,
                 parent_id: editingTask.parent_id
               }}
             />

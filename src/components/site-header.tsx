@@ -15,12 +15,10 @@ import { TicketButton } from "./tickets/ticket-button"
 import React from "react"
 
 const routeMap: Record<string, string> = {
-  dashboard: "Dashboard",
-  overview: "Overview",
   chat: "Chat",
   clients: "Clients",
   projects: "Projects",
-  proposals: "Proposals",
+  phases: "Phases",
   credentials: "Credentials",
   team: "Team",
   "audit-logs": "Audit Logs",
@@ -79,7 +77,7 @@ export function SiteHeader() {
           <BreadcrumbList>
             {breadcrumbs.length === 0 && (
               <BreadcrumbItem>
-                <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                <BreadcrumbPage>Projects</BreadcrumbPage>
               </BreadcrumbItem>
             )}
             {breadcrumbs.map((crumb, index) => {
@@ -91,8 +89,8 @@ export function SiteHeader() {
               if (crumb.isID && !last) {
                 const parent = rawPathnames[index - 1]
                 if (parent === "projects") {
-                  if (!to.endsWith("/proposals")) {
-                    to += "/proposals"
+                  if (!to.endsWith("/phases")) {
+                    to += "/phases"
                   }
                 } else if (parent === "clients") {
                   if (!to.endsWith("/overview")) {

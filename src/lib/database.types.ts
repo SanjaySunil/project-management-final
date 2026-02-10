@@ -63,7 +63,7 @@ export type Database = {
           id: string
           name: string
           project_id: string | null
-          proposal_id: string | null
+          phase_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -72,7 +72,7 @@ export type Database = {
           id?: string
           name: string
           project_id?: string | null
-          proposal_id?: string | null
+          phase_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -81,7 +81,7 @@ export type Database = {
           id?: string
           name?: string
           project_id?: string | null
-          proposal_id?: string | null
+          phase_id?: string | null
         }
         Relationships: [
           {
@@ -99,10 +99,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "channels_proposal_id_fkey"
-            columns: ["proposal_id"]
+            foreignKeyName: "channels_phase_id_fkey"
+            columns: ["phase_id"]
             isOneToOne: true
-            referencedRelation: "proposals"
+            referencedRelation: "phases"
             referencedColumns: ["id"]
           },
         ]
@@ -202,7 +202,7 @@ export type Database = {
           description: string | null
           id: string
           order_index: number
-          proposal_id: string | null
+          phase_id: string | null
           title: string
           updated_at: string | null
           user_id: string | null
@@ -212,7 +212,7 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number
-          proposal_id?: string | null
+          phase_id?: string | null
           title: string
           updated_at?: string | null
           user_id?: string | null
@@ -222,17 +222,17 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number
-          proposal_id?: string | null
+          phase_id?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "deliverables_proposal_id_fkey"
-            columns: ["proposal_id"]
+            foreignKeyName: "deliverables_phase_id_fkey"
+            columns: ["phase_id"]
             isOneToOne: false
-            referencedRelation: "proposals"
+            referencedRelation: "phases"
             referencedColumns: ["id"]
           },
         ]
@@ -620,6 +620,64 @@ export type Database = {
           },
         ]
       }
+      revisions: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          phase_id: string
+          status: string
+          task_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          phase_id: string
+          status?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          phase_id?: string
+          status?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revisions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revisions_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revisions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_members: {
         Row: {
           created_at: string
@@ -706,7 +764,7 @@ export type Database = {
           },
         ]
       }
-      proposals: {
+      phases: {
         Row: {
           amount: number | null
           commission_amount: number | null
@@ -757,7 +815,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "proposals_project_id_fkey"
+            foreignKeyName: "phases_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -845,7 +903,7 @@ export type Database = {
           id: string
           order_index: number | null
           parent_id: string | null
-          proposal_id: string | null
+          phase_id: string | null
           status: string
           title: string
           type: string | null
@@ -859,7 +917,7 @@ export type Database = {
           id?: string
           order_index?: number | null
           parent_id?: string | null
-          proposal_id?: string | null
+          phase_id?: string | null
           status?: string
           title: string
           type?: string | null
@@ -873,7 +931,7 @@ export type Database = {
           id?: string
           order_index?: number | null
           parent_id?: string | null
-          proposal_id?: string | null
+          phase_id?: string | null
           status?: string
           title?: string
           type?: string | null
@@ -896,10 +954,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_proposal_id_fkey"
-            columns: ["proposal_id"]
+            foreignKeyName: "tasks_phase_id_fkey"
+            columns: ["phase_id"]
             isOneToOne: false
-            referencedRelation: "proposals"
+            referencedRelation: "phases"
             referencedColumns: ["id"]
           },
         ]

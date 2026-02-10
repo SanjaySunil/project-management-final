@@ -9,21 +9,24 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ProjectProposalsTab } from "@/components/projects/project-proposals-tab"
+import { ProjectPhasesTab } from "@/components/projects/project-phases-tab"
 import { ProjectDocumentsTab } from "@/components/projects/project-documents-tab"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const { role } = useAuth()
+  const isClient = role === 'client'
   const [project, setProject] = React.useState<any>(null)
   const [isLoading, setIsLoading] = React.useState(true)
 
-  // Get active tab from URL or default to proposals
+  // Get active tab from URL or default to phases
   const pathParts = location.pathname.split('/')
   const lastPart = pathParts[pathParts.length - 1]
   const [activeTab, setActiveTab] = React.useState(
-    ["proposals", "documents"].includes(lastPart) ? lastPart : "proposals"
+    ["phases", "documents"].includes(lastPart) ? lastPart : "phases"
   )
 
   const fetchProjectDetails = React.useCallback(async () => {
@@ -66,16 +69,23 @@ export default function ProjectOverviewPage() {
     }
   }, [fetchProjectDetails, projectId])
 
-  // Sync active tab with URL
+  // Sync active tab with URL and handle permissions
   React.useEffect(() => {
     const pathParts = location.pathname.split('/')
     const lastPart = pathParts[pathParts.length - 1]
-    if (["proposals", "documents"].includes(lastPart)) {
+    
+    if (isClient && lastPart === "documents") {
+      setActiveTab("phases")
+      navigate(`/dashboard/projects/${projectId}/phases`, { replace: true })
+      return
+    }
+
+    if (["phases", "documents"].includes(lastPart)) {
       setActiveTab(lastPart)
     } else if (lastPart === projectId) {
-      setActiveTab("proposals")
+      setActiveTab("phases")
     }
-  }, [location.pathname, projectId])
+  }, [location.pathname, projectId, isClient, navigate])
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
@@ -136,21 +146,25 @@ export default function ProjectOverviewPage() {
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col gap-4">
           <TabsList className="w-fit">
-            <TabsTrigger value="proposals" className="gap-2">
-              <IconFileText className="h-4 w-4" /> Proposals
+            <TabsTrigger value="phases" className="gap-2">
+              <IconFileText className="h-4 w-4" /> Phases
             </TabsTrigger>
-            <TabsTrigger value="documents" className="gap-2">
-              <IconFileText className="h-4 w-4" /> Documents
-            </TabsTrigger>
+            {!isClient && (
+              <TabsTrigger value="documents" className="gap-2">
+                <IconFileText className="h-4 w-4" /> Documents
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <div className="mt-2">
-            <TabsContent value="proposals" className="m-0 border-none p-0">
-              <ProjectProposalsTab projectId={projectId as string} />
+            <TabsContent value="phases" className="m-0 border-none p-0">
+              <ProjectPhasesTab projectId={projectId as string} />
             </TabsContent>
-            <TabsContent value="documents" className="m-0 border-none p-0">
-              <ProjectDocumentsTab projectId={projectId as string} />
-            </TabsContent>
+            {!isClient && (
+              <TabsContent value="documents" className="m-0 border-none p-0">
+                <ProjectDocumentsTab projectId={projectId as string} />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </div>

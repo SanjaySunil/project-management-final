@@ -55,7 +55,7 @@ export function AssignedTasks({
   const [mode, setMode] = React.useState<"project" | "personal">("project")
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
-  const [proposals, setProposals] = React.useState<Tables<"proposals">[]>([])
+  const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
   const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
@@ -96,13 +96,13 @@ export function AssignedTasks({
     try {
       setIsLoading(true)
       
-      const [membersRes, proposalsRes, projectsRes] = await Promise.all([
+      const [membersRes, phasesRes, projectsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("*")
           .order("full_name", { ascending: true }),
         supabase
-          .from("proposals")
+          .from("phases")
           .select("*")
           .order("order_index", { ascending: true })
           .order("title", { ascending: true }),
@@ -118,7 +118,7 @@ export function AssignedTasks({
           .from("tasks")
           .select(`
             *,
-            proposals (
+            phases (
               id,
               title,
               project_id,
@@ -139,7 +139,7 @@ export function AssignedTasks({
 
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
-      if (proposalsRes.error) throw proposalsRes.error
+      if (phasesRes.error) throw phasesRes.error
       if (projectsRes.error) throw projectsRes.error
 
       const fetchedMembers = membersRes.data || []
@@ -150,7 +150,7 @@ export function AssignedTasks({
 
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
-      setProposals(proposalsRes.data || [])
+      setPhases(phasesRes.data || [])
       setProjects(projectsRes.data || [])
     } catch (error: any) {
       console.error("Fetch tasks error:", error)
@@ -187,7 +187,7 @@ export function AssignedTasks({
                 .from("tasks")
                 .select(`
                   *,
-                  proposals (
+                  phases (
                     id,
                     title,
                     project_id,
@@ -300,7 +300,7 @@ export function AssignedTasks({
       }
 
       if (mode === "project") {
-        payload.proposal_id = values.proposal_id === "none" ? null : values.proposal_id
+        payload.phase_id = values.phase_id === "none" ? null : values.phase_id
       }
 
       const query = (supabase.from as any)(table).insert([payload])
@@ -309,7 +309,7 @@ export function AssignedTasks({
       if (mode === "project") {
         res = await query.select(`
           *,
-          proposals (
+          phases (
             id,
             title,
             project_id,
@@ -334,13 +334,13 @@ export function AssignedTasks({
           status: "todo",
           parent_id: taskId,
           user_id: targetUserId,
-          proposal_id: mode === "project" ? res.data.proposal_id : null,
+          phase_id: mode === "project" ? res.data.phase_id : null,
           order_index: index
         }))
         
         const { data: createdSubtasks, error: subtasksError } = await (supabase.from as any)(table)
           .insert(subtasksToInsert)
-          .select(mode === "project" ? `*, proposals(id, title, project_id, projects(name)), task_attachments(*)` : `*`)
+          .select(mode === "project" ? `*, phases(id, title, project_id, projects(name)), task_attachments(*)` : `*`)
 
         if (subtasksError) throw subtasksError
         
@@ -442,7 +442,7 @@ export function AssignedTasks({
       }
 
       if (mode === "project") {
-        updates.proposal_id = values.proposal_id === "none" ? null : (values.proposal_id || null)
+        updates.phase_id = values.phase_id === "none" ? null : (values.phase_id || null)
       }
 
       const table = mode === "project" ? "tasks" : "personal_tasks"
@@ -487,7 +487,7 @@ export function AssignedTasks({
       }
 
       if (mode === "project") {
-        payload.proposal_id = parentTask?.proposal_id || null
+        payload.phase_id = parentTask?.phase_id || null
       }
 
       const query = (supabase.from as any)(table).insert([payload])
@@ -496,7 +496,7 @@ export function AssignedTasks({
       if (mode === "project") {
         res = await query.select(`
           *,
-          proposals (
+          phases (
             id,
             title,
             project_id,
@@ -707,7 +707,7 @@ export function AssignedTasks({
             }}
             isLoading={isSubmitting}
             members={members}
-            proposals={proposals}
+            phases={phases}
             projects={projects}
             tasks={tasks}
             hideAssignee={mode === "personal"}
@@ -754,7 +754,7 @@ export function AssignedTasks({
               onAddSubtask={(title) => handleTaskQuickCreate(editingTask.status, editingTask.id, title)}
               isLoading={isSubmitting}
               members={members}
-              proposals={proposals}
+              phases={phases}
               projects={projects}
               tasks={tasks}
               hideAssignee={mode === "personal"}
@@ -765,7 +765,7 @@ export function AssignedTasks({
                 status: editingTask.status,
                 type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id,
-                proposal_id: editingTask.proposal_id,
+                phase_id: editingTask.phase_id,
                 parent_id: editingTask.parent_id,
               }}
             />

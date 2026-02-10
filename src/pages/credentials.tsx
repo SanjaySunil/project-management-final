@@ -70,12 +70,41 @@ export default function CredentialsPage() {
     if (!credentialToDelete) return
 
     try {
+      // Find the credential first to check for user_id
+      const credential = credentials.find(c => c.id === credentialToDelete)
+      const userId = credential?.user_id
+
+      // 1. Delete the credential
       const { error } = await supabase
         .from("credentials")
         .delete()
         .eq("id", credentialToDelete)
 
       if (error) throw error
+
+      // 2. If there's an associated user_id, clean up auth and related tables
+      if (userId) {
+        // Unlink from clients and clear email
+        await supabase
+          .from("clients")
+          .update({ 
+            user_id: null,
+            email: null
+          })
+          .eq("user_id", userId)
+
+        // Remove from project_members
+        await supabase
+          .from("project_members")
+          .delete()
+          .eq("user_id", userId)
+
+        // Delete auth user via RPC
+        await supabase.rpc('delete_user_account', {
+          user_id_to_delete: userId
+        })
+      }
+
       toast.success("Credential deleted successfully")
       fetchCredentials()
     } catch (error: any) {

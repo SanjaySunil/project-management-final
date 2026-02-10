@@ -7,23 +7,23 @@ import { DeliverablesManager, type Deliverable } from "./deliverables-manager"
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
 
-type Proposal = Tables<"proposals">
+type Phase = Tables<"phases">
 
-interface ProposalFormProps {
-  initialData?: Proposal | null
+interface PhaseFormProps {
+  initialData?: Phase | null
   initialDeliverables?: Deliverable[]
   onSubmit: (values: any, deliverables: Deliverable[]) => Promise<void>
   onCancel: () => void
   isSubmitting?: boolean
 }
 
-export function ProposalForm({
+export function PhaseForm({
   initialData,
   initialDeliverables = [],
   onSubmit,
   onCancel,
   isSubmitting = false,
-}: ProposalFormProps) {
+}: PhaseFormProps) {
   const { role } = useAuth()
   const isAdmin = role === "admin"
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>(initialDeliverables)
@@ -76,7 +76,7 @@ export function ProposalForm({
           <Textarea
             id="description"
             name="description"
-            placeholder="Briefly describe the proposal..."
+            placeholder="Briefly describe the phase..."
             defaultValue={initialData?.description || ""}
           />
         </div>
@@ -158,7 +158,7 @@ export function ProposalForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : initialData ? "Update Proposal" : "Create Proposal"}
+          {isSubmitting ? "Saving..." : initialData ? "Update Phase" : "Create Phase"}
         </Button>
       </div>
     </form>

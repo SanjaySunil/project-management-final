@@ -14,7 +14,7 @@ import { toast } from "sonner"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 
 export default function AccountPage() {
-  const { user, role, setPin } = useAuth()
+  const { user, role, setPin, isPinBlacklisted } = useAuth()
   const [fullName, setFullName] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -89,14 +89,20 @@ export default function AccountPage() {
   }
 
   const handleUpdatePin = async () => {
-    if (newPin.length !== 4) {
+    const sanitizedPin = newPin.toString().trim()
+    if (sanitizedPin.length !== 4) {
       toast.error("PIN must be 4 digits")
+      return
+    }
+
+    if (isPinBlacklisted(sanitizedPin)) {
+      toast.error("You've entered a commonly used passcode, please try another one.")
       return
     }
 
     try {
       setIsUpdatingPin(true)
-      await setPin(newPin)
+      await setPin(sanitizedPin)
       toast.success("PIN updated successfully")
       setNewPin("")
     } catch (error: any) {

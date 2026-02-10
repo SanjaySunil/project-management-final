@@ -31,20 +31,20 @@ import {
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
 
-type Proposal = Tables<"proposals">
+type Phase = Tables<"phases">
 
-interface ProposalsTableProps {
-  data: Proposal[]
+interface PhasesTableProps {
+  data: Phase[]
   projectId: string
-  onEdit: (proposal: Proposal | null) => void
+  onEdit: (phase: Phase | null) => void
   onDelete: (id: string) => void
-  onView?: (proposal: Proposal) => void
+  onView?: (phase: Phase) => void
   onStatusChange?: (id: string, status: string) => void
-  onDataChange?: (data: Proposal[]) => void
+  onDataChange?: (data: Phase[]) => void
   isLoading?: boolean
 }
 
-export function ProposalsTable({ 
+export function PhasesTable({ 
   data, 
   projectId, 
   onEdit, 
@@ -53,17 +53,21 @@ export function ProposalsTable({
   onStatusChange, 
   onDataChange,
   isLoading 
-}: ProposalsTableProps) {
-  const { role } = useAuth()
+}: PhasesTableProps) {
+  const { role, checkPermission } = useAuth()
   const isAdmin = role === "admin"
+  
+  const canUpdate = checkPermission('update', 'phases')
+  const canDelete = checkPermission('delete', 'phases')
+  const canCreate = checkPermission('create', 'phases')
 
-  const columns: ColumnDef<Proposal>[] = [
+  const columns: ColumnDef<Phase>[] = [
     {
       id: "drag-handle",
       header: "",
       cell: ({ row }) => (
         <div className="flex items-center justify-center">
-          <DragHandle id={row.original.id} />
+          {canUpdate ? <DragHandle id={row.original.id} /> : <div className="w-4" />}
         </div>
       ),
       enableSorting: false,
@@ -95,6 +99,17 @@ export function ProposalsTable({
       enableSorting: false,
       enableHiding: false,
     },
+    ...(!projectId ? [
+      {
+        accessorKey: "projects.name",
+        header: "Project",
+        cell: ({ row }: any) => (
+          <div className="font-medium">
+            {row.original.projects?.name || "N/A"}
+          </div>
+        ),
+      }
+    ] : []),
     {
       accessorKey: "title",
       header: "Title",
@@ -115,7 +130,7 @@ export function ProposalsTable({
         return (
           <div className="flex flex-col">
             <Link 
-              to={`/dashboard/projects/${projectId}/proposals/${row.original.id}`}
+              to={`/dashboard/projects/${projectId}/phases/${row.original.id}`}
               className="flex items-center gap-2 hover:underline text-primary font-medium"
             >
               <IconFileText className="h-4 w-4 text-muted-foreground" />
@@ -169,6 +184,25 @@ export function ProposalsTable({
       cell: ({ row }) => {
         const status = row.original.status || "draft"
         
+        if (!canUpdate) {
+          return (
+            <div className="flex items-center px-3 py-1.5 text-sm">
+              {status === "active" ? (
+                <IconCircleCheckFilled className="size-4 fill-green-500 dark:fill-green-400 mr-2" />
+              ) : status === "complete" ? (
+                <IconCircleCheckFilled className="size-4 fill-blue-500 dark:fill-blue-400 mr-2" />
+              ) : status === "draft" ? (
+                <IconLoader className="size-4 animate-spin mr-2" />
+              ) : status === "sent" ? (
+                <IconSend className="size-4 text-orange-500 mr-2" />
+              ) : status === "rejected" ? (
+                <IconX className="size-4 text-red-500 mr-2" />
+              ) : null}
+              <span className="capitalize">{status}</span>
+            </div>
+          )
+        }
+
         return (
           <Select
             value={status}
@@ -240,23 +274,32 @@ export function ProposalsTable({
                   <IconExternalLink className="mr-2 h-4 w-4" /> View Details
                 </div>
               ) : (
-                <Link to={`/dashboard/projects/${projectId}/proposals/${row.original.id}`}>
+                <Link to={`/dashboard/projects/${projectId}/phases/${row.original.id}`}>
                   <IconExternalLink className="mr-2 h-4 w-4" /> View Details
                 </Link>
               )}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(row.original)}>Edit</DropdownMenuItem>
+            
+            {canUpdate && (
+              <DropdownMenuItem onClick={() => onEdit(row.original)}>Edit</DropdownMenuItem>
+            )}
+
             <DropdownMenuItem onClick={() => {
                  navigator.clipboard.writeText(row.original.id)
                  toast.success("ID copied to clipboard")
             }}>Copy ID</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-                variant="destructive" 
-                onClick={() => onDelete(row.original.id)}
-            >
-                Delete
-            </DropdownMenuItem>
+            
+            {canDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                    variant="destructive" 
+                    onClick={() => onDelete(row.original.id)}
+                >
+                    Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -267,11 +310,11 @@ export function ProposalsTable({
     <DataTable
       columns={columns}
       data={data}
-      searchPlaceholder="Search proposals..."
-      addLabel="Create Proposal"
-      onAdd={() => onEdit(null as any)}
+      searchPlaceholder="Search phases..."
+      addLabel="Create Phase"
+      onAdd={canCreate ? () => onEdit(null as any) : undefined}
       isLoading={isLoading}
-      enableReordering={true}
+      enableReordering={canUpdate}
       onDataChange={onDataChange}
     />
   )

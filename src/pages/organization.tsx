@@ -21,7 +21,6 @@ import { useAuth } from "@/hooks/use-auth"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const SIDEBAR_ITEMS = [
-  { id: "Dashboard", label: "Dashboard" },
   { id: "My Tasks", label: "My Tasks" },
   { id: "Notifications", label: "Notifications" },
   { id: "Clients", label: "Clients" },

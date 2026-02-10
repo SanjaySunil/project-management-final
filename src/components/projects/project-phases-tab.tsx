@@ -2,8 +2,8 @@ import * as React from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
-import { ProposalsTable } from "@/components/projects/proposals-table"
-import { ProposalForm } from "@/components/projects/proposal-form"
+import { PhasesTable } from "@/components/projects/phases-table"
+import { PhaseForm } from "@/components/projects/phase-form"
 import type { Deliverable } from "@/components/projects/deliverables-manager"
 import {
   Dialog,
@@ -16,51 +16,51 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { updateProjectStatus } from "@/lib/projects"
 import { slugify } from "@/lib/utils"
 
-type Proposal = Tables<"proposals">
+type Phase = Tables<"phases">
 
-interface ProjectProposalsTabProps {
+interface ProjectPhasesTabProps {
   projectId: string
 }
 
-export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
-  const [proposals, setProposals] = React.useState<Proposal[]>([])
+export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
+  const [phases, setPhases] = React.useState<Phase[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
-  const [editingProposal, setEditingProposal] = React.useState<Proposal | null>(null)
+  const [editingPhase, setEditingPhase] = React.useState<Phase | null>(null)
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>([])
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
-  const [proposalToDelete, setProposalToDelete] = React.useState<string | null>(null)
+  const [phaseToDelete, setPhaseToDelete] = React.useState<string | null>(null)
 
-  const fetchProposals = React.useCallback(async () => {
+  const fetchPhases = React.useCallback(async () => {
     try {
       setIsLoading(true)
       const { data, error } = await supabase
-        .from("proposals")
+        .from("phases")
         .select("*")
         .eq("project_id", projectId)
         .order("order_index", { ascending: true })
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setProposals(data || [])
+      setPhases(data || [])
     } catch (error: any) {
-      toast.error("Failed to fetch proposals: " + error.message)
+      toast.error("Failed to fetch phases: " + error.message)
     } finally {
       setIsLoading(false)
     }
   }, [projectId])
 
-  const handleReorder = async (newData: Proposal[]) => {
-    const oldData = [...proposals]
-    setProposals(newData)
+  const handleReorder = async (newData: Phase[]) => {
+    const oldData = [...phases]
+    setPhases(newData)
 
     try {
-      const updatePromises = newData.map((proposal, index) => 
+      const updatePromises = newData.map((phase, index) => 
         supabase
-          .from("proposals")
+          .from("phases")
           .update({ order_index: index })
-          .eq("id", proposal.id)
+          .eq("id", phase.id)
       )
 
       const results = await Promise.all(updatePromises)
@@ -69,17 +69,17 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
       if (error) throw error
       toast.success("Order updated")
     } catch (error: any) {
-      setProposals(oldData)
+      setPhases(oldData)
       toast.error("Failed to update order: " + error.message)
     }
   }
 
-  const fetchDeliverables = React.useCallback(async (proposalId: string) => {
+  const fetchDeliverables = React.useCallback(async (phaseId: string) => {
     try {
       const { data, error } = await supabase
         .from("deliverables")
         .select("*")
-        .eq("proposal_id", proposalId)
+        .eq("phase_id", phaseId)
         .order("order_index", { ascending: true })
 
       if (error) throw error
@@ -91,14 +91,14 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
 
   React.useEffect(() => {
     if (projectId) {
-      fetchProposals()
+      fetchPhases()
     }
-  }, [fetchProposals, projectId])
+  }, [fetchPhases, projectId])
 
-  const handleEdit = async (proposal: Proposal | null) => {
-    setEditingProposal(proposal)
-    if (proposal) {
-      await fetchDeliverables(proposal.id)
+  const handleEdit = async (phase: Phase | null) => {
+    setEditingPhase(phase)
+    if (phase) {
+      await fetchDeliverables(phase.id)
     } else {
       setDeliverables([])
     }
@@ -108,7 +108,7 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
   const handleStatusChange = async (id: string, status: string) => {
     try {
       const { error } = await supabase
-        .from("proposals")
+        .from("phases")
         .update({ status })
         .eq("id", id)
 
@@ -116,87 +116,87 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
       
       await updateProjectStatus(projectId)
       
-      toast.success("Proposal status updated")
-      fetchProposals()
+      toast.success("Phase status updated")
+      fetchPhases()
     } catch (error: any) {
       toast.error("Failed to update status: " + error.message)
     }
   }
 
   const handleDelete = (id: string) => {
-    setProposalToDelete(id)
+    setPhaseToDelete(id)
     setDeleteConfirmOpen(true)
   }
 
   const confirmDelete = async () => {
-    if (!proposalToDelete) return
+    if (!phaseToDelete) return
 
     try {
-      const { error } = await supabase.from("proposals").delete().eq("id", proposalToDelete)
+      const { error } = await supabase.from("phases").delete().eq("id", phaseToDelete)
       if (error) throw error
       
       await updateProjectStatus(projectId)
       
-      toast.success("Proposal deleted successfully")
-      fetchProposals()
+      toast.success("Phase deleted successfully")
+      fetchPhases()
     } catch (error: any) {
-      toast.error("Failed to delete proposal: " + error.message)
+      toast.error("Failed to delete phase: " + error.message)
     } finally {
       setDeleteConfirmOpen(false)
-      setProposalToDelete(null)
+      setPhaseToDelete(null)
     }
   }
 
   const handleSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
     try {
       setIsSubmitting(true)
-      let proposalId = editingProposal?.id
+      let phaseId = editingPhase?.id
 
-      const proposalData = {
+      const phaseData = {
         ...values,
         project_id: projectId,
       }
 
-      if (editingProposal?.id) {
+      if (editingPhase?.id) {
         const { error } = await supabase
-          .from("proposals")
-          .update(proposalData)
-          .eq("id", editingProposal.id)
+          .from("phases")
+          .update(phaseData)
+          .eq("id", editingPhase.id)
         if (error) throw error
 
         if (values.title) {
           await supabase
             .from("channels")
             .update({ name: slugify(values.title) })
-            .eq("proposal_id", editingProposal.id)
+            .eq("phase_id", editingPhase.id)
         }
 
-        toast.success("Proposal updated successfully")
+        toast.success("Phase updated successfully")
       } else {
         const { data, error } = await supabase
-          .from("proposals")
+          .from("phases")
           .insert([{
-            ...proposalData,
-            order_index: proposals.length
+            ...phaseData,
+            order_index: phases.length
           }])
           .select()
           .single()
         if (error) throw error
-        proposalId = data.id
-        toast.success("Proposal added successfully")
+        phaseId = data.id
+        toast.success("Phase added successfully")
       }
 
-      if (proposalId) {
+      if (phaseId) {
         const { error: deleteError } = await supabase
           .from("deliverables")
           .delete()
-          .eq("proposal_id", proposalId)
+          .eq("phase_id", phaseId)
         
         if (deleteError) throw deleteError
 
         if (updatedDeliverables.length > 0) {
           const deliverablesToInsert = updatedDeliverables.map((d, index) => ({
-            proposal_id: proposalId,
+            phase_id: phaseId,
             title: d.title,
             description: d.description,
             order_index: index,
@@ -213,9 +213,9 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
       await updateProjectStatus(projectId)
 
       setIsDialogOpen(false)
-      fetchProposals()
+      fetchPhases()
     } catch (error: any) {
-      toast.error("Failed to save proposal: " + error.message)
+      toast.error("Failed to save phase: " + error.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -223,8 +223,8 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <ProposalsTable 
-        data={proposals} 
+      <PhasesTable 
+        data={phases} 
         projectId={projectId}
         onEdit={handleEdit}
         onDelete={handleDelete}
@@ -236,16 +236,16 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingProposal ? "Edit Proposal" : "Create Proposal"}</DialogTitle>
+            <DialogTitle>{editingPhase ? "Edit Phase" : "Create Phase"}</DialogTitle>
             <DialogDescription>
-              {editingProposal
-                ? "Update the proposal's information below."
-                : "Fill in the details to create a new proposal for this project."}
+              {editingPhase
+                ? "Update the phase's information below."
+                : "Fill in the details to create a new phase for this project."}
             </DialogDescription>
           </DialogHeader>
           
-          <ProposalForm
-            initialData={editingProposal}
+          <PhaseForm
+            initialData={editingPhase}
             initialDeliverables={deliverables}
             onSubmit={handleSubmit}
             onCancel={() => setIsDialogOpen(false)}
@@ -258,8 +258,8 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
         onConfirm={confirmDelete}
-        title="Delete Proposal"
-        description="Are you sure you want to delete this proposal? This action cannot be undone."
+        title="Delete Phase"
+        description="Are you sure you want to delete this phase? This action cannot be undone."
       />
     </div>
   )

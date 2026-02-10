@@ -67,8 +67,8 @@ export type Task = {
   user_id: string | null
   parent_id: string | null
   deliverable_id: string | null
-  proposal_id: string | null
-  proposals?: {
+  phase_id: string | null
+  phases?: {
     id: string
     title: string
     project_id?: string | null

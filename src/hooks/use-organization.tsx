@@ -40,24 +40,27 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     let mounted = true
 
     async function fetchOrganization() {
-      if (authLoading) return
+      if (authLoading) {
+        console.log('OrganizationProvider: Auth still loading, skipping fetch')
+        return
+      }
       
-      // Prevent duplicate fetches in StrictMode
       const fetchKey = organizationId || 'global'
-      if (fetchedRef.current === fetchKey) return
+      if (fetchedRef.current === fetchKey && !loading) return
       fetchedRef.current = fetchKey
 
-      console.log('OrganizationProvider: Fetching org', organizationId || 'global')
+      console.log('OrganizationProvider: Fetching org', fetchKey)
+      
       try {
         let query = supabase.from('organizations').select('*')
         
         if (organizationId) {
           query = query.eq('id', organizationId)
         } else {
-          // If no organization_id is set for the user, fetch the first organization (global)
           query = query.order('created_at', { ascending: true }).limit(1)
         }
 
+        console.log('OrganizationProvider: Executing query...')
         const { data, error } = await query.maybeSingle()
 
         if (!mounted) return
@@ -67,11 +70,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         } else if (data) {
           console.log('OrganizationProvider: Org data received')
           setOrganization(data as unknown as Organization)
+        } else {
+          console.warn('OrganizationProvider: No organization found')
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('OrganizationProvider: Unexpected error:', err)
       } finally {
         if (mounted) {
+          console.log('OrganizationProvider: Setting loading to false')
           setLoading(false)
         }
       }

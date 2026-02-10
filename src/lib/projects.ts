@@ -1,32 +1,32 @@
 import { supabase } from "./supabase";
 
 /**
- * Automatically updates a project's status based on its proposals.
+ * Automatically updates a project's status based on its phases.
  * Rule:
- * - Status is "active" if it has at least one "active" or "sent" proposal.
- * - Status is "completed" if it has no "active"/"sent" proposals (all are complete, rejected, or draft, or no proposals exist).
+ * - Status is "active" if it has at least one "active" or "sent" phase.
+ * - Status is "completed" if it has no "active"/"sent" phases (all are complete, rejected, or draft, or no phases exist).
  */
 export async function updateProjectStatus(projectId: string) {
   try {
-    const { data: proposals, error: proposalsError } = await supabase
-      .from("proposals")
+    const { data: phases, error: phasesError } = await supabase
+      .from("phases")
       .select("status")
       .eq("project_id", projectId);
 
-    if (proposalsError) throw proposalsError;
+    if (phasesError) throw phasesError;
 
     let newStatus = "completed";
 
-    if (proposals && proposals.length > 0) {
-      // "active" or "sent" proposals mean the project is active
-      const hasActive = proposals.some((p) => p.status === "active" || p.status === "sent");
+    if (phases && phases.length > 0) {
+      // "active" or "sent" phases mean the project is active
+      const hasActive = phases.some((p) => p.status === "active" || p.status === "sent");
       if (hasActive) {
         newStatus = "active";
       } else {
         newStatus = "completed";
       }
     } else {
-      // If no proposals exist, it's considered completed (or could be 'draft', but 'completed' is the requested default for no active work)
+      // If no phases exist, it's considered completed (or could be 'draft', but 'completed' is the requested default for no active work)
       newStatus = "completed";
     }
 

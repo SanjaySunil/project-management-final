@@ -48,6 +48,46 @@ export default function ProjectsPage() {
     try {
       setIsLoading(true)
       
+      const normalizedRole = role?.toLowerCase()
+      
+      // If client, we can use an inner join to projects to filter by their user_id in clients table
+      // This is more efficient and handles the case where they might not have a client record yet
+      if (normalizedRole === "client") {
+        const { data, error } = await supabase
+          .from("projects")
+          .select(`
+            *,
+            clients!inner (
+              id,
+              user_id,
+              first_name,
+              last_name
+            ),
+            project_members (
+              user_id,
+              profiles (
+                full_name,
+                avatar_url
+              )
+            )
+          `)
+          .eq("clients.user_id", user.id)
+          .order("updated_at", { ascending: false, nullsFirst: false })
+
+        if (error) throw error
+        
+        const projectsWithSync = (data as any) || []
+        projectsWithSync.sort((a: any, b: any) => {
+          const dateA = new Date(a.updated_at || a.created_at).getTime()
+          const dateB = new Date(b.updated_at || b.created_at).getTime()
+          return dateB - dateA
+        })
+        
+        setProjects(projectsWithSync)
+        return
+      }
+
+      // Default query for non-clients (Admin/Employee)
       let query = supabase
         .from("projects")
         .select(`
@@ -65,31 +105,7 @@ export default function ProjectsPage() {
           )
         `)
       
-      // Filter by role
-      const normalizedRole = role?.toLowerCase()
-      if (normalizedRole === "client") {
-        // Find the client record for this user
-        const { data: clientData, error: clientError } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("user_id", user.id)
-          .single()
-        
-        if (clientError) {
-          console.error("Failed to fetch client record:", clientError)
-          setProjects([])
-          setIsLoading(false)
-          return
-        }
-
-        if (clientData) {
-          query = query.eq("client_id", clientData.id)
-        } else {
-          setProjects([])
-          setIsLoading(false)
-          return
-        }
-      } else if (normalizedRole !== "admin") {
+      if (normalizedRole !== "admin") {
         // Employee sees projects they are members of
         query = query.filter("project_members.user_id", "eq", user.id)
       }
@@ -109,6 +125,7 @@ export default function ProjectsPage() {
       
       setProjects(projectsWithSync)
     } catch (error: any) {
+      console.error("Failed to fetch projects:", error)
       toast.error("Failed to fetch projects: " + error.message)
     } finally {
       setIsLoading(false)
@@ -136,7 +153,7 @@ export default function ProjectsPage() {
   }
 
   const handleViewDetails = (project: ProjectWithClient) => {
-    navigate(`/dashboard/projects/${project.id}/proposals`)
+    navigate(`/dashboard/projects/${project.id}/phases`)
   }
 
   const handleAssignMembers = async (projectId: string, memberIds: string[]) => {
@@ -170,6 +187,13 @@ export default function ProjectsPage() {
   const confirmDeleteProject = async () => {
     if (!projectToDelete) return
 
+    if (role === 'client') {
+      toast.error("Clients are not authorized to delete projects")
+      setDeleteConfirmOpen(false)
+      setProjectToDelete(null)
+      return
+    }
+
     try {
       const { error } = await supabase.from("projects").delete().eq("id", projectToDelete)
       if (error) throw error
@@ -184,6 +208,11 @@ export default function ProjectsPage() {
   }
 
   const handleSubmit = async (values: any) => {
+    if (role === 'client') {
+      toast.error("Clients are not authorized to create or edit projects")
+      return
+    }
+    
     const { member_ids, ...projectValues } = values
     
     try {
@@ -253,7 +282,7 @@ export default function ProjectsPage() {
             onEdit={handleEditProject}
             onDelete={handleDeleteProject}
             onAdd={handleAddProject}
-            onViewProposals={handleViewDetails}
+            onViewPhases={handleViewDetails}
             onRowClick={handleViewDetails}
             onAssignMembers={handleAssignMembers}
             defaultTab="active"

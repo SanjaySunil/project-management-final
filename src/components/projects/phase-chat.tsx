@@ -21,13 +21,13 @@ interface Message {
   }
 }
 
-interface ProposalChatProps {
+interface PhaseChatProps {
   projectId: string
-  proposalId: string
-  proposalTitle: string
+  phaseId: string
+  phaseTitle: string
 }
 
-export function ProposalChat({ projectId, proposalId, proposalTitle }: ProposalChatProps) {
+export function PhaseChat({ projectId, phaseId, phaseTitle }: PhaseChatProps) {
   const { user } = useAuth()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [newMessage, setNewMessage] = React.useState("")
@@ -51,7 +51,7 @@ export function ProposalChat({ projectId, proposalId, proposalTitle }: ProposalC
   }, [messages, scrollToBottom])
 
   React.useEffect(() => {
-    if (!proposalId || !user) return
+    if (!phaseId || !user) return
 
     async function setupChat() {
       try {
@@ -59,13 +59,13 @@ export function ProposalChat({ projectId, proposalId, proposalTitle }: ProposalC
         const { data: initialChannelData, error: channelError } = await supabase
           .from("channels")
           .select("*")
-          .eq("proposal_id", proposalId)
+          .eq("phase_id", phaseId)
           .maybeSingle()
 
         if (channelError) throw channelError
 
         let channelData = initialChannelData
-        const expectedName = slugify(proposalTitle)
+        const expectedName = slugify(phaseTitle)
 
         if (!channelData) {
           const { data: newChannel, error: createError } = await supabase
@@ -73,7 +73,7 @@ export function ProposalChat({ projectId, proposalId, proposalTitle }: ProposalC
             .insert({
               name: expectedName,
               project_id: projectId,
-              proposal_id: proposalId,
+              phase_id: phaseId,
               created_by: user?.id
             })
             .select()
@@ -84,7 +84,7 @@ export function ProposalChat({ projectId, proposalId, proposalTitle }: ProposalC
               const { data: existingChannel } = await supabase
                 .from("channels")
                 .select("*")
-                .eq("proposal_id", proposalId)
+                .eq("phase_id", phaseId)
                 .single()
               channelData = existingChannel
             } else throw createError
@@ -128,13 +128,13 @@ export function ProposalChat({ projectId, proposalId, proposalTitle }: ProposalC
     setupChat()
 
     // Real-time subscription is handled in a separate effect for channelId
-  }, [proposalId, projectId, user, proposalTitle])
+  }, [phaseId, projectId, user, phaseTitle])
 
   React.useEffect(() => {
     if (!channel?.id) return
 
     const subscription = supabase
-      .channel(`proposal_chat:${channel.id}`)
+      .channel(`phase_chat:${channel.id}`)
       .on(
         "postgres_changes",
         {

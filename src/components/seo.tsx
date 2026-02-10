@@ -17,7 +17,7 @@ export function SEO({
 }: SEOProps) {
   const siteTitle = "Arehsoft";
   const fullTitle = title ? `${title} | ${siteTitle}` : siteTitle;
-  const defaultDescription = "Streamline your business operations, project management, and client relations with Arehsoft's comprehensive dashboard.";
+  const defaultDescription = "Streamline your business operations, project management, and client relations with Arehsoft's comprehensive platform.";
 
   return (
     <>

@@ -61,7 +61,7 @@ interface ProjectsTableProps {
   onEdit: (project: ProjectWithClient) => void
   onDelete: (id: string) => void
   onAdd: () => void
-  onViewProposals: (project: ProjectWithClient) => void
+  onViewPhases: (project: ProjectWithClient) => void
   disablePadding?: boolean
   onRowClick?: (project: ProjectWithClient) => void
   onAssignMembers?: (projectId: string, memberIds: string[]) => Promise<void>
@@ -75,7 +75,7 @@ export function ProjectsTable({
   onEdit, 
   onDelete, 
   onAdd,
-  onViewProposals,
+  onViewPhases,
   disablePadding = true,
   onRowClick,
   onAssignMembers,
@@ -322,8 +322,8 @@ export function ProjectsTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => onViewProposals(row.original)}>
-              <IconExternalLink className="mr-2 h-4 w-4" /> View Proposals
+            <DropdownMenuItem onClick={() => onViewPhases(row.original)}>
+              <IconExternalLink className="mr-2 h-4 w-4" /> View Phases
             </DropdownMenuItem>
             
             {canUpdate && (
@@ -361,7 +361,7 @@ export function ProjectsTable({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
-      onRowClick={onRowClick || onViewProposals}
+      onRowClick={onRowClick || onViewPhases}
     />
   )
 }

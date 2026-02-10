@@ -49,6 +49,10 @@ export default function TeamPage() {
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
 
+  const teamRoles = Object.fromEntries(
+    Object.entries(ROLES).filter(([key]) => key !== 'client')
+  ) as Record<string, RoleData>
+
   const handleUserClick = (profile: Profile) => {
     setSelectedUser(profile)
     setDetailsModalOpen(true)
@@ -63,6 +67,7 @@ export default function TeamPage() {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .neq('role', 'client')
         .order('role', { ascending: false })
 
       if (error) throw error
@@ -247,16 +252,17 @@ export default function TeamPage() {
                   </div>
                 ))
               ) : (
-                (Object.entries(ROLES) as [string, RoleData][]).map(([key, roleInfo]) => (
-                  <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant={key === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                        {roleInfo.label}
-                      </Badge>
+                (Object.entries(teamRoles) as [string, RoleData][])
+                  .map(([key, roleInfo]) => (
+                    <div key={key} className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant={key === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                          {roleInfo.label}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{roleInfo.description}</p>
-                  </div>
-                ))
+                  ))
               )}
             </div>
 
@@ -266,7 +272,7 @@ export default function TeamPage() {
               onDelete={handleDelete}
               onRowClick={handleUserClick}
               currentUserRole={role}
-              availableRoles={ROLES}
+              availableRoles={teamRoles}
               isOnline={isOnline}
               isLoading={loading}
             />
@@ -282,7 +288,7 @@ export default function TeamPage() {
         user={selectedUser}
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
-        availableRoles={ROLES}
+        availableRoles={teamRoles}
         isOnline={isOnline}
       />
 
@@ -298,7 +304,7 @@ export default function TeamPage() {
             onSubmit={handleAddMember} 
             onCancel={() => setAddMemberOpen(false)} 
             isLoading={isCreating}
-            availableRoles={ROLES}
+            availableRoles={teamRoles}
           />
         </DialogContent>
       </Dialog>

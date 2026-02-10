@@ -16,11 +16,10 @@ export const ROLES: Record<Role, RoleData> = {
     label: 'Employee',
     description: 'Can manage projects, tasks, clients, and chat. Cannot manage users or organization settings.',
     permissions: [
-      'dashboard:read',
       'projects:*',
       'tasks:*',
       'deliverables:*',
-      'proposals:*',
+      'phases:*',
       'clients:*',
       'team:read',
       'chat:*',
@@ -30,13 +29,12 @@ export const ROLES: Record<Role, RoleData> = {
   },
   client: {
     label: 'Client',
-    description: 'Access to their own projects, tasks, and proposals.',
+    description: 'Access to their own projects, tasks, and phases.',
     permissions: [
-      'dashboard:read',
       'projects:read',
       'tasks:read',
       'deliverables:read',
-      'proposals:read',
+      'phases:read',
       'chat:*',
     ],
   },
@@ -54,10 +52,16 @@ export function hasPermission(
   }
   
   // Normalize role
-  let role: Role = 'employee';
+  let role: Role | null = null;
   const lowerRole = userRole.toLowerCase();
   if (lowerRole === 'admin') role = 'admin';
+  else if (lowerRole === 'employee') role = 'employee';
   else if (lowerRole === 'client') role = 'client';
+  
+  if (!role) {
+    console.log(`Permission denied: Unrecognized role=${userRole}`);
+    return false;
+  }
   
   const roleData = ROLES[role];
   
