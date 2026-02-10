@@ -357,10 +357,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} />
-        <div className="px-4 py-2 text-[10px] text-muted-foreground font-mono opacity-50 group-data-[collapsible=icon]:hidden flex flex-col gap-0.5">
-          <div>{__APP_VERSION__}</div>
-          <div className="truncate">{__APP_COMMIT_MESSAGE__}</div>
-        </div>
+        {(role === "admin" || role === "employee") && (
+          <div className="px-4 py-2 text-[10px] text-muted-foreground font-mono opacity-50 group-data-[collapsible=icon]:hidden flex flex-col gap-0.5">
+            <div>{__APP_VERSION__}</div>
+            <div className="truncate">{__APP_COMMIT_MESSAGE__}</div>
+          </div>
+        )}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
