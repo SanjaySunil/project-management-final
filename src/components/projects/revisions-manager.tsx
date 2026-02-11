@@ -1,6 +1,6 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconExternalLink, IconGitPullRequest, IconCheck, IconClock } from "@tabler/icons-react"
+import { IconExternalLink, IconGitPullRequest, IconCheck, IconClock, IconEdit, IconTrash } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,7 @@ import { TaskForm, type TaskFormValues } from "./task-form"
 import type { Task } from "./kanban-board"
 import { DataTable } from "@/components/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 const revisionSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -72,8 +73,10 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [isDelegateOpen, setIsDelegateOpen] = React.useState(false)
   const [isDetailOpen, setIsDetailOpen] = React.useState(false)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false)
   const [selectedRevision, setSelectedRevision] = React.useState<Revision | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isEditing, setIsEditing] = React.useState(false)
 
   const form = useForm<RevisionFormValues>({
     resolver: zodResolver(revisionSchema),
@@ -132,27 +135,67 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
     }
   }, [phaseId, fetchRevisions])
 
-  const onCreateRevision = async (values: RevisionFormValues) => {
+  const onSubmitRevision = async (values: RevisionFormValues) => {
     if (!user) return
     try {
       setIsSubmitting(true)
-      const { error } = await supabase.from("revisions").insert({
-        phase_id: phaseId,
-        client_id: user.id,
-        title: values.title,
-        description: values.description,
-        status: "pending",
-      })
+      
+      if (isEditing && selectedRevision) {
+        const { error } = await supabase
+          .from("revisions")
+          .update({
+            title: values.title,
+            description: values.description,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", selectedRevision.id)
 
-      if (error) throw error
+        if (error) throw error
+        toast.success("Revision updated")
+      } else {
+        const { error } = await supabase.from("revisions").insert({
+          phase_id: phaseId,
+          client_id: user.id,
+          title: values.title,
+          description: values.description,
+          status: "pending",
+        })
 
-      toast.success("Revision request submitted")
+        if (error) throw error
+        toast.success("Revision request submitted")
+      }
+
       setIsCreateOpen(false)
+      setIsEditing(false)
       form.reset()
       fetchRevisions()
     } catch (error: any) {
-      console.error("Create revision error:", error)
-      toast.error("Failed to submit revision: " + getErrorMessage(error))
+      console.error("Submit revision error:", error)
+      toast.error(`Failed to ${isEditing ? "update" : "submit"} revision: ` + getErrorMessage(error))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const onDeleteRevision = async () => {
+    if (!selectedRevision) return
+    try {
+      setIsSubmitting(true)
+      const { error } = await supabase
+        .from("revisions")
+        .delete()
+        .eq("id", selectedRevision.id)
+
+      if (error) throw error
+
+      toast.success("Revision deleted")
+      setIsDeleteConfirmOpen(false)
+      setIsDetailOpen(false)
+      setSelectedRevision(null)
+      fetchRevisions()
+    } catch (error: any) {
+      console.error("Delete revision error:", error)
+      toast.error("Failed to delete revision: " + getErrorMessage(error))
     } finally {
       setIsSubmitting(false)
     }
@@ -255,6 +298,29 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
     setIsDetailOpen(true)
   }
 
+  const handleEdit = (revision: Revision) => {
+    setSelectedRevision(revision)
+    setIsEditing(true)
+    form.reset({
+      title: revision.title,
+      description: revision.description || "",
+    })
+    setIsCreateOpen(true)
+    setIsDetailOpen(false)
+  }
+
+  const canEdit = (revision: Revision) => {
+    if (isAdminOrEmployee) return true
+    if (isClient && revision.client_id === user?.id && revision.status === "pending") return true
+    return false
+  }
+
+  const canDelete = (revision: Revision) => {
+    if (isAdminOrEmployee) return true
+    if (isClient && revision.client_id === user?.id && revision.status === "pending") return true
+    return false
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -269,14 +335,42 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
         onRowClick={handleRowClick}
         searchPlaceholder="Search revisions..."
         addLabel="New Revision"
-        onAdd={isClient ? () => setIsCreateOpen(true) : undefined}
+        onAdd={isClient ? () => {
+          setIsEditing(false)
+          form.reset({ title: "", description: "" })
+          setIsCreateOpen(true)
+        } : undefined}
       />
 
       {/* Revision Details Dialog */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{selectedRevision?.title}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>{selectedRevision?.title}</DialogTitle>
+              <div className="flex items-center gap-2 mr-6">
+                {selectedRevision && canEdit(selectedRevision) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => handleEdit(selectedRevision)}
+                  >
+                    <IconEdit className="size-4" />
+                  </Button>
+                )}
+                {selectedRevision && canDelete(selectedRevision) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-destructive hover:text-destructive"
+                    onClick={() => setIsDeleteConfirmOpen(true)}
+                  >
+                    <IconTrash className="size-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
             <DialogDescription>
               Requested on {selectedRevision && new Date(selectedRevision.created_at || "").toLocaleDateString()}
             </DialogDescription>
@@ -326,15 +420,17 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
         </DialogContent>
       </Dialog>
 
-      {/* Create Revision Dialog */}
+      {/* Create/Edit Revision Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request a Revision</DialogTitle>
-            <DialogDescription>Describe the changes you would like to see.</DialogDescription>
+            <DialogTitle>{isEditing ? "Edit Revision" : "Request a Revision"}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? "Update the details of your revision request." : "Describe the changes you would like to see."}
+            </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onCreateRevision)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmitRevision)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="title"
@@ -370,7 +466,7 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Submitting..." : "Submit Request"}
+                  {isSubmitting ? "Submitting..." : isEditing ? "Save Changes" : "Submit Request"}
                 </Button>
               </div>
             </form>
@@ -403,6 +499,16 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        title="Delete Revision"
+        description="Are you sure you want to delete this revision request? This action cannot be undone."
+        onConfirm={onDeleteRevision}
+        isLoading={isSubmitting}
+        variant="destructive"
+      />
     </div>
   )
 }
