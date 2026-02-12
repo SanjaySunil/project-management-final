@@ -38,6 +38,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     let mounted = true
+    let timeoutId: any
 
     async function fetchOrganization() {
       if (authLoading) {
@@ -79,23 +80,29 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         if (mounted) {
           console.log('OrganizationProvider: Setting loading to false')
           setLoading(false)
+          if (timeoutId) clearTimeout(timeoutId)
         }
       }
     }
 
-    fetchOrganization()
-
     // Safety timeout for organization loading
-    const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('OrganizationProvider: Loading timeout reached')
-        setLoading(false)
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        setLoading(currentLoading => {
+          if (currentLoading) {
+            console.warn('OrganizationProvider: Loading timeout reached')
+            return false
+          }
+          return false
+        })
       }
     }, 3000)
 
+    fetchOrganization()
+
     return () => {
       mounted = false
-      clearTimeout(timeout)
+      if (timeoutId) clearTimeout(timeoutId)
     }
   }, [organizationId, authLoading])
 
