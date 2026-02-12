@@ -62,8 +62,8 @@ export type Database = {
           description: string | null
           id: string
           name: string
-          project_id: string | null
           phase_id: string | null
+          project_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -71,8 +71,8 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
-          project_id?: string | null
           phase_id?: string | null
+          project_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -80,8 +80,8 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
-          project_id?: string | null
           phase_id?: string | null
+          project_id?: string | null
         }
         Relationships: [
           {
@@ -92,17 +92,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "channels_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
+            foreignKeyName: "channels_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: true
+            referencedRelation: "phases"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "channels_phase_id_fkey"
             columns: ["phase_id"]
             isOneToOne: true
-            referencedRelation: "phases"
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channels_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -233,6 +240,13 @@ export type Database = {
             columns: ["phase_id"]
             isOneToOne: false
             referencedRelation: "phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliverables_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
         ]
@@ -451,41 +465,6 @@ export type Database = {
           },
         ]
       }
-      pin_logs: {
-        Row: {
-          attempt_type: string
-          created_at: string
-          id: string
-          is_success: boolean
-          pin_entered: string
-          user_id: string
-        }
-        Insert: {
-          attempt_type: string
-          created_at?: string
-          id?: string
-          is_success: boolean
-          pin_entered: string
-          user_id: string
-        }
-        Update: {
-          attempt_type?: string
-          created_at?: string
-          id?: string
-          is_success?: boolean
-          pin_entered?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pin_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organizations: {
         Row: {
           billing_email: string | null
@@ -537,6 +516,7 @@ export type Database = {
           parent_id: string | null
           status: string
           title: string
+          type: string | null
           user_id: string
         }
         Insert: {
@@ -547,6 +527,7 @@ export type Database = {
           parent_id?: string | null
           status?: string
           title: string
+          type?: string | null
           user_id: string
         }
         Update: {
@@ -557,6 +538,7 @@ export type Database = {
           parent_id?: string | null
           status?: string
           title?: string
+          type?: string | null
           user_id?: string
         }
         Relationships: [
@@ -569,6 +551,100 @@ export type Database = {
           },
           {
             foreignKeyName: "personal_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phases: {
+        Row: {
+          amount: number | null
+          commission_amount: number | null
+          commission_rate: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          net_amount: number | null
+          order_index: number | null
+          order_source: string | null
+          project_id: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          net_amount?: number | null
+          order_index?: number | null
+          order_source?: string | null
+          project_id?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          net_amount?: number | null
+          order_index?: number | null
+          order_source?: string | null
+          project_id?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pin_logs: {
+        Row: {
+          attempt_type: string
+          created_at: string | null
+          id: string
+          is_success: boolean
+          pin_entered: string
+          user_id: string | null
+        }
+        Insert: {
+          attempt_type: string
+          created_at?: string | null
+          id?: string
+          is_success: boolean
+          pin_entered: string
+          user_id?: string | null
+        }
+        Update: {
+          attempt_type?: string
+          created_at?: string | null
+          id?: string
+          is_success?: boolean
+          pin_entered?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pin_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -616,64 +692,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      revisions: {
-        Row: {
-          client_id: string
-          created_at: string | null
-          description: string | null
-          id: string
-          phase_id: string
-          status: string
-          task_id: string | null
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          client_id: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          phase_id: string
-          status?: string
-          task_id?: string | null
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          phase_id?: string
-          status?: string
-          task_id?: string | null
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "revisions_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "revisions_phase_id_fkey"
-            columns: ["phase_id"]
-            isOneToOne: false
-            referencedRelation: "phases"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "revisions_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -764,65 +782,6 @@ export type Database = {
           },
         ]
       }
-      phases: {
-        Row: {
-          amount: number | null
-          commission_amount: number | null
-          commission_rate: number | null
-          created_at: string | null
-          description: string | null
-          id: string
-          net_amount: number | null
-          order_index: number | null
-          order_source: string | null
-          project_id: string | null
-          status: string | null
-          title: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          amount?: number | null
-          commission_amount?: number | null
-          commission_rate?: number | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          net_amount?: number | null
-          order_index?: number | null
-          order_source?: string | null
-          project_id?: string | null
-          status?: string | null
-          title: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number | null
-          commission_amount?: number | null
-          commission_rate?: number | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          net_amount?: number | null
-          order_index?: number | null
-          order_source?: string | null
-          project_id?: string | null
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "phases_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       push_subscriptions: {
         Row: {
           created_at: string | null
@@ -843,6 +802,71 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      revisions: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          phase_id: string
+          status: string
+          task_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          phase_id: string
+          status?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          phase_id?: string
+          status?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revisions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revisions_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revisions_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revisions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_attachments: {
         Row: {
@@ -888,6 +912,42 @@ export type Database = {
           },
           {
             foreignKeyName: "task_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_members: {
+        Row: {
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_members_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_members_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -960,6 +1020,13 @@ export type Database = {
             referencedRelation: "phases"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tasks_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
         ]
       }
       tickets: {
@@ -1005,10 +1072,71 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      proposals: {
+        Row: {
+          amount: number | null
+          commission_amount: number | null
+          commission_rate: number | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          net_amount: number | null
+          order_index: number | null
+          order_source: string | null
+          project_id: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          net_amount?: number | null
+          order_index?: number | null
+          order_source?: string | null
+          project_id?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          net_amount?: number | null
+          order_index?: number | null
+          order_source?: string | null
+          project_id?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      delete_user_account: {
+        Args: { user_id_to_delete: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

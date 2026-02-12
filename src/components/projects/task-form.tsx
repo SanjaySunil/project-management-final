@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket } from "@tabler/icons-react"
+import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket, IconGitPullRequest } from "@tabler/icons-react"
 import type { Tables } from "@/lib/database.types"
 import type { Task } from "./kanban-board"
 import { supabase } from "@/lib/supabase"
@@ -564,6 +564,12 @@ export function TaskForm({
                         <div className="flex items-center gap-2">
                           <IconBug className="size-4 text-destructive" />
                           <span>Bug</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="revision">
+                        <div className="flex items-center gap-2">
+                          <IconGitPullRequest className="size-4 text-orange-600" />
+                          <span>Revision</span>
                         </div>
                       </SelectItem>
                     </SelectContent>

@@ -50,7 +50,7 @@ type RevisionFormValues = z.infer<typeof revisionSchema>
 type Revision = {
   id: string
   phase_id: string
-  client_id: string
+  client_id: string | null
   title: string
   description: string | null
   status: string
@@ -66,10 +66,11 @@ interface RevisionsManagerProps {
   phaseId: string
   projectId: string
   members: Tables<"profiles">[]
+  projectEmployees?: Tables<"profiles">[]
   tasks: Task[]
 }
 
-export function RevisionsManager({ phaseId, projectId, members, tasks }: RevisionsManagerProps) {
+export function RevisionsManager({ phaseId, projectId, members, projectEmployees = [], tasks }: RevisionsManagerProps) {
   const { user, role } = useAuth()
   const isAdminOrEmployee = role === "admin" || role === "employee"
   const isClient = role === "client"
@@ -77,7 +78,6 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
   const [revisions, setRevisions] = React.useState<Revision[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
-  const [isDelegateOpen, setIsDelegateOpen] = React.useState(false)
   const [isDetailOpen, setIsDetailOpen] = React.useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false)
   const [selectedRevision, setSelectedRevision] = React.useState<Revision | null>(null)
@@ -159,21 +159,18 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
         if (error) throw error
         toast.success("Revision updated")
       } else {
-        let clientId = user.id
+        let clientId: string | null = user.id
 
         // If admin/employee, we need to find the project's client's profile ID
         if (isAdminOrEmployee) {
           const { data: projectData, error: projectError } = await supabase
             .from("projects")
-            .select("clients!inner(user_id)")
+            .select("clients(user_id)")
             .eq("id", projectId)
             .single()
 
           if (projectError) throw projectError
-          if (!projectData?.clients?.user_id) {
-            throw new Error("Could not find client for this project")
-          }
-          clientId = projectData.clients.user_id
+          clientId = projectData?.clients?.user_id || null
         }
 
         const { error } = await supabase.from("revisions").insert({
@@ -224,7 +221,7 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
     }
   }
 
-  const onDelegateTask = async (values: TaskFormValues) => {
+  const onDelegateTask = async (values: Partial<TaskFormValues>) => {
     if (!selectedRevision) return
     try {
       setIsSubmitting(true)
@@ -233,11 +230,11 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
       const { data: taskData, error: taskError } = await supabase
         .from("tasks")
         .insert({
-          title: values.title,
-          description: values.description,
+          title: values.title || selectedRevision.title,
+          description: values.description || selectedRevision.description || "",
           status: values.status || "todo",
-          type: values.type || "feature",
-          user_id: values.user_id === "unassigned" ? null : values.user_id,
+          type: values.type || "revision",
+          user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
           phase_id: phaseId,
           order_index: tasks.filter(t => t.status === (values.status || "todo")).length,
         })
@@ -246,7 +243,16 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
 
       if (taskError) throw taskError
 
-      // 2. Link revision to task and update status
+      // 2. Auto-assign all project employees
+      if (projectEmployees.length > 0) {
+        const assignments = projectEmployees.map(emp => ({
+          task_id: taskData.id,
+          user_id: emp.id
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
+
+      // 3. Link revision to task and update status
       const { error: revisionError } = await supabase
         .from("revisions")
         .update({
@@ -258,7 +264,6 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
       if (revisionError) throw revisionError
 
       toast.success("Revision delegated to Kanban")
-      setIsDelegateOpen(false)
       setIsDetailOpen(false)
       setSelectedRevision(null)
       fetchRevisions()
@@ -472,11 +477,11 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
             {isAdminOrEmployee && selectedRevision?.status === "pending" && (
               <Button 
                 className="gap-2"
-                onClick={() => {
-                  setIsDelegateOpen(true)
-                }}
+                onClick={() => onDelegateTask({})}
+                disabled={isSubmitting}
               >
-                <IconExternalLink className="size-4" /> Delegate to Kanban
+                <IconExternalLink className="size-4" /> 
+                {isSubmitting ? "Delegating..." : "Delegate to Kanban"}
               </Button>
             )}
             <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
@@ -537,32 +542,6 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
               </div>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delegate Task Dialog */}
-      <Dialog open={isDelegateOpen} onOpenChange={setIsDelegateOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Delegate Revision to Kanban</DialogTitle>
-            <DialogDescription>Create a Kanban task based on this revision request.</DialogDescription>
-          </DialogHeader>
-          {selectedRevision && (
-            <TaskForm 
-              onSubmit={onDelegateTask}
-              onCancel={() => setIsDelegateOpen(false)}
-              members={members}
-              tasks={tasks}
-              isLoading={isSubmitting}
-              defaultValues={{
-                title: `[REVISION] ${selectedRevision.title}`,
-                description: selectedRevision.description || "",
-                status: "todo",
-                phase_id: phaseId,
-                project_id: projectId
-              }}
-            />
-          )}
         </DialogContent>
       </Dialog>
 

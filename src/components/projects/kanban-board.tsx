@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
@@ -82,6 +82,15 @@ export type Task = {
     email: string | null
   } | null
   task_attachments?: Tables<"task_attachments">[]
+  task_members?: {
+    user_id: string
+    profiles: {
+      id: string
+      full_name: string | null
+      avatar_url: string | null
+      email: string | null
+    } | null
+  }[]
 }
 
 interface KanbanBoardProps {
@@ -649,6 +658,11 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                     <IconBug className="size-2.5" />
                     Bug
                   </Badge>
+                ) : task.type === 'revision' ? (
+                  <Badge variant="outline" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-200 uppercase font-bold tracking-wider">
+                    <IconGitPullRequest className="size-2.5" />
+                    Revision
+                  </Badge>
                 ) : (
                   <Badge variant="secondary" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-transparent uppercase font-bold tracking-wider">
                     <IconRocket className="size-2.5" />
@@ -665,6 +679,10 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { type: 'bug' }) }}>
                 <IconBug className="size-3.5 mr-2 text-destructive" />
                 <span>Bug</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { type: 'revision' }) }}>
+                <IconGitPullRequest className="size-3.5 mr-2 text-orange-600" />
+                <span>Revision</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -795,55 +813,78 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
         )}
 
         <div className="flex items-center justify-between mt-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" className="h-6 p-0 hover:bg-transparent flex items-center gap-1.5">
-                <Avatar className="h-5 w-5 border border-background">
-                  <AvatarImage src={task.profiles?.avatar_url || undefined} />
-                  <AvatarFallback className="text-[8px]">{userInitials}</AvatarFallback>
-                </Avatar>
-                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                  {task.profiles?.full_name || task.profiles?.email?.split('@')[0] || "Unassigned"}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Assign To</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onUpdate(task.id, { user_id: null })
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-[10px]">?</AvatarFallback>
+          <div className="flex items-center -space-x-2 overflow-hidden">
+            {task.task_members && task.task_members.length > 0 ? (
+              task.task_members.map((member, i) => {
+                const initials = member.profiles?.full_name
+                  ? member.profiles.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+                  : member.profiles?.email?.slice(0, 2).toUpperCase() || '?'
+                
+                return (
+                  <Avatar key={member.user_id} className="h-5 w-5 border-2 border-background shrink-0" style={{ zIndex: 10 - i }}>
+                    <AvatarImage src={member.profiles?.avatar_url || undefined} />
+                    <AvatarFallback className="text-[7px]">{initials}</AvatarFallback>
                   </Avatar>
-                  <span>Unassigned</span>
-                </div>
-              </DropdownMenuItem>
-              {members.map((member) => (
-                <DropdownMenuItem 
-                  key={member.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onUpdate(task.id, { user_id: member.id })
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={member.avatar_url || undefined} />
-                      <AvatarFallback className="text-[10px]">
-                        {member.full_name ? member.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : member.email?.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
+                )
+              })
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" className="h-6 p-0 hover:bg-transparent flex items-center gap-1.5">
+                    <Avatar className="h-5 w-5 border border-background">
+                      <AvatarImage src={task.profiles?.avatar_url || undefined} />
+                      <AvatarFallback className="text-[8px]">{userInitials}</AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{member.full_name || member.email}</span>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                      {task.profiles?.full_name || task.profiles?.email?.split('@')[0] || "Unassigned"}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuLabel>Assign To</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onUpdate(task.id, { user_id: null })
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">?</AvatarFallback>
+                      </Avatar>
+                      <span>Unassigned</span>
+                    </div>
+                  </DropdownMenuItem>
+                  {members.map((member) => (
+                    <DropdownMenuItem 
+                      key={member.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onUpdate(task.id, { user_id: member.id })
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={member.avatar_url || undefined} />
+                          <AvatarFallback className="text-[10px]">
+                            {member.full_name ? member.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : member.email?.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{member.full_name || member.email}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+          
+          {task.task_members && task.task_members.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              {task.task_members.length} {task.task_members.length === 1 ? 'assignee' : 'assignees'}
+            </span>
+          )}
         </div>
       </div>
     </Card>

@@ -59,6 +59,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   // Kanban state
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
+  const [projectEmployees, setProjectEmployees] = React.useState<Tables<"profiles">[]>([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
@@ -130,7 +131,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       setPhase(phaseData)
 
       // Fetch deliverables, tasks, and members in parallel
-      const [deliverablesRes, tasksRes, membersRes] = await Promise.all([
+      const [deliverablesRes, tasksRes, membersRes, projectMembersRes] = await Promise.all([
         supabase
           .from("deliverables")
           .select("*")
@@ -148,19 +149,37 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
                 name
               )
             ),
-            task_attachments (*)
+            task_attachments (*),
+            task_members (
+              *,
+              profiles (*)
+            )
           `)
           .eq("phase_id", phaseId)
           .order("order_index", { ascending: true }),
         supabase
           .from("profiles")
           .select("*")
-          .order("full_name", { ascending: true })
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("project_members")
+          .select(`
+            user_id,
+            profiles!inner (
+              id,
+              full_name,
+              avatar_url,
+              email,
+              role
+            )
+          `)
+          .eq("project_id", projectId)
       ])
 
       if (deliverablesRes.error) throw deliverablesRes.error
       if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
+      if (projectMembersRes.error) throw projectMembersRes.error
 
       setDeliverables(deliverablesRes.data || [])
       
@@ -171,6 +190,12 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       }))
       setTasks(fetchedTasks as Task[])
       setMembers(fetchedMembers)
+
+      // Filter project members for employees only
+      const employees = (projectMembersRes.data || [])
+        .map(pm => pm.profiles)
+        .filter(p => (p as any).role === "employee")
+      setProjectEmployees(employees as any[])
 
     } catch (error: any) {
       console.error("Fetch phase details error:", error)
@@ -213,7 +238,11 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
                     name
                   )
                 ),
-                task_attachments (*)
+                task_attachments (*),
+                task_members (
+                  *,
+                  profiles (*)
+                )
               `)
               .eq("id", payload.new.id)
               .single()
@@ -336,12 +365,29 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
           status: finalStatus,
           order_index: tasks.filter(t => t.status === finalStatus).length
         }])
-        .select(`*, phases(id, title, project_id, projects(name)), task_attachments(*)`)
+        .select(`
+          *,
+          phases(id, title, project_id, projects(name)),
+          task_attachments(*),
+          task_members(
+            *,
+            profiles(*)
+          )
+        `)
         .single()
 
       if (error) throw error
       
       const taskId = data.id
+
+      // Auto-assign all project employees
+      if (projectEmployees.length > 0) {
+        const assignments = projectEmployees.map(emp => ({
+          task_id: taskId,
+          user_id: emp.id
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
 
       // Handle subtasks
       if (values.subtasks && values.subtasks.length > 0) {
@@ -481,10 +527,28 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
           phase_id: phaseId,
           order_index: tasks.filter(t => t.parent_id === parentId).length
         }])
-        .select(`*, phases(id, title, project_id, projects(name)), task_attachments(*)`)
+        .select(`
+          *,
+          phases(id, title, project_id, projects(name)),
+          task_attachments(*),
+          task_members(
+            *,
+            profiles(*)
+          )
+        `)
         .single()
 
       if (error) throw error
+      
+      // Auto-assign all project employees
+      if (projectEmployees.length > 0) {
+        const assignments = projectEmployees.map(emp => ({
+          task_id: data.id,
+          user_id: emp.id
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
+
       const newTask = { ...data, profiles: null }
       setTasks(prev => [...prev, newTask as Task])
       toast.success("Subtask added")
@@ -729,6 +793,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
             phaseId={phaseId} 
             projectId={projectId}
             members={members}
+            projectEmployees={projectEmployees}
             tasks={tasks}
           />
         </TabsContent>
