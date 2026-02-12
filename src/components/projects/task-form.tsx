@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket, IconGitPullRequest } from "@tabler/icons-react"
+import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket, IconGitPullRequest, IconAlarm } from "@tabler/icons-react"
 import type { Tables } from "@/lib/database.types"
 import type { Task } from "./kanban-board"
 import { supabase } from "@/lib/supabase"
@@ -28,6 +28,8 @@ import imageCompression from "browser-image-compression"
 import { toast } from "sonner"
 
 import { MultiSelect } from "@/components/ui/multi-select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { ReminderForm } from "@/components/reminder-form"
 
 const taskSchema = z.object({
   id: z.string().optional(),
@@ -459,6 +461,50 @@ export function TaskForm({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <FormLabel>Reminders</FormLabel>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs gap-1"
+                  >
+                    <IconAlarm className="size-3" />
+                    Set Reminder
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Set Task Reminder</DialogTitle>
+                    <DialogDescription>
+                      Get notified about this task at a specific time.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ReminderForm 
+                    initialData={{
+                      title: `Task: ${form.getValues("title")}`,
+                      task_id: defaultValues?.id,
+                      link: defaultValues?.id 
+                        ? (form.getValues("phase_id") && form.getValues("phase_id") !== "none"
+                          ? `/dashboard/projects/${selectedProjectId}/phases/${form.getValues("phase_id")}?taskId=${defaultValues.id}`
+                          : `/dashboard/tasks?taskId=${defaultValues.id}`)
+                        : undefined
+                    }}
+                    onSuccess={() => {
+                      toast.success("Reminder scheduled")
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+            <p className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded-md border border-dashed text-center">
+              You can set multiple reminders for this task. Manage them in the Reminders page.
+            </p>
           </div>
 
           <div className="space-y-2">

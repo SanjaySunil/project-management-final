@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock, IconAlarm } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
@@ -43,6 +43,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { ReminderForm } from "@/components/reminder-form"
 
 // Custom collision detection strategy for multi-container kanban
 const customCollisionDetection: CollisionDetection = (args) => {
@@ -749,6 +751,39 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                   <IconPlus className="size-3" />
                 </Button>
               )}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <IconAlarm className="size-3" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]" onClick={(e) => e.stopPropagation()}>
+                  <DialogHeader>
+                    <DialogTitle>Set Task Reminder</DialogTitle>
+                    <DialogDescription>
+                      Get notified about this task at a specific time.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ReminderForm 
+                    initialData={{
+                      title: `Task: ${task.title}`,
+                      task_id: task.id,
+                      link: task.phase_id 
+                        ? `/dashboard/projects/${task.phases?.project_id}/phases/${task.phase_id}?taskId=${task.id}`
+                        : `/dashboard/tasks?taskId=${task.id}`
+                    }}
+                    onSuccess={() => {
+                      // No need to close manually if we use controlled state, but for simplicity:
+                      toast.success("Reminder set!")
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
               <Button
                 variant="ghost"
                 size="icon"

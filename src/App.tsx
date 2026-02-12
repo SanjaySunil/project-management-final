@@ -22,6 +22,7 @@ import ChatPage from "@/pages/chat"
 import AccountPage from "@/pages/account"
 import OrganizationPage from "@/pages/organization"
 import NotificationsPage from "@/pages/notifications"
+import RemindersPage from "@/pages/reminders"
 import FinancesPage from "@/pages/finances"
 import TicketsPage from "@/pages/tickets"
 import { Toaster } from "@/components/ui/sonner"
@@ -86,6 +87,7 @@ function AppRoutes() {
         <Route path="account" element={<AccountPage />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="reminders" element={<RemindersPage />} />
       </Route>
 
       <Route 

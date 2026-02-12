@@ -6,6 +6,7 @@ import {
   GalleryVerticalEnd,
   CheckSquare,
   Bell,
+  AlarmClock,
   Users,
   Briefcase,
   DollarSign,
@@ -86,6 +87,11 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       url: "/dashboard/tasks/assigned",
       icon: CheckSquare,
       permission: { action: "read", resource: "tasks" },
+    },
+    {
+      title: "Reminders",
+      url: "/dashboard/reminders",
+      icon: AlarmClock,
     },
     {
       title: "Notifications",
