@@ -239,13 +239,17 @@ export default function TasksPage() {
 
     try {
       setIsSubmitting(true)
+
+      const assigneeIds = values.assignee_ids || []
+      const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : null
+
       const { data, error } = await supabase
         .from("tasks")
         .insert([{
           title: values.title,
           description: values.description,
           type: values.type || 'feature',
-          user_id: values.user_id === "unassigned" ? null : values.user_id,
+          user_id: finalUserId,
           phase_id: values.phase_id === "none" ? null : values.phase_id,
           parent_id: (values.parent_id === "none" ? null : values.parent_id) || creatingParentId,
           status: finalStatus,
@@ -269,12 +273,22 @@ export default function TasksPage() {
 
       const taskId = data.id
 
+      // Handle multiple assignees
+      if (assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
+          task_id: taskId,
+          user_id: userId
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
+
       // Handle subtasks
       if (values.subtasks && values.subtasks.length > 0) {
         const subtasksToInsert = values.subtasks.map((title, index) => ({
           title,
           status: "todo",
           parent_id: taskId,
+          user_id: finalUserId,
           phase_id: data.phase_id,
           order_index: index
         }))
@@ -298,9 +312,23 @@ export default function TasksPage() {
         if (subtasksError) throw subtasksError
         
         if (createdSubtasks) {
+          if (assigneeIds.length > 0) {
+            const subtaskAssignments = createdSubtasks.flatMap(st => 
+              assigneeIds.map(userId => ({
+                task_id: st.id,
+                user_id: userId
+              }))
+            )
+            await supabase.from("task_members").insert(subtaskAssignments)
+          }
+
           const formattedSubtasks = createdSubtasks.map(st => ({
             ...st,
-            profiles: null
+            profiles: members.find(m => m.id === st.user_id) || null,
+            task_members: assigneeIds.map(userId => ({
+              user_id: userId,
+              profiles: members.find(m => m.id === userId) || null
+            }))
           }))
           setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
         }
@@ -369,11 +397,14 @@ export default function TasksPage() {
 
       const newTask = {
         ...data,
-        profiles: members.find(m => m.id === data.user_id) || null
+        profiles: members.find(m => m.id === data.user_id) || null,
+        task_members: assigneeIds.map(userId => ({
+          user_id: userId,
+          profiles: members.find(m => m.id === userId) || null
+        }))
       }
 
       setTasks(prev => {
-        // If task already exists (e.g. we updated it with attachments), just return prev
         if (prev.some(t => t.id === newTask.id)) return prev
         return [...prev, newTask as Task]
       })
@@ -395,12 +426,15 @@ export default function TasksPage() {
 
     try {
       setIsSubmitting(true)
+      const assigneeIds = values.assignee_ids || []
+      const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : null
+
       const updates = {
         title: values.title,
         description: values.description || null,
         status: values.status || editingTask.status,
         type: values.type || editingTask.type || 'feature',
-        user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+        user_id: finalUserId,
         phase_id: values.phase_id === "none" ? null : (values.phase_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
@@ -412,11 +446,31 @@ export default function TasksPage() {
 
       if (error) throw error
 
-      setTasks(prev => prev.map(t => t.id === editingTask.id ? { 
-        ...t, 
-        ...updates,
-        profiles: members.find(m => m.id === updates.user_id) || null,
-      } : t))
+      // Update task_members
+      await supabase.from("task_members").delete().eq("task_id", editingTask.id)
+      
+      if (assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
+          task_id: editingTask.id,
+          user_id: userId
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
+
+      setTasks(prev => prev.map(t => {
+        if (t.id === editingTask.id) {
+          return { 
+            ...t, 
+            ...updates,
+            profiles: members.find(m => m.id === updates.user_id) || null,
+            task_members: assigneeIds.map(userId => ({
+              user_id: userId,
+              profiles: members.find(m => m.id === userId) || null
+            }))
+          }
+        }
+        return t
+      }))
       
       setIsEditDialogOpen(false)
       setEditingTask(null)

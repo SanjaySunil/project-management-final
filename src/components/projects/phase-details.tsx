@@ -353,13 +353,22 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
     const finalStatus = values.status || creatingStatus || "todo"
     try {
       setIsTaskSubmitting(true)
+      
+      // Handle multiple assignees
+      const assigneeIds = values.assignee_ids && values.assignee_ids.length > 0 
+        ? values.assignee_ids 
+        : (projectEmployees.length > 0 ? projectEmployees.map(emp => emp.id) : []);
+      
+      // Set primary user_id to the first assignee if any
+      const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : null;
+
       const { data, error } = await supabase
         .from("tasks")
         .insert([{
           title: values.title,
           description: values.description,
           type: values.type || 'feature',
-          user_id: values.user_id === "unassigned" ? null : values.user_id,
+          user_id: finalUserId,
           phase_id: phaseId,
           parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId),
           status: finalStatus,
@@ -380,11 +389,11 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       
       const taskId = data.id
 
-      // Auto-assign all project employees
-      if (projectEmployees.length > 0) {
-        const assignments = projectEmployees.map(emp => ({
+      // Assign all selected assignees (or project employees if none selected)
+      if (assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
           task_id: taskId,
-          user_id: emp.id
+          user_id: userId
         }))
         await supabase.from("task_members").insert(assignments)
       }
@@ -394,6 +403,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         const subtasksToInsert = values.subtasks.map((title, index) => ({
           title,
           status: "todo",
+          user_id: finalUserId, // Also assign the same primary user to subtasks
           parent_id: taskId,
           phase_id: phaseId,
           order_index: index
@@ -407,9 +417,24 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         if (subtasksError) throw subtasksError
         
         if (createdSubtasks) {
+          // Auto-assign the same set of people to subtasks too
+          if (assigneeIds.length > 0) {
+            const subtaskAssignments = createdSubtasks.flatMap(st => 
+              assigneeIds.map(userId => ({
+                task_id: st.id,
+                user_id: userId
+              }))
+            )
+            await supabase.from("task_members").insert(subtaskAssignments)
+          }
+
           const formattedSubtasks = createdSubtasks.map(st => ({
             ...st,
-            profiles: null
+            profiles: members.find(m => m.id === st.user_id) || null,
+            task_members: assigneeIds.map(userId => ({
+              user_id: userId,
+              profiles: members.find(m => m.id === userId) || null
+            }))
           }))
           setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
         }
@@ -467,7 +492,14 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         }
       }
 
-      const newTask = { ...data, profiles: members.find(m => m.id === data.user_id) || null }
+      const newTask = { 
+        ...data, 
+        profiles: members.find(m => m.id === data.user_id) || null,
+        task_members: assigneeIds.map(userId => ({
+          user_id: userId,
+          profiles: members.find(m => m.id === userId) || null
+        }))
+      }
       setTasks(prev => {
         if (prev.some(t => t.id === newTask.id)) return prev
         return [...prev, newTask as Task]
@@ -489,19 +521,47 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
     if (!editingTask) return
     try {
       setIsTaskSubmitting(true)
+      const assigneeIds = values.assignee_ids || []
+      const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : null
+
       const updates = {
         title: values.title,
         description: values.description || null,
         status: values.status || editingTask.status,
         type: values.type || editingTask.type || 'feature',
-        user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+        user_id: finalUserId,
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
+
       const { error } = await supabase.from("tasks").update(updates).eq("id", editingTask.id)
       if (error) throw error
-      setTasks(prev => prev.map(t => t.id === editingTask.id ? { 
-        ...t, ...updates, profiles: members.find(m => m.id === updates.user_id) || null 
-      } : t))
+
+      // Update task_members
+      await supabase.from("task_members").delete().eq("task_id", editingTask.id)
+      
+      if (assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
+          task_id: editingTask.id,
+          user_id: userId
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
+
+      setTasks(prev => prev.map(t => {
+        if (t.id === editingTask.id) {
+          return { 
+            ...t, 
+            ...updates, 
+            profiles: members.find(m => m.id === updates.user_id) || null,
+            task_members: assigneeIds.map(userId => ({
+              user_id: userId,
+              profiles: members.find(m => m.id === userId) || null
+            }))
+          }
+        }
+        return t
+      }))
+      
       setIsEditDialogOpen(false)
       setEditingTask(null)
       toast.success("Task updated successfully")
@@ -517,11 +577,15 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
     try {
       const parentTask = tasks.find(t => t.id === parentId)
+      // If there's only one employee, auto-assign them as the user_id
+      const finalUserId = projectEmployees.length === 1 ? projectEmployees[0].id : null;
+
       const { data, error } = await supabase
         .from("tasks")
         .insert([{
           title,
           status,
+          user_id: finalUserId,
           type: parentTask?.type || 'feature',
           parent_id: parentId,
           phase_id: phaseId,
@@ -549,7 +613,14 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         await supabase.from("task_members").insert(assignments)
       }
 
-      const newTask = { ...data, profiles: null }
+      const newTask = { 
+        ...data, 
+        profiles: members.find(m => m.id === data.user_id) || null,
+        task_members: projectEmployees.map(emp => ({
+          user_id: emp.id,
+          profiles: emp
+        }))
+      }
       setTasks(prev => [...prev, newTask as Task])
       toast.success("Subtask added")
     } catch (error: any) {

@@ -226,6 +226,11 @@ export function RevisionsManager({ phaseId, projectId, members, projectEmployees
     try {
       setIsSubmitting(true)
       
+      // If there's only one project employee, auto-assign them as the user_id
+      const finalUserId = values.user_id === "unassigned" 
+        ? (projectEmployees.length === 1 ? projectEmployees[0].id : null)
+        : (values.user_id || (projectEmployees.length === 1 ? projectEmployees[0].id : null));
+
       // 1. Create the task
       const { data: taskData, error: taskError } = await supabase
         .from("tasks")
@@ -234,7 +239,7 @@ export function RevisionsManager({ phaseId, projectId, members, projectEmployees
           description: values.description || selectedRevision.description || "",
           status: values.status || "todo",
           type: values.type || "revision",
-          user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+          user_id: finalUserId,
           phase_id: phaseId,
           order_index: tasks.filter(t => t.status === (values.status || "todo")).length,
         })

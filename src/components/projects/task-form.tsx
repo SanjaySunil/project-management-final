@@ -27,6 +27,8 @@ import { useAuth } from "@/hooks/use-auth"
 import imageCompression from "browser-image-compression"
 import { toast } from "sonner"
 
+import { MultiSelect } from "@/components/ui/multi-select"
+
 const taskSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1, "Title is required"),
@@ -34,6 +36,7 @@ const taskSchema = z.object({
   status: z.string().optional(),
   type: z.string().optional(),
   user_id: z.string().nullable().optional(),
+  assignee_ids: z.array(z.string()).default([]),
   project_id: z.string().nullable().optional(),
   phase_id: z.string().nullable().optional(),
   parent_id: z.string().nullable().optional(),
@@ -99,6 +102,22 @@ export function TaskForm({
     return null
   }, [defaultValues?.project_id, defaultValues?.phase_id, phases])
 
+  // Get current task to access task_members
+  const currentTask = React.useMemo(() => {
+    if (!defaultValues?.id) return null
+    return tasks.find(t => t.id === defaultValues.id)
+  }, [tasks, defaultValues?.id])
+
+  const initialAssigneeIds = React.useMemo(() => {
+    if (defaultValues?.assignee_ids) return defaultValues.assignee_ids
+    if (currentTask?.task_members) {
+      return currentTask.task_members.map(m => m.user_id)
+    }
+    // Fallback to user_id if assignee_ids not present
+    if (defaultValues?.user_id) return [defaultValues.user_id]
+    return []
+  }, [defaultValues, currentTask])
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -108,6 +127,7 @@ export function TaskForm({
       status: defaultValues?.status || "todo",
       type: defaultValues?.type || "feature",
       user_id: defaultValues?.user_id || null,
+      assignee_ids: initialAssigneeIds,
       project_id: initialProjectId,
       phase_id: defaultValues?.phase_id || null,
       parent_id: defaultValues?.parent_id || null,
@@ -610,28 +630,22 @@ export function TaskForm({
             {!hideAssignee && (
               <FormField
                 control={form.control}
-                name="user_id"
+                name="assignee_ids"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assign To</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value || "unassigned"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a member" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {members.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.full_name || member.email || member.username}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <MultiSelect
+                        options={members.map(member => ({
+                          label: member.full_name || member.email || member.username || "Unknown",
+                          value: member.id,
+                          avatar_url: member.avatar_url
+                        }))}
+                        selected={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select assignees"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
