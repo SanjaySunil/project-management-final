@@ -33,6 +33,7 @@ export default function TasksPage() {
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
   const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
 
   const fetchInitialData = React.useCallback(async () => {
     if (!user || authLoading) return
@@ -240,7 +241,16 @@ export default function TasksPage() {
     try {
       setIsSubmitting(true)
 
-      const assigneeIds = values.assignee_ids || []
+      // Handle multiple assignees based on mode
+      let assigneeIds: string[] = []
+      
+      if (values.assignee_ids && values.assignee_ids.length > 0) {
+        assigneeIds = values.assignee_ids
+      } else if (kanbanMode === "admin") {
+        // Assign to all admins
+        assigneeIds = members.filter(m => m.role === "admin").map(m => m.id)
+      }
+      
       const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : null
 
       const { data, error } = await supabase
@@ -507,11 +517,21 @@ export default function TasksPage() {
       // Find parent task to inherit phase/project if needed
       const parentTask = tasks.find(t => t.id === parentId)
       
+      // Get assignees based on mode
+      let assigneeIds: string[] = []
+      if (kanbanMode === "admin") {
+        assigneeIds = members.filter(m => m.role === "admin").map(m => m.id)
+      }
+
+      // If there's only one assignee, auto-assign them as the user_id
+      const finalUserId = assigneeIds.length === 1 ? assigneeIds[0] : null;
+
       const { data, error } = await supabase
         .from("tasks")
         .insert([{
           title,
           status,
+          user_id: finalUserId,
           type: parentTask?.type || 'feature',
           parent_id: parentId,
           phase_id: parentTask?.phase_id || null,
@@ -533,9 +553,22 @@ export default function TasksPage() {
 
       if (error) throw error
 
+      // Auto-assign all members from the mode
+      if (assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
+          task_id: data.id,
+          user_id: userId
+        }))
+        await supabase.from("task_members").insert(assignments)
+      }
+
       const newTask = {
         ...data,
-        profiles: null
+        profiles: members.find(m => m.id === data.user_id) || null,
+        task_members: assigneeIds.map(userId => ({
+          user_id: userId,
+          profiles: members.find(m => m.id === userId) || null
+        }))
       }
 
       setTasks(prev => [...prev, newTask as Task])
@@ -581,6 +614,8 @@ export default function TasksPage() {
             onTaskEdit={handleTaskEditTrigger}
             onTaskDelete={handleTaskDelete}
             isLoading={isLoading}
+            mode={kanbanMode}
+            onModeChange={setKanbanMode}
           />
         </div>
       </div>

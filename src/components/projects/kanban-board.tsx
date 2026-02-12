@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 
 // Custom collision detection strategy for multi-container kanban
@@ -80,6 +81,7 @@ export type Task = {
     full_name: string | null
     avatar_url: string | null
     email: string | null
+    role?: string | null
   } | null
   task_attachments?: Tables<"task_attachments">[]
   task_members?: {
@@ -89,9 +91,12 @@ export type Task = {
       full_name: string | null
       avatar_url: string | null
       email: string | null
+      role?: string | null
     } | null
   }[]
 }
+
+export type KanbanMode = "development" | "admin"
 
 interface KanbanBoardProps {
   tasks: Task[]
@@ -105,6 +110,8 @@ interface KanbanBoardProps {
   hideControls?: boolean
   hideCreate?: boolean
   isLoading?: boolean
+  mode?: KanbanMode
+  onModeChange?: (mode: KanbanMode) => void
 }
 
 const COLUMNS = [
@@ -126,7 +133,9 @@ export function KanbanBoard({
   onShare,
   hideControls = false,
   hideCreate = false,
-  isLoading = false
+  isLoading = false,
+  mode = "development",
+  onModeChange
 }: KanbanBoardProps) {
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks)
   const [activeTask, setActiveTask] = React.useState<Task | null>(null)
@@ -163,8 +172,18 @@ export function KanbanBoard({
     // Get a set of IDs for quick lookup
     const taskIds = new Set(tasks.map(t => t.id))
     
+    // Filter tasks based on mode
+    const filteredTasks = tasks.filter(task => {
+      const hasAdmin = task.task_members?.some(m => m.profiles?.role === 'admin')
+      if (mode === 'admin') {
+        return hasAdmin
+      }
+      // In development mode, show tasks that don't have admins
+      return !hasAdmin
+    })
+
     // Only include tasks that are top-level OR whose parent is NOT in this list
-    tasks.filter(t => !t.parent_id || !taskIds.has(t.parent_id)).forEach((task) => {
+    filteredTasks.filter(t => !t.parent_id || !taskIds.has(t.parent_id)).forEach((task) => {
       const status = task.status
       if (groups[status]) {
         groups[status].push(task)
@@ -178,12 +197,17 @@ export function KanbanBoard({
       groups[status].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
     })
     return groups
-  }, [tasks])
+  }, [tasks, mode])
 
   // Get subtasks for a task
   const getSubtasks = React.useCallback((taskId: string) => {
-    return tasks.filter(t => t.parent_id === taskId)
-  }, [tasks])
+    return tasks.filter(t => {
+      if (t.parent_id !== taskId) return false
+      const hasAdmin = t.task_members?.some(m => m.profiles?.role === 'admin')
+      if (mode === 'admin') return hasAdmin
+      return !hasAdmin
+    })
+  }, [tasks, mode])
 
   const handleShare = React.useCallback(async (task: Task) => {
     if (onShare) {
@@ -337,9 +361,27 @@ export function KanbanBoard({
     <div className="flex flex-1 flex-col gap-3 min-h-0 overflow-hidden">
       {!hideControls && (
         <div className="flex items-center justify-between shrink-0 px-4 lg:px-6">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm font-medium">
-            <IconLayoutKanban className="size-4" />
-            Kanban
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm font-medium">
+              <IconLayoutKanban className="size-4" />
+              Kanban
+            </div>
+
+            <ToggleGroup 
+              type="single" 
+              value={mode} 
+              onValueChange={(v) => v && onModeChange?.(v as KanbanMode)}
+              className="bg-muted p-1 rounded-md"
+            >
+              <ToggleGroupItem value="development" className="text-xs h-7 px-2.5 gap-1.5 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <IconCode className="size-3.5" />
+                Development Tasks
+              </ToggleGroupItem>
+              <ToggleGroupItem value="admin" className="text-xs h-7 px-2.5 gap-1.5 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <IconShieldLock className="size-3.5" />
+                Admin Tasks
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
           
           {!hideCreate && (

@@ -60,6 +60,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [projectEmployees, setProjectEmployees] = React.useState<Tables<"profiles">[]>([])
+  const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
@@ -354,10 +355,20 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
     try {
       setIsTaskSubmitting(true)
       
-      // Handle multiple assignees
-      const assigneeIds = values.assignee_ids && values.assignee_ids.length > 0 
-        ? values.assignee_ids 
-        : (projectEmployees.length > 0 ? projectEmployees.map(emp => emp.id) : []);
+      // Handle multiple assignees based on mode
+      let assigneeIds: string[] = []
+      
+      if (values.assignee_ids && values.assignee_ids.length > 0) {
+        assigneeIds = values.assignee_ids
+      } else {
+        if (kanbanMode === "admin") {
+          // Assign to all admins
+          assigneeIds = members.filter(m => m.role === "admin").map(m => m.id)
+        } else {
+          // Assign to project employees
+          assigneeIds = projectEmployees.length > 0 ? projectEmployees.map(emp => emp.id) : []
+        }
+      }
       
       // Set primary user_id to the first assignee if any
       const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : null;
@@ -577,8 +588,17 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   const handleTaskQuickCreate = async (status: string, parentId: string, title: string) => {
     try {
       const parentTask = tasks.find(t => t.id === parentId)
-      // If there's only one employee, auto-assign them as the user_id
-      const finalUserId = projectEmployees.length === 1 ? projectEmployees[0].id : null;
+      
+      // Get assignees based on mode
+      let assigneeIds: string[] = []
+      if (kanbanMode === "admin") {
+        assigneeIds = members.filter(m => m.role === "admin").map(m => m.id)
+      } else {
+        assigneeIds = projectEmployees.length > 0 ? projectEmployees.map(emp => emp.id) : []
+      }
+
+      // If there's only one assignee, auto-assign them as the user_id
+      const finalUserId = assigneeIds.length === 1 ? assigneeIds[0] : null;
 
       const { data, error } = await supabase
         .from("tasks")
@@ -604,11 +624,11 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
 
       if (error) throw error
       
-      // Auto-assign all project employees
-      if (projectEmployees.length > 0) {
-        const assignments = projectEmployees.map(emp => ({
+      // Auto-assign all members from the mode
+      if (assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
           task_id: data.id,
-          user_id: emp.id
+          user_id: userId
         }))
         await supabase.from("task_members").insert(assignments)
       }
@@ -616,9 +636,9 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       const newTask = { 
         ...data, 
         profiles: members.find(m => m.id === data.user_id) || null,
-        task_members: projectEmployees.map(emp => ({
-          user_id: emp.id,
-          profiles: emp
+        task_members: assigneeIds.map(userId => ({
+          user_id: userId,
+          profiles: members.find(m => m.id === userId) || null
         }))
       }
       setTasks(prev => [...prev, newTask as Task])
@@ -854,6 +874,8 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
                   }
                 }}
                 isLoading={isLoading}
+                mode={kanbanMode}
+                onModeChange={setKanbanMode}
               />
             </div>
           </TabsContent>
