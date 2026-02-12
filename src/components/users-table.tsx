@@ -67,6 +67,7 @@ interface Profile {
   role: string | null
   email: string | null
   updated_at: string | null
+  pin: string | null
 }
 
 export function UsersTable({
@@ -78,6 +79,7 @@ export function UsersTable({
   availableRoles,
   isOnline,
   isLoading = false,
+  onChangePin,
 }: {
   data: Profile[]
   onChangeRole: (profile: Profile, newRole: string) => void
@@ -87,6 +89,7 @@ export function UsersTable({
   availableRoles?: Record<string, RoleData>
   isOnline?: (userId: string) => boolean
   isLoading?: boolean
+  onChangePin?: (profile: Profile) => void
 }) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -185,6 +188,11 @@ export function UsersTable({
             >
               Copy user ID
             </DropdownMenuItem>
+            {onChangePin && (
+              <DropdownMenuItem onClick={() => onChangePin(row.original)} disabled={!canManageUsers(currentUserRole)}>
+                Change PIN
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Change Role</DropdownMenuLabel>
             {Object.keys(allRoles).map((roleKey) => (

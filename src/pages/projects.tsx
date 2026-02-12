@@ -33,6 +33,7 @@ export default function ProjectsPage() {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
+        .eq("role", "employee")
         .order("full_name", { ascending: true })
       
       if (error) throw error
@@ -69,6 +70,11 @@ export default function ProjectsPage() {
                 full_name,
                 avatar_url
               )
+            ),
+            phases (
+              tasks (
+                status
+              )
             )
           `)
           .eq("clients.user_id", user.id)
@@ -101,6 +107,11 @@ export default function ProjectsPage() {
             profiles (
               full_name,
               avatar_url
+            )
+          ),
+          phases (
+            tasks (
+              status
             )
           )
         `)
@@ -158,6 +169,18 @@ export default function ProjectsPage() {
 
   const handleAssignMembers = async (projectId: string, memberIds: string[]) => {
     try {
+      // Fetch all admins to ensure they are always added to all projects
+      const { data: admins, error: adminsError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin")
+      
+      if (adminsError) throw adminsError
+      const adminIds = admins?.map(a => a.id) || []
+      
+      // Combine employee IDs from the UI with all admin IDs
+      const allMemberIds = Array.from(new Set([...memberIds, ...adminIds]))
+
       // Update members: delete old, insert new
       const { error: deleteError } = await supabase
         .from("project_members")
@@ -166,8 +189,8 @@ export default function ProjectsPage() {
       
       if (deleteError) throw deleteError
 
-      if (memberIds.length > 0) {
-        const memberEntries = memberIds.map((userId) => ({
+      if (allMemberIds.length > 0) {
+        const memberEntries = allMemberIds.map((userId) => ({
           project_id: projectId,
           user_id: userId,
         }))
@@ -226,7 +249,7 @@ export default function ProjectsPage() {
           .eq("id", projectId)
         if (error) throw error
         
-        // Update members using the helper logic
+        // Update members using the helper logic (which now includes admins)
         await handleAssignMembers(projectId, member_ids || [])
       } else {
         const { data, error } = await supabase
@@ -237,17 +260,8 @@ export default function ProjectsPage() {
         if (error) throw error
         projectId = data.id
 
-        // Insert new members
-        if (member_ids && member_ids.length > 0) {
-          const memberEntries = member_ids.map((userId: string) => ({
-            project_id: projectId,
-            user_id: userId,
-          }))
-          const { error: memberError } = await supabase
-            .from("project_members")
-            .insert(memberEntries)
-          if (memberError) throw memberError
-        }
+        // Insert new members using the same helper logic to include admins
+        await handleAssignMembers(projectId, member_ids || [])
       }
 
       toast.success(editingProject ? "Project updated successfully" : "Project added successfully")
@@ -262,9 +276,11 @@ export default function ProjectsPage() {
     if (!editingProject) return {}
     return {
       ...editingProject,
-      member_ids: editingProject.project_members?.map(m => m.user_id) || []
+      member_ids: editingProject.project_members
+        ?.filter(m => profiles.some(p => p.id === m.user_id))
+        ?.map(m => m.user_id) || []
     }
-  }, [editingProject])
+  }, [editingProject, profiles])
 
   return (
     <PageContainer>

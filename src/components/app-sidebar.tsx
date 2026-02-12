@@ -275,27 +275,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const items = filterByPermission(sidebarGroups.operations)
     
     return items.map((item: SidebarItem) => {
-      // Project contextual sub-menu
-      if (item.title === "Projects" && projectId && !phaseId) {
-        const projectItems = [
-          { title: "Phases", url: `/dashboard/projects/${projectId}/phases` },
-        ]
-
-        if (role !== "client") {
-          projectItems.push({ title: "Documents", url: `/dashboard/projects/${projectId}/documents` })
-        }
-
-        projectItems.push(
-          { title: "← All Projects", url: "/dashboard/projects" }
-        )
-
-        return {
-          ...item,
-          isActive: true,
-          items: projectItems
-        }
-      }
-      
       // Keep Projects highlighted when inside a project or phase
       if (item.title === "Projects" && (projectId || location.pathname.startsWith("/dashboard/projects"))) {
         return { ...item, isActive: true }

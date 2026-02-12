@@ -316,6 +316,7 @@ export function PhasesTable({
       isLoading={isLoading}
       enableReordering={canUpdate}
       onDataChange={onDataChange}
+      defaultSorting={[{ id: "title", desc: false }]}
     />
   )
 }

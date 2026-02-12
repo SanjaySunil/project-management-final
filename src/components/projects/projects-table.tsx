@@ -52,6 +52,11 @@ export type ProjectWithClient = Tables<"projects"> & {
       avatar_url: string | null
     }
   }[]
+  phases?: {
+    tasks: {
+      status: string
+    }[]
+  }[]
 }
 
 interface ProjectsTableProps {
@@ -146,18 +151,22 @@ export function ProjectsTable({
     {
       accessorKey: "name",
       header: "Project Name",
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-primary">
-            {row.original.name}
-          </span>
-          {row.original.description && (
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {row.original.description}
-            </p>
-          )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        return (
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-primary">
+                {row.original.name}
+              </span>
+            </div>
+            {row.original.description && (
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                {row.original.description}
+              </p>
+            )}
+          </div>
+        )
+      },
       enableHiding: false,
     },
     {
@@ -190,6 +199,36 @@ export function ProjectsTable({
               <IconBrandGithub className="h-4 w-4" />
               <span className="truncate max-w-[150px]">{source.split('/').pop()}</span>
             </a>
+          </div>
+        )
+      },
+    },
+    {
+      id: "tasks",
+      header: "Tasks",
+      accessorFn: (row) => {
+        const phases = row.phases || []
+        return phases.reduce((total, phase) => {
+          return total + (phase.tasks?.filter(task => 
+            task.status === "todo" || task.status === "in progress"
+          ).length || 0)
+        }, 0)
+      },
+      cell: ({ row }) => {
+        const phases = row.original.phases || []
+        const activeTasksCount = phases.reduce((total, phase) => {
+          return total + (phase.tasks?.filter(task => 
+            task.status === "todo" || task.status === "in progress"
+          ).length || 0)
+        }, 0)
+
+        if (activeTasksCount === 0) return <span className="text-muted-foreground text-xs italic">No active tasks</span>
+
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="h-5 px-2 text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-100 border-none">
+              {activeTasksCount} active
+            </Badge>
           </div>
         )
       },
@@ -362,6 +401,7 @@ export function ProjectsTable({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onRowClick={onRowClick || onViewPhases}
+      defaultSorting={[{ id: "tasks", desc: true }]}
     />
   )
 }

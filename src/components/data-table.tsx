@@ -19,9 +19,11 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  IconArrowsSort,
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
+  IconChevronUp,
   IconChevronsLeft,
   IconChevronsRight,
   IconGripVertical,
@@ -178,6 +180,8 @@ export interface DataTableProps<TData extends { id: string | number }> {
 
   toolbar?: React.ReactNode
 
+  defaultSorting?: SortingState
+
 }
 
 
@@ -214,6 +218,8 @@ export function DataTable<TData extends { id: string | number }> ({
 
   toolbar,
 
+  defaultSorting = [],
+
 }: DataTableProps<TData>) {
   const [data, setData] = React.useState(() => initialData)
   
@@ -228,7 +234,7 @@ export function DataTable<TData extends { id: string | number }> ({
     []
   )
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>(defaultSorting)
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
@@ -317,12 +323,27 @@ export function DataTable<TData extends { id: string | number }> ({
                     {headerGroup.headers.map((header) => {
                       return (
                         <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
+                          {header.isPlaceholder ? null : (
+                            <div
+                              className={cn(
+                                header.column.getCanSort() &&
+                                  "flex cursor-pointer select-none items-center gap-2"
+                              )}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(
                                 header.column.columnDef.header,
                                 header.getContext()
                               )}
+                              {{
+                                asc: <IconChevronUp className="size-4" />,
+                                desc: <IconChevronDown className="size-4" />,
+                              }[header.column.getIsSorted() as string] ?? 
+                                (header.column.getCanSort() ? (
+                                  <IconArrowsSort className="size-4 text-muted-foreground/50" />
+                                ) : null)}
+                            </div>
+                          )}
                         </TableHead>
                       )
                     })}
@@ -370,12 +391,27 @@ export function DataTable<TData extends { id: string | number }> ({
                   {headerGroup.headers.map((header) => {
                     return (
                       <TableHead key={header.id} colSpan={header.colSpan}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
+                        {header.isPlaceholder ? null : (
+                          <div
+                            className={cn(
+                              header.column.getCanSort() &&
+                                "flex cursor-pointer select-none items-center gap-2"
+                            )}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
+                            {{
+                              asc: <IconChevronUp className="size-4" />,
+                              desc: <IconChevronDown className="size-4" />,
+                            }[header.column.getIsSorted() as string] ?? 
+                              (header.column.getCanSort() ? (
+                                <IconArrowsSort className="size-4 text-muted-foreground/50" />
+                              ) : null)}
+                          </div>
+                        )}
                       </TableHead>
                     )
                   })}

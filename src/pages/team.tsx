@@ -12,6 +12,7 @@ import { AlertCircle, RefreshCw, Plus } from "lucide-react"
 import { UsersTable } from "@/components/users-table"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { usePresence } from "@/hooks/use-presence"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ interface Profile {
   role: string | null
   email: string | null
   updated_at: string | null
+  pin: string | null
 }
 
 export default function TeamPage() {
@@ -48,6 +50,9 @@ export default function TeamPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
+  const [pinChangeOpen, setPinChangeOpen] = useState(false)
+  const [newPin, setNewPin] = useState("")
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false)
 
   const teamRoles = Object.fromEntries(
     Object.entries(ROLES).filter(([key]) => key !== 'client')
@@ -152,6 +157,38 @@ export default function TeamPage() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "An unknown error occurred"
       toast.error("Error updating role: " + message)
+    }
+  }
+
+  async function handlePinChange(profile: Profile, pin: string) {
+    if (!canManageUsers(role)) {
+      toast.error("You don't have permission to change this user's PIN")
+      return
+    }
+
+    try {
+      setIsUpdatingPin(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ pin })
+        .eq('id', profile.id)
+        .select()
+
+      if (error) throw error
+      
+      if (!data || data.length === 0) {
+        throw new Error("No profile was updated. You might not have permission or the user does not exist.")
+      }
+      
+      setProfiles(profiles.map(p => p.id === profile.id ? { ...p, pin } : p))
+      toast.success(`User PIN updated successfully`)
+      setPinChangeOpen(false)
+      setNewPin("")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An unknown error occurred"
+      toast.error("Error updating PIN: " + message)
+    } finally {
+      setIsUpdatingPin(false)
     }
   }
 
@@ -271,6 +308,10 @@ export default function TeamPage() {
               onChangeRole={changeRole} 
               onDelete={handleDelete}
               onRowClick={handleUserClick}
+              onChangePin={(profile) => {
+                setSelectedUser(profile)
+                setPinChangeOpen(true)
+              }}
               currentUserRole={role}
               availableRoles={teamRoles}
               isOnline={isOnline}
@@ -290,7 +331,44 @@ export default function TeamPage() {
         onOpenChange={setDetailsModalOpen}
         availableRoles={teamRoles}
         isOnline={isOnline}
+        onChangePin={(profile) => {
+          setSelectedUser(profile)
+          setDetailsModalOpen(false)
+          setPinChangeOpen(true)
+        }}
       />
+
+      <Dialog open={pinChangeOpen} onOpenChange={setPinChangeOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change PIN</DialogTitle>
+            <DialogDescription>
+              Enter a new PIN for {selectedUser?.full_name || selectedUser?.email}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="pin" className="text-sm font-medium">New PIN</label>
+              <Input
+                id="pin"
+                type="text"
+                placeholder="Enter 4-6 digit PIN"
+                value={newPin}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPin(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPinChangeOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => selectedUser && handlePinChange(selectedUser, newPin)}
+              disabled={isUpdatingPin || !newPin}
+            >
+              {isUpdatingPin ? "Updating..." : "Update PIN"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
         <DialogContent className="sm:max-w-[425px]">

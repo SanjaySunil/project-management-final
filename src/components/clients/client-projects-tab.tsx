@@ -22,11 +22,27 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   const navigate = useNavigate()
   const { user, role, loading: authLoading } = useAuth()
   const [projects, setProjects] = React.useState<ProjectWithClient[]>([])
+  const [profiles, setProfiles] = React.useState<any[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [editingProject, setEditingProject] = React.useState<ProjectWithClient | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
+
+  const fetchProfiles = React.useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", "employee")
+        .order("full_name", { ascending: true })
+      
+      if (error) throw error
+      setProfiles(data || [])
+    } catch (error: any) {
+      console.error("Failed to fetch profiles:", error)
+    }
+  }, [])
 
   const fetchProjects = React.useCallback(async () => {
     if (!user || authLoading) return
@@ -46,6 +62,11 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
             profiles (
               full_name,
               avatar_url
+            )
+          ),
+          phases (
+            tasks (
+              status
             )
           )
         `)
@@ -80,8 +101,9 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   React.useEffect(() => {
     if (clientId) {
       fetchProjects()
+      fetchProfiles()
     }
-  }, [fetchProjects, clientId])
+  }, [fetchProjects, fetchProfiles, clientId])
 
   const handleAddProject = () => {
     setEditingProject(null)
@@ -100,6 +122,45 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
 
   const handleViewPhases = (project: ProjectWithClient) => {
     navigate(`/dashboard/projects/${project.id}`)
+  }
+
+  const handleAssignMembers = async (projectId: string, memberIds: string[]) => {
+    try {
+      // Fetch all admins to ensure they are always added to all projects
+      const { data: admins, error: adminsError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin")
+      
+      if (adminsError) throw adminsError
+      const adminIds = admins?.map(a => a.id) || []
+      
+      // Combine employee IDs from the UI with all admin IDs
+      const allMemberIds = Array.from(new Set([...memberIds, ...adminIds]))
+
+      // Update members: delete old, insert new
+      const { error: deleteError } = await supabase
+        .from("project_members")
+        .delete()
+        .eq("project_id", projectId)
+      
+      if (deleteError) throw deleteError
+
+      if (allMemberIds.length > 0) {
+        const memberEntries = allMemberIds.map((userId) => ({
+          project_id: projectId,
+          user_id: userId,
+        }))
+        const { error: insertError } = await supabase
+          .from("project_members")
+          .insert(memberEntries)
+        if (insertError) throw insertError
+      }
+
+      fetchProjects()
+    } catch (error: any) {
+      toast.error("Failed to update members: " + error.message)
+    }
   }
 
   const confirmDeleteProject = async () => {
@@ -148,8 +209,8 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
           .eq("id", projectId)
         if (error) throw error
         
-        // Update members: delete old, insert new
-        await supabase.from("project_members").delete().eq("project_id", projectId)
+        // Update members using the helper logic (which now includes admins)
+        await handleAssignMembers(projectId, member_ids || [])
       } else {
         const { data, error } = await supabase
           .from("projects")
@@ -158,18 +219,9 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
           .single()
         if (error) throw error
         projectId = data.id
-      }
 
-      // Insert new members
-      if (member_ids && member_ids.length > 0) {
-        const memberEntries = member_ids.map((userId: string) => ({
-          project_id: projectId,
-          user_id: userId,
-        }))
-        const { error: memberError } = await supabase
-          .from("project_members")
-          .insert(memberEntries)
-        if (memberError) throw memberError
+        // Insert new members using the same helper logic to include admins
+        await handleAssignMembers(projectId, member_ids || [])
       }
 
       toast.success(editingProject ? "Project updated successfully" : "Project added successfully")
@@ -184,20 +236,24 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
     if (!editingProject) return { client_id: clientId }
     return {
       ...editingProject,
-      member_ids: editingProject.project_members?.map(m => m.user_id) || []
+      member_ids: editingProject.project_members
+        ?.filter(m => profiles.some(p => p.id === m.user_id))
+        ?.map(m => m.user_id) || []
     }
-  }, [editingProject, clientId])
+  }, [editingProject, clientId, profiles])
 
   return (
     <div className="flex flex-1 flex-col gap-4 py-4">
       <div className="flex-1">
         <ProjectsTable 
           data={projects}
+          profiles={profiles}
           isLoading={isLoading}
           onEdit={handleEditProject}
           onDelete={handleDeleteProject}
           onAdd={handleAddProject}
           onViewPhases={handleViewPhases}
+          onAssignMembers={handleAssignMembers}
           disablePadding={true}
         />
       </div>

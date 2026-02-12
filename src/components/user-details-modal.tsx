@@ -15,9 +15,12 @@ import {
   IconClipboardList, 
   IconMessage2,
   IconExternalLink,
-  IconHammer
+  IconHammer,
+  IconLock
 } from "@tabler/icons-react"
-import { ROLES, type RoleData } from "@/lib/rbac"
+import { Button } from "@/components/ui/button"
+import { ROLES, type RoleData, canManageUsers } from "@/lib/rbac"
+import { useAuth } from "@/hooks/use-auth"
 import { format } from "date-fns"
 import { AssignedTasks } from "@/components/projects/assigned-tasks"
 import { DirectMessage } from "@/components/direct-message"
@@ -31,6 +34,7 @@ interface Profile {
   role: string | null
   email: string | null
   updated_at: string | null
+  pin: string | null
 }
 
 interface UserDetailsModalProps {
@@ -39,6 +43,7 @@ interface UserDetailsModalProps {
   onOpenChange: (open: boolean) => void
   availableRoles?: Record<string, RoleData>
   isOnline?: (userId: string) => boolean
+  onChangePin?: (profile: Profile) => void
 }
 
 export function UserDetailsModal({
@@ -47,7 +52,9 @@ export function UserDetailsModal({
   onOpenChange,
   availableRoles,
   isOnline,
+  onChangePin,
 }: UserDetailsModalProps) {
+  const { role } = useAuth()
   if (!user) return null
 
   const allRoles = availableRoles || ROLES
@@ -138,6 +145,32 @@ export function UserDetailsModal({
                   <span className="text-xs text-muted-foreground line-clamp-2">{roleData.description}</span>
                 </div>
               </div>
+
+              {canManageUsers(role) && (
+                <div className="flex items-start sm:items-center gap-3 text-sm">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                    <IconLock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col w-full">
+                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Security PIN</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-medium">
+                        {user.pin ? "••••" : "Not set"}
+                      </span>
+                      {onChangePin && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 text-xs text-primary"
+                          onClick={() => onChangePin(user)}
+                        >
+                          Change
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {user.updated_at && (
                 <div className="flex items-start sm:items-center gap-3 text-sm">
