@@ -80,6 +80,7 @@ export default function TasksPage() {
         supabase
           .from("profiles")
           .select("*")
+          .neq("role", "client")
           .order("full_name", { ascending: true }),
         phasesQuery
           .order("order_index", { ascending: true })

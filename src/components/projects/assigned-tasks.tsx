@@ -100,6 +100,7 @@ export function AssignedTasks({
         supabase
           .from("profiles")
           .select("*")
+          .neq("role", "client")
           .order("full_name", { ascending: true }),
         supabase
           .from("phases")

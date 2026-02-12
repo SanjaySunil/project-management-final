@@ -216,7 +216,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const phaseMatch = matchPath({ path: "/dashboard/projects/:projectId/phases/:phaseId" }, location.pathname)
   
   const projectId = projectMatch?.params.projectId || phaseMatch?.params.projectId
-  const phaseId = phaseMatch?.params.phaseId
 
   const clientMatch = matchPath({ path: "/dashboard/clients/:clientId/*" }, location.pathname)
   const clientId = clientMatch?.params.clientId

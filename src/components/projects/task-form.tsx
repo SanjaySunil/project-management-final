@@ -32,11 +32,11 @@ import { MultiSelect } from "@/components/ui/multi-select"
 const taskSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   status: z.string().optional(),
   type: z.string().optional(),
   user_id: z.string().nullable().optional(),
-  assignee_ids: z.array(z.string()).default([]),
+  assignee_ids: z.array(z.string()),
   project_id: z.string().nullable().optional(),
   phase_id: z.string().nullable().optional(),
   parent_id: z.string().nullable().optional(),

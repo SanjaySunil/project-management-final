@@ -34,7 +34,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useAuth } from "@/hooks/use-auth"
 import { getErrorMessage } from "@/lib/utils"
-import { TaskForm, type TaskFormValues } from "./task-form"
+import { type TaskFormValues } from "./task-form"
 import type { Task } from "./kanban-board"
 import { DataTable } from "@/components/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -65,12 +65,11 @@ type Revision = {
 interface RevisionsManagerProps {
   phaseId: string
   projectId: string
-  members: Tables<"profiles">[]
   projectEmployees?: Tables<"profiles">[]
   tasks: Task[]
 }
 
-export function RevisionsManager({ phaseId, projectId, members, projectEmployees = [], tasks }: RevisionsManagerProps) {
+export function RevisionsManager({ phaseId, projectId, projectEmployees = [], tasks }: RevisionsManagerProps) {
   const { user, role } = useAuth()
   const isAdminOrEmployee = role === "admin" || role === "employee"
   const isClient = role === "client"
@@ -173,13 +172,15 @@ export function RevisionsManager({ phaseId, projectId, members, projectEmployees
           clientId = projectData?.clients?.user_id || null
         }
 
+        if (!clientId) throw new Error("Could not determine client for this revision")
+
         const { error } = await supabase.from("revisions").insert({
           phase_id: phaseId,
           client_id: clientId,
           title: values.title,
           description: values.description,
           status: "pending",
-        })
+        } as any)
 
         if (error) throw error
         toast.success(isAdminOrEmployee ? "Revision created" : "Revision request submitted")

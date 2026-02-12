@@ -161,6 +161,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         supabase
           .from("profiles")
           .select("*")
+          .neq("role", "client")
           .order("full_name", { ascending: true }),
         supabase
           .from("project_members")
@@ -885,7 +886,6 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
           <RevisionsManager 
             phaseId={phaseId} 
             projectId={projectId}
-            members={members}
             projectEmployees={projectEmployees}
             tasks={tasks}
           />
