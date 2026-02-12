@@ -1,7 +1,6 @@
 import * as React from "react"
 import { Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/use-auth"
-import { FullScreenLoader } from "./full-screen-loader"
 import { PinWall } from "./pin-wall"
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -9,7 +8,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation()
 
   if (loading) {
-    return <FullScreenLoader />
+    return null
   }
 
   if (!session) {

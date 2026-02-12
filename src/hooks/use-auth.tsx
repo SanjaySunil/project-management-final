@@ -95,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(currentSession?.user ?? null)
     
     if (currentSession?.user) {
+      setLoading(true)
       console.log('AuthProvider: User detected, starting fetchData (non-blocking)...')
       // Don't await fetchData here if we want to ensure loading is set to false eventually
       // But we DO want the role before we say we are finished loading.
@@ -162,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!initialized) {
           initialized = true
           await handleSession(currentSession, 'onAuthStateChange_INITIAL')
-        } else if (event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        } else {
           await handleSession(currentSession, 'onAuthStateChange_UPDATE')
         }
       } else if (event === 'SIGNED_OUT') {

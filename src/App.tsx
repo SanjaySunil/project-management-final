@@ -27,7 +27,6 @@ import TicketsPage from "@/pages/tickets"
 import { Toaster } from "@/components/ui/sonner"
 import ReloadPrompt from "@/components/reload-prompt"
 import { PWAInstallModal } from "@/components/pwa-install-modal"
-import { FullScreenLoader } from "@/components/full-screen-loader"
 import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
 
@@ -36,7 +35,7 @@ function AppRoutes() {
   const { loading: orgLoading } = useOrganization()
 
   if (authLoading || orgLoading) {
-    return <FullScreenLoader />
+    return null
   }
 
   const isClient = role === "client"
