@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { hasPermission } from '@/lib/rbac'
@@ -36,6 +36,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isPinVerified, setIsPinVerified] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Use refs to keep track of current state for stable callbacks
+  const userRef = useRef<User | null>(null)
+  const roleRef = useRef<string | null>(null)
+  const organizationIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    userRef.current = user
+    roleRef.current = role
+    organizationIdRef.current = organizationId
+  }, [user, role, organizationId])
+
   const isPinBlacklisted = useCallback((pinToCheck: string) => {
     if (!pinToCheck) return false
     const sanitizedPin = pinToCheck.toString().trim()
@@ -43,10 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logPinAttempt = useCallback(async (pinEntered: string, type: string, success: boolean) => {
-    if (!user) return
+    const currentUser = userRef.current
+    if (!currentUser) return
     try {
       await supabase.from('pin_logs').insert({
-        user_id: user.id,
+        user_id: currentUser.id,
         pin_entered: pinEntered,
         attempt_type: type,
         is_success: success
@@ -54,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error logging pin attempt:', error)
     }
-  }, [user])
+  }, []) // No deps needed as it uses ref
 
   const fetchData = useCallback(async (userId: string) => {
     console.log('AuthProvider: Starting fetchData for', userId)
@@ -91,15 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSession = useCallback(async (currentSession: Session | null, source: string) => {
     console.log(`AuthProvider: handleSession from ${source}, session exists:`, !!currentSession)
     
-    const prevUserId = user?.id
+    const prevUserId = userRef.current?.id
     setSession(currentSession)
     setUser(currentSession?.user ?? null)
     
     if (currentSession?.user) {
       // Only set loading to true if we don't have a user yet or the user changed
-      // This prevents flickers on background token refreshes
       const isNewUser = currentSession.user.id !== prevUserId
-      const hasProfileData = !!role && !!organizationId
+      const hasProfileData = !!roleRef.current && !!organizationIdRef.current
       
       if (isNewUser || !hasProfileData) {
         setLoading(true)
@@ -127,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log(`AuthProvider: handleSession ${source} (no user) - setting loading to false`)
       setLoading(false)
     }
-  }, [fetchData, user, role, organizationId])
+  }, [fetchData]) // Stable dependency!
 
   useEffect(() => {
     let mounted = true

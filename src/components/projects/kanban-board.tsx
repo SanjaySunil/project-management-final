@@ -398,7 +398,7 @@ export function KanbanBoard({
       {isLoading ? (
         <div className="flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0 px-4 lg:px-6">
           {COLUMNS.map((column) => (
-            <div key={column.id} className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2">
+            <div key={column.id} className="flex h-full w-80 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-4 w-20" />
@@ -509,7 +509,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
   return (
     <div 
       ref={setNodeRef}
-      className="flex h-full w-72 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2"
+      className="flex h-full w-80 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2"
     >
       <div className="flex items-center justify-between px-1 mb-1">
         <div className="flex items-center gap-2">
@@ -733,7 +733,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
         </div>
         
         <div className="flex items-start justify-between gap-2">
-          <h4 className="text-sm font-semibold leading-tight line-clamp-3">
+          <h4 className="text-sm font-semibold leading-tight">
             {task.title}
           </h4>
           {!isOverlay && (
@@ -852,7 +852,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                       <IconCircle className="size-3" />
                     )}
                   </button>
-                  <span className={`truncate flex-1 ${st.status === 'complete' ? 'line-through text-muted-foreground/60' : ''}`}>
+                  <span className={`flex-1 ${st.status === 'complete' ? 'line-through text-muted-foreground/60' : ''}`}>
                     {st.title}
                   </span>
                 </div>

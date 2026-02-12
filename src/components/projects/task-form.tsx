@@ -405,7 +405,7 @@ export function TaskForm({
                       <IconCircle className="size-4" />
                     )}
                   </Button>
-                  <span className={`text-sm truncate flex-1 ${st.status === 'complete' ? 'line-through text-muted-foreground' : ''}`}>
+                  <span className={`text-sm flex-1 ${st.status === 'complete' ? 'line-through text-muted-foreground' : ''}`}>
                     {st.title}
                   </span>
                 </div>
@@ -417,7 +417,7 @@ export function TaskForm({
                   <div className="size-5 shrink-0 flex items-center justify-center">
                     <IconCircle className="size-4 text-muted-foreground opacity-50" />
                   </div>
-                  <span className="text-sm truncate flex-1">
+                  <span className="text-sm flex-1">
                     {title}
                   </span>
                   <Button

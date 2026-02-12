@@ -4,7 +4,8 @@ import {
   IconFileText,
   IconTrash,
   IconEdit,
-  IconCalendar
+  IconCalendar,
+  IconLayoutKanban
 } from "@tabler/icons-react"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,7 @@ interface DocumentsTableProps {
   data: Document[]
   onEdit: (doc: Document) => void
   onDelete: (id: string) => void
+  onConvertToTasks?: (doc: Document) => void
   onAdd: () => void
   isLoading?: boolean
 }
@@ -31,6 +33,7 @@ export function DocumentsTable({
   data, 
   onEdit, 
   onDelete, 
+  onConvertToTasks,
   onAdd,
   isLoading 
 }: DocumentsTableProps) {
@@ -96,10 +99,15 @@ export function DocumentsTable({
               <span className="sr-only">Open menu</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => onEdit(row.original)}>
               <IconEdit className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
+            {onConvertToTasks && (
+              <DropdownMenuItem onClick={() => onConvertToTasks(row.original)}>
+                <IconLayoutKanban className="mr-2 h-4 w-4" /> Convert to Tasks
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem 
                 variant="destructive" 
