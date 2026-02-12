@@ -535,7 +535,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
         items={tasks.map((t) => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="flex flex-1 flex-col gap-2 overflow-y-auto min-h-0 pr-0.5 custom-scrollbar">
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden min-h-0 pr-0.5 custom-scrollbar">
           {tasks.map((task) => (
             <SortableTaskCard 
               key={task.id} 
@@ -733,7 +733,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
         </div>
         
         <div className="flex items-start justify-between gap-2">
-          <h4 className="text-sm font-semibold leading-tight">
+          <h4 className="text-sm font-semibold leading-tight flex-1 min-w-0 break-words">
             {task.title}
           </h4>
           {!isOverlay && (
@@ -811,7 +811,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
         </div>
 
         {task.description && (
-          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed break-words">
             {task.description}
           </p>
         )}
@@ -828,7 +828,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                 style={{ width: `${subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0}%` }}
               />
             </div>
-            <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-0.5 max-h-24 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
               {subtasks.map(st => (
                 <div 
                   key={st.id} 
@@ -852,7 +852,10 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                       <IconCircle className="size-3" />
                     )}
                   </button>
-                  <span className={`flex-1 ${st.status === 'complete' ? 'line-through text-muted-foreground/60' : ''}`}>
+                  <span className={cn(
+                    "flex-1 min-w-0 break-words",
+                    st.status === 'complete' && "line-through text-muted-foreground/60"
+                  )}>
                     {st.title}
                   </span>
                 </div>
@@ -867,7 +870,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                   <input
                     ref={inputRef}
                     type="text"
-                    className="flex-1 bg-muted border-none rounded px-1 py-0.5 text-[10px] focus:ring-1 focus:ring-primary outline-none"
+                    className="flex-1 min-w-0 bg-muted border-none rounded px-1 py-0.5 text-[10px] focus:ring-1 focus:ring-primary outline-none"
                     placeholder="Add subtask..."
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
