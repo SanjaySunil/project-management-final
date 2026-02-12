@@ -1,10 +1,16 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconExternalLink, IconGitPullRequest, IconCheck, IconClock, IconEdit, IconTrash } from "@tabler/icons-react"
+import { IconExternalLink, IconGitPullRequest, IconCheck, IconClock, IconEdit, IconTrash, IconDotsVertical } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Dialog,
   DialogContent,
@@ -153,16 +159,33 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
         if (error) throw error
         toast.success("Revision updated")
       } else {
+        let clientId = user.id
+
+        // If admin/employee, we need to find the project's client's profile ID
+        if (isAdminOrEmployee) {
+          const { data: projectData, error: projectError } = await supabase
+            .from("projects")
+            .select("clients!inner(user_id)")
+            .eq("id", projectId)
+            .single()
+
+          if (projectError) throw projectError
+          if (!projectData?.clients?.user_id) {
+            throw new Error("Could not find client for this project")
+          }
+          clientId = projectData.clients.user_id
+        }
+
         const { error } = await supabase.from("revisions").insert({
           phase_id: phaseId,
-          client_id: user.id,
+          client_id: clientId,
           title: values.title,
           description: values.description,
           status: "pending",
         })
 
         if (error) throw error
-        toast.success("Revision request submitted")
+        toast.success(isAdminOrEmployee ? "Revision created" : "Revision request submitted")
       }
 
       setIsCreateOpen(false)
@@ -271,28 +294,6 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
     return linkedTask?.status || revision.task?.status || "todo"
   }
 
-  const columns: ColumnDef<Revision>[] = [
-    {
-      accessorKey: "title",
-      header: "Title",
-      cell: ({ row }) => <div className="font-medium">{row.original.title}</div>,
-    },
-    {
-      accessorKey: "created_at",
-      header: "Requested On",
-      cell: ({ row }) => (
-        <div className="text-muted-foreground">
-          {new Date(row.original.created_at || "").toLocaleDateString()}
-        </div>
-      ),
-    },
-    {
-      id: "status",
-      header: "Status",
-      cell: ({ row }) => getStatusBadge(row.original),
-    },
-  ]
-
   const handleRowClick = (revision: Revision) => {
     setSelectedRevision(revision)
     setIsDetailOpen(true)
@@ -321,6 +322,71 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
     return false
   }
 
+  const columns = React.useMemo<ColumnDef<Revision>[]>(() => [
+    {
+      accessorKey: "title",
+      header: "Title",
+      cell: ({ row }) => <div className="font-medium">{row.original.title}</div>,
+    },
+    {
+      accessorKey: "created_at",
+      header: "Requested On",
+      cell: ({ row }) => (
+        <div className="text-muted-foreground">
+          {new Date(row.original.created_at || "").toLocaleDateString()}
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => getStatusBadge(row.original),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const revision = row.original
+        const canEditRevision = canEdit(revision)
+        const canDeleteRevision = canDelete(revision)
+
+        if (!canEditRevision && !canDeleteRevision) return null
+
+        return (
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <IconDotsVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canEditRevision && (
+                  <DropdownMenuItem onClick={() => handleEdit(revision)}>
+                    <IconEdit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {canDeleteRevision && (
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => {
+                      setSelectedRevision(revision)
+                      setIsDeleteConfirmOpen(true)
+                    }}
+                  >
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      },
+    },
+  ], [isAdminOrEmployee, isClient, user?.id, tasks])
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -335,11 +401,11 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
         onRowClick={handleRowClick}
         searchPlaceholder="Search revisions..."
         addLabel="New Revision"
-        onAdd={isClient ? () => {
+        onAdd={() => {
           setIsEditing(false)
           form.reset({ title: "", description: "" })
           setIsCreateOpen(true)
-        } : undefined}
+        }}
       />
 
       {/* Revision Details Dialog */}
@@ -424,9 +490,9 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Revision" : "Request a Revision"}</DialogTitle>
+            <DialogTitle>{isEditing ? "Edit Revision" : isAdminOrEmployee ? "Create Revision" : "Request a Revision"}</DialogTitle>
             <DialogDescription>
-              {isEditing ? "Update the details of your revision request." : "Describe the changes you would like to see."}
+              {isEditing ? "Update the details of the revision." : isAdminOrEmployee ? "Add a new revision to this phase." : "Describe the changes you would like to see."}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -452,7 +518,7 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Detailed description of the requested changes..." 
+                        placeholder={isAdminOrEmployee ? "Detailed description of the changes..." : "Detailed description of the requested changes..."}
                         className="min-h-[120px]"
                         {...field} 
                       />
@@ -466,7 +532,7 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Submitting..." : isEditing ? "Save Changes" : "Submit Request"}
+                  {isSubmitting ? "Submitting..." : isEditing ? "Save Changes" : isAdminOrEmployee ? "Create Revision" : "Submit Request"}
                 </Button>
               </div>
             </form>
@@ -506,7 +572,6 @@ export function RevisionsManager({ phaseId, projectId, members, tasks }: Revisio
         title="Delete Revision"
         description="Are you sure you want to delete this revision request? This action cannot be undone."
         onConfirm={onDeleteRevision}
-        isLoading={isSubmitting}
         variant="destructive"
       />
     </div>
