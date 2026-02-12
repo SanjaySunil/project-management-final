@@ -606,18 +606,17 @@ function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAdd
     transition,
   }
 
-  if (isDragging) {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className="h-[100px] rounded-lg border-2 border-primary bg-primary/5 opacity-30"
-      />
-    )
-  }
-
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes} 
+      {...listeners}
+      className={cn(
+        "outline-none touch-none",
+        isDragging && "opacity-0"
+      )}
+    >
       <TaskCard 
         task={task} 
         members={members} 
@@ -695,7 +694,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
 
         <div className="flex items-center gap-1.5">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
               <button className="focus:outline-none">
                 {task.type === 'bug' ? (
                   <Badge variant="destructive" className="h-4 px-1 text-[9px] gap-0.5 flex items-center uppercase font-bold tracking-wider">
@@ -747,6 +746,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                     e.stopPropagation()
                     setIsAddingSubtask(true)
                   }}
+                  onPointerDown={(e) => e.stopPropagation()}
                 >
                   <IconPlus className="size-3" />
                 </Button>
@@ -758,6 +758,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                     size="icon"
                     className="size-6 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
                     onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                   >
                     <IconAlarm className="size-3" />
                   </Button>
@@ -792,6 +793,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                   e.stopPropagation()
                   onShare(task)
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <IconShare className="size-3" />
               </Button>
@@ -803,6 +805,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                   e.stopPropagation()
                   onDelete()
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <IconTrash className="size-3" />
               </Button>
@@ -845,6 +848,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                       e.stopPropagation()
                       onUpdate(st.id, { status: st.status === 'complete' ? 'todo' : 'complete' })
                     }}
+                    onPointerDown={(e) => e.stopPropagation()}
                   >
                     {st.status === 'complete' ? (
                       <IconCircleCheck className="size-3 text-green-500" />
@@ -865,6 +869,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                 <form 
                   onSubmit={handleQuickAdd}
                   onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="flex items-center gap-1 mt-0.5"
                 >
                   <input
@@ -909,7 +914,7 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
               })
             ) : (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
                   <Button variant="ghost" className="h-6 p-0 hover:bg-transparent flex items-center gap-1.5">
                     <Avatar className="h-5 w-5 border border-background">
                       <AvatarImage src={task.profiles?.avatar_url || undefined} />
