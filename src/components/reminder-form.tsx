@@ -20,9 +20,7 @@ import { BellOff } from "lucide-react"
 const reminderSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  date: z.date({
-    required_error: "A date is required.",
-  }),
+  date: z.date(),
   time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Please enter a valid time (HH:MM)"),
   link: z.string().optional(),
 })

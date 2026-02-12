@@ -1,12 +1,14 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconLayoutKanban, IconPlus } from "@tabler/icons-react"
+import { IconLayoutKanban, IconPlus, IconTable } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
 import { Button } from "@/components/ui/button"
 import { KanbanBoard, type Task } from "@/components/projects/kanban-board"
+import { TasksTable } from "@/components/projects/tasks-table"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   Dialog,
   DialogContent,
@@ -34,6 +36,7 @@ export default function TasksPage() {
   const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
+  const [viewMode, setViewMode] = React.useState<"kanban" | "table">("kanban")
 
   const fetchInitialData = React.useCallback(async () => {
     if (!user || authLoading) return
@@ -597,6 +600,21 @@ export default function TasksPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <ToggleGroup 
+                type="single" 
+                value={viewMode} 
+                onValueChange={(v) => v && setViewMode(v as "kanban" | "table")}
+                className="border rounded-lg p-1 bg-muted/50"
+              >
+                <ToggleGroupItem value="kanban" className="h-8 px-3 gap-2 data-[state=on]:bg-background">
+                  <IconLayoutKanban className="size-4" />
+                  <span className="text-xs font-medium">Kanban</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="table" className="h-8 px-3 gap-2 data-[state=on]:bg-background">
+                  <IconTable className="size-4" />
+                  <span className="text-xs font-medium">Table</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
               <Button onClick={() => handleTaskCreateTrigger("todo")} size="sm">
                 <IconPlus className="mr-2 h-4 w-4" />
                 Add Task
@@ -606,18 +624,43 @@ export default function TasksPage() {
         </div>
 
         <div className="flex-1 min-h-0">
-          <KanbanBoard 
-            tasks={tasks} 
-            members={members}
-            onTaskUpdate={handleTaskUpdate}
-            onTaskCreate={handleTaskCreateTrigger}
-            onTaskQuickCreate={handleTaskQuickCreate}
-            onTaskEdit={handleTaskEditTrigger}
-            onTaskDelete={handleTaskDelete}
-            isLoading={isLoading}
-            mode={kanbanMode}
-            onModeChange={setKanbanMode}
-          />
+          {viewMode === "kanban" ? (
+            <KanbanBoard 
+              tasks={tasks} 
+              members={members}
+              onTaskUpdate={handleTaskUpdate}
+              onTaskCreate={handleTaskCreateTrigger}
+              onTaskQuickCreate={handleTaskQuickCreate}
+              onTaskEdit={handleTaskEditTrigger}
+              onTaskDelete={handleTaskDelete}
+              isLoading={isLoading}
+              mode={kanbanMode}
+              onModeChange={setKanbanMode}
+            />
+          ) : (
+            <TasksTable 
+              tasks={tasks}
+              onTaskEdit={handleTaskEditTrigger}
+              onTaskDelete={handleTaskDelete}
+              onTaskUpdate={handleTaskUpdate}
+              onShare={(task) => {
+                const shareData = {
+                  title: task.title,
+                  text: task.description || task.title,
+                  url: `${window.location.origin}/dashboard/tasks?taskId=${task.id}`,
+                }
+                if (navigator.share && navigator.canShare(shareData)) {
+                  navigator.share(shareData).catch(err => {
+                    if (err.name !== 'AbortError') toast.error("Failed to share task")
+                  })
+                } else {
+                  navigator.clipboard.writeText(shareData.url)
+                  toast.success("Link copied to clipboard")
+                }
+              }}
+              isLoading={isLoading}
+            />
+          )}
         </div>
       </div>
 

@@ -91,19 +91,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSession = useCallback(async (currentSession: Session | null, source: string) => {
     console.log(`AuthProvider: handleSession from ${source}, session exists:`, !!currentSession)
     
+    const prevUserId = user?.id
     setSession(currentSession)
     setUser(currentSession?.user ?? null)
     
     if (currentSession?.user) {
-      setLoading(true)
+      // Only set loading to true if we don't have a user yet or the user changed
+      // This prevents flickers on background token refreshes
+      const isNewUser = currentSession.user.id !== prevUserId
+      const hasProfileData = !!role && !!organizationId
+      
+      if (isNewUser || !hasProfileData) {
+        setLoading(true)
+      }
+      
       console.log('AuthProvider: User detected, starting fetchData (non-blocking)...')
-      // Don't await fetchData here if we want to ensure loading is set to false eventually
-      // But we DO want the role before we say we are finished loading.
-      // Let's use a timeout-wrapped promise.
+      
       const fetchDataWithTimeout = async () => {
         try {
-          // Give the connection a moment to stabilize if needed
-          await new Promise(resolve => setTimeout(resolve, 100));
           await fetchData(currentSession.user.id);
         } catch (e) {
           console.error('AuthProvider: Error in fetchData promise:', e);
@@ -122,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log(`AuthProvider: handleSession ${source} (no user) - setting loading to false`)
       setLoading(false)
     }
-  }, [fetchData])
+  }, [fetchData, user, role, organizationId])
 
   useEffect(() => {
     let mounted = true
@@ -178,20 +183,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timeout)
     }
   }, [handleSession])
-
-  // Require PIN re-entry when switching tabs/apps
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && isPinVerified) {
-        setIsPinVerified(false)
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [isPinVerified])
 
   const checkPermission = useCallback((action: string, resource: string) => {
     return hasPermission(role, action, resource)

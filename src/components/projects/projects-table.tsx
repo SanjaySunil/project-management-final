@@ -10,7 +10,7 @@ import {
   IconBrandGithub,
 } from "@tabler/icons-react"
 
-import { DataTable } from "@/components/data-table"
+import { DataTable, DragHandle } from "@/components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -70,6 +70,7 @@ interface ProjectsTableProps {
   disablePadding?: boolean
   onRowClick?: (project: ProjectWithClient) => void
   onAssignMembers?: (projectId: string, memberIds: string[]) => Promise<void>
+  onReorder?: (data: ProjectWithClient[]) => void
   defaultTab?: string
 }
 
@@ -84,6 +85,7 @@ export function ProjectsTable({
   disablePadding = true,
   onRowClick,
   onAssignMembers,
+  onReorder,
   defaultTab = "all",
 }: ProjectsTableProps) {
   const { checkPermission } = useAuth()
@@ -122,6 +124,13 @@ export function ProjectsTable({
   }
 
   const columns: ColumnDef<ProjectWithClient>[] = [
+    {
+      id: "drag-handle",
+      header: "",
+      cell: ({ row }) => (canUpdate && activeTab === "all") ? <DragHandle id={row.original.id} /> : null,
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       id: "select",
       header: ({ table }) => (
@@ -401,7 +410,8 @@ export function ProjectsTable({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onRowClick={onRowClick || onViewPhases}
-      defaultSorting={[{ id: "tasks", desc: true }]}
+      enableReordering={activeTab === "all" && canUpdate} // Only enable reordering on "All" tab and if user can update
+      onDataChange={onReorder}
     />
   )
 }

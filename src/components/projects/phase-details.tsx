@@ -3,7 +3,6 @@ import { toast } from "sonner"
 import { IconFileText, IconEdit, IconLayoutKanban, IconGitPullRequest } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PhaseForm } from "@/components/projects/phase-form"
@@ -746,6 +745,11 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
               </div>
             )}
             {getStatusBadge(phase.status)}
+            {isStaff && (
+              <Button onClick={() => setIsDialogOpen(true)} size="sm" variant="outline" className="gap-2 ml-2">
+                <IconEdit className="h-4 w-4" /> Edit Phase
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -753,11 +757,6 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col gap-4 min-h-0">
         <div className="px-4 lg:px-6 shrink-0">
           <TabsList className="w-fit">
-            {isStaff && (
-              <TabsTrigger value="overview" className="gap-2">
-                <IconFileText className="h-4 w-4" /> Overview
-              </TabsTrigger>
-            )}
             {isStaff && (
               <TabsTrigger value="kanban" className="gap-2">
                 <IconLayoutKanban className="h-4 w-4" /> Kanban
@@ -773,76 +772,6 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
             )}
           </TabsList>
         </div>
-
-        {isStaff && (
-          <TabsContent value="overview" className="flex-1 overflow-y-auto px-4 lg:px-6">
-            <div className="flex flex-col gap-6 pb-6">
-              {isStaff && (
-                <div className="flex justify-end">
-                  <Button onClick={() => setIsDialogOpen(true)} size="sm" className="gap-2">
-                    <IconEdit className="h-4 w-4" /> Edit Phase
-                  </Button>
-                </div>
-              )}
-              <div className="grid gap-6 md:grid-cols-3">
-                <Card className="md:col-span-2">
-                  <CardHeader><CardTitle>Description</CardTitle></CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground whitespace-pre-wrap">
-                      {phase.description || "No description provided."}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Created On</p>
-                      <p>{phase.created_at ? new Date(phase.created_at).toLocaleDateString() : "N/A"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Order Source</p>
-                      <p className="capitalize">{phase.order_source === "fiverr" ? "Fiverr" : "Direct (Bank Transfer)"}</p>
-                    </div>
-                    {isAdmin && phase.order_source === "fiverr" && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Commission (20%)</p>
-                        <p className="text-destructive">-${phase.commission_amount?.toLocaleString()}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Status</p>
-                      <p className="capitalize">{phase.status}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="md:col-span-3">
-                  <CardHeader>
-                    <CardTitle>Deliverables</CardTitle>
-                    <CardDescription>Included in this phase.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {deliverables.length > 0 ? (
-                      <div className="relative space-y-4 before:absolute before:inset-y-0 before:left-[17px] before:w-[2px] before:bg-muted">
-                        {deliverables.map((d, i) => (
-                          <div key={d.id} className="relative pl-10">
-                            <div className="absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border bg-background text-sm font-bold shadow-sm">{i+1}</div>
-                            <div className="flex flex-col gap-1">
-                              <h3 className="font-semibold">{d.title}</h3>
-                              {d.description && <p className="text-sm text-muted-foreground">{d.description}</p>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">No deliverables added.</div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-        )}
 
         {isStaff && (
           <TabsContent value="kanban" className="flex-1 min-h-0">

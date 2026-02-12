@@ -7,8 +7,7 @@ import {
   IconDotsVertical,
   IconPencil,
   IconTrash,
-  IconShare,
-  IconExternalLink
+  IconShare
 } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

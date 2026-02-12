@@ -102,7 +102,7 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
           supabase
             .from("profiles")
             .select("id, full_name, email, avatar_url")
-            .eq("role", "employee")
+            .neq("role", "client")
             .order("full_name", { ascending: true })
         ])
 

@@ -282,7 +282,7 @@ export default function ChatPage() {
 
       const [projectsRes, profilesRes] = await Promise.all([
         projectsQuery,
-        supabase.from("profiles").select("*").order("full_name")
+        supabase.from("profiles").select("*").neq('role', 'client').order("full_name")
       ])
       
       if (!projectsRes.error && projectsRes.data) {
@@ -290,12 +290,7 @@ export default function ChatPage() {
       }
 
       if (!profilesRes.error && profilesRes.data) {
-        // For clients, filter profiles to only show non-clients (admins/employees)
-        if (role === "client") {
-          setMembers((profilesRes.data as Profile[]).filter(p => p.role !== 'client'))
-        } else {
-          setMembers(profilesRes.data as Profile[])
-        }
+        setMembers(profilesRes.data as Profile[])
       }
     }
     fetchData()

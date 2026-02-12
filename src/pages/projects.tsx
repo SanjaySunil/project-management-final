@@ -33,7 +33,7 @@ export default function ProjectsPage() {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("role", "employee")
+        .neq("role", "client")
         .order("full_name", { ascending: true })
       
       if (error) throw error
@@ -78,16 +78,11 @@ export default function ProjectsPage() {
             )
           `)
           .eq("clients.user_id", user.id)
-          .order("updated_at", { ascending: false, nullsFirst: false })
+          .order("order_index", { ascending: true })
 
         if (error) throw error
         
         const projectsWithSync = (data as any) || []
-        projectsWithSync.sort((a: any, b: any) => {
-          const dateA = new Date(a.updated_at || a.created_at).getTime()
-          const dateB = new Date(b.updated_at || b.created_at).getTime()
-          return dateB - dateA
-        })
         
         setProjects(projectsWithSync)
         return
@@ -121,18 +116,11 @@ export default function ProjectsPage() {
         query = query.filter("project_members.user_id", "eq", user.id)
       }
 
-      const { data, error } = await query.order("updated_at", { ascending: false, nullsFirst: false })
+      const { data, error } = await query.order("order_index", { ascending: true })
 
       if (error) throw error
       
       const projectsWithSync = (data as any) || []
-      
-      // If any projects have null updated_at, fall back to created_at sorting
-      projectsWithSync.sort((a: any, b: any) => {
-        const dateA = new Date(a.updated_at || a.created_at).getTime()
-        const dateB = new Date(b.updated_at || b.created_at).getTime()
-        return dateB - dateA
-      })
       
       setProjects(projectsWithSync)
     } catch (error: any) {
@@ -142,6 +130,33 @@ export default function ProjectsPage() {
       setIsLoading(false)
     }
   }, [user, role, authLoading])
+
+  const handleReorder = async (reorderedProjects: ProjectWithClient[]) => {
+    // Update local state immediately for optimistic UI
+    setProjects(reorderedProjects)
+
+    try {
+      const updates = reorderedProjects.map((project, index) => ({
+        id: project.id,
+        name: project.name,
+        order_index: index,
+        updated_at: new Date().toISOString(),
+      }))
+
+      // Use upsert to update multiple rows
+      // We need to provide the primary key 'id' for upsert to act as update
+      const { error } = await supabase
+        .from("projects")
+        .upsert(updates)
+
+      if (error) throw error
+    } catch (error: any) {
+      console.error("Failed to save project order:", error)
+      toast.error("Failed to save project order: " + error.message)
+      // Revert to original order if failed
+      fetchProjects()
+    }
+  }
 
   React.useEffect(() => {
     fetchProjects()
@@ -252,9 +267,13 @@ export default function ProjectsPage() {
         // Update members using the helper logic (which now includes admins)
         await handleAssignMembers(projectId, member_ids || [])
       } else {
+        // For new projects, set order_index to the end of the list
         const { data, error } = await supabase
           .from("projects")
-          .insert([projectValues])
+          .insert([{ 
+            ...projectValues,
+            order_index: projects.length 
+          }])
           .select()
           .single()
         if (error) throw error
@@ -301,6 +320,7 @@ export default function ProjectsPage() {
             onViewPhases={handleViewDetails}
             onRowClick={handleViewDetails}
             onAssignMembers={handleAssignMembers}
+            onReorder={handleReorder}
             defaultTab="active"
           />
         </div>

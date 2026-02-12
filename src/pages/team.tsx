@@ -67,11 +67,13 @@ export default function TeamPage() {
   const canCreateMember = canManageUsers(role)
 
   const fetchProfiles = useCallback(async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .eq('organization_id', organizationId)
         .neq('role', 'client')
         .order('role', { ascending: false })
 

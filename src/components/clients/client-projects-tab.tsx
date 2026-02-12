@@ -34,7 +34,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("role", "employee")
+        .neq("role", "client")
         .order("full_name", { ascending: true })
       
       if (error) throw error
@@ -78,18 +78,11 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
         query = query.filter("project_members.user_id", "eq", user.id)
       }
 
-      const { data, error } = await query.order("updated_at", { ascending: false, nullsFirst: false })
+      const { data, error } = await query.order("order_index", { ascending: true })
 
       if (error) throw error
       const projectsData = (data as any) || []
       
-      // If any projects have null updated_at, fall back to created_at sorting
-      projectsData.sort((a: any, b: any) => {
-        const dateA = new Date(a.updated_at || a.created_at).getTime()
-        const dateB = new Date(b.updated_at || b.created_at).getTime()
-        return dateB - dateA
-      })
-
       setProjects(projectsData)
     } catch (error: any) {
       toast.error("Failed to fetch projects: " + error.message)
@@ -214,7 +207,10 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
       } else {
         const { data, error } = await supabase
           .from("projects")
-          .insert([projectData])
+          .insert([{
+            ...projectData,
+            order_index: projects.length
+          }])
           .select()
           .single()
         if (error) throw error

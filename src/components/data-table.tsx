@@ -4,6 +4,7 @@ import {
   DndContext,
   KeyboardSensor,
   MouseSensor,
+  PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -80,23 +81,34 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
+// Create a context to share sortable attributes and listeners with cells
+const SortableRowContext = React.createContext<{
+  attributes: any
+  listeners: any
+  setActivatorNodeRef: (element: HTMLElement | null) => void
+  isDragging?: boolean
+} | null>(null)
+
 // Create a separate component for the drag handle
 export function DragHandle({ id }: { id: UniqueIdentifier }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  })
+  const context = React.useContext(SortableRowContext)
+  
+  // Use useSortable if not within a context (fallback)
+  const sortable = useSortable({ id })
+  
+  const { attributes, listeners, setActivatorNodeRef } = context || sortable
 
   return (
-    <Button
+    <div
+      ref={setActivatorNodeRef}
       {...attributes}
       {...listeners}
-      variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
+      data-drag-handle="true"
+      className="text-muted-foreground size-8 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
     >
-      <IconGripVertical className="text-muted-foreground size-3" />
+      <IconGripVertical className="size-4" />
       <span className="sr-only">Drag to reorder</span>
-    </Button>
+    </div>
   )
 }
 
@@ -107,37 +119,47 @@ function DraggableRow<TData extends { id: string | number }>({
   row: Row<TData>,
   onRowClick?: (row: TData) => void
 }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
+  const { 
+    transform, 
+    transition, 
+    setNodeRef, 
+    isDragging,
+    attributes,
+    listeners,
+    setActivatorNodeRef
+  } = useSortable({
     id: row.original.id,
   })
 
   return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className={cn(
-        "relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80",
-        onRowClick && "cursor-pointer hover:bg-muted/50"
-      )}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-      onClick={() => onRowClick?.(row.original)}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id} onClick={(e) => {
-          // Prevent row click if clicking on a button, checkbox or dropdown
-          const target = e.target as HTMLElement
-          if (target.closest('button') || target.closest('input[type="checkbox"]') || target.closest('[role="menuitem"]')) {
-            e.stopPropagation()
-          }
-        }}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
+    <SortableRowContext.Provider value={{ attributes, listeners, setActivatorNodeRef, isDragging }}>
+      <TableRow
+        data-state={row.getIsSelected() && "selected"}
+        data-dragging={isDragging}
+        ref={setNodeRef}
+        className={cn(
+          "relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80",
+          onRowClick && "cursor-pointer hover:bg-muted/50"
+        )}
+        style={{
+          transform: CSS.Transform.toString(transform),
+          transition: transition,
+        }}
+        onClick={() => onRowClick?.(row.original)}
+      >
+        {row.getVisibleCells().map((cell) => (
+          <TableCell key={cell.id} onClick={(e) => {
+            // Prevent row click if clicking on a button, checkbox or dropdown
+            const target = e.target as HTMLElement
+            if (target.closest('button') || target.closest('input[type="checkbox"]') || target.closest('[role="menuitem"]') || target.closest('[data-drag-handle="true"]')) {
+              e.stopPropagation()
+            }
+          }}>
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        ))}
+      </TableRow>
+    </SortableRowContext.Provider>
   )
 }
 
@@ -251,8 +273,18 @@ export function DataTable<TData extends { id: string | number }> ({
 
   const sortableId = React.useId()
   const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
     useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {})
   )
 

@@ -743,6 +743,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          order_index: number | null
           source_repo: string | null
           status: string | null
           updated_at: string | null
@@ -755,6 +756,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          order_index?: number | null
           source_repo?: string | null
           status?: string | null
           updated_at?: string | null
@@ -767,6 +769,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          order_index?: number | null
           source_repo?: string | null
           status?: string | null
           updated_at?: string | null
@@ -802,6 +805,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reminders: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_sent: boolean
+          link: string | null
+          remind_at: string
+          task_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_sent?: boolean
+          link?: string | null
+          remind_at: string
+          task_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_sent?: boolean
+          link?: string | null
+          remind_at?: string
+          task_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       revisions: {
         Row: {
