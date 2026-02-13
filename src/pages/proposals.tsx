@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { PageContainer } from "@/components/page-container"
 import { SEO } from "@/components/seo"
 import { PhasesTable } from "@/components/projects/phases-table"
+import { PhaseDetailsModal } from "@/components/projects/phase-details-modal"
 import type { Tables } from "@/lib/database.types"
 
 type Phase = Tables<"phases">
@@ -15,6 +16,8 @@ export default function ProposalsPage() {
   const { user, role, loading: authLoading } = useAuth()
   const [phases, setPhases] = React.useState<any[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
+  const [viewingPhase, setViewingPhase] = React.useState<Phase | null>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = React.useState(false)
 
   const fetchPhases = React.useCallback(async () => {
     if (!user || authLoading) return
@@ -73,7 +76,8 @@ export default function ProposalsPage() {
   }, [fetchPhases])
 
   const handleViewPhase = (phase: Phase) => {
-    navigate(`/dashboard/projects/${phase.project_id}/phases/${phase.id}`)
+    setViewingPhase(phase)
+    setIsViewModalOpen(true)
   }
 
   return (
@@ -95,6 +99,16 @@ export default function ProposalsPage() {
           />
         </div>
       </div>
+
+      <PhaseDetailsModal
+        phase={viewingPhase}
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false)
+          setViewingPhase(null)
+        }}
+        projectId={viewingPhase?.project_id || ""}
+      />
     </PageContainer>
   )
 }

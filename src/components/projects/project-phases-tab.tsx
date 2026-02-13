@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { PhasesTable } from "@/components/projects/phases-table"
 import { PhaseForm } from "@/components/projects/phase-form"
+import { PhaseDetailsModal } from "@/components/projects/phase-details-modal"
 import type { Deliverable } from "@/components/projects/deliverables-manager"
 import {
   Dialog,
@@ -27,6 +28,8 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
   const [isLoading, setIsLoading] = React.useState(true)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [editingPhase, setEditingPhase] = React.useState<Phase | null>(null)
+  const [viewingPhase, setViewingPhase] = React.useState<Phase | null>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = React.useState(false)
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>([])
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
@@ -103,6 +106,11 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
       setDeliverables([])
     }
     setIsDialogOpen(true)
+  }
+
+  const handleView = (phase: Phase) => {
+    setViewingPhase(phase)
+    setIsViewModalOpen(true)
   }
 
   const handleStatusChange = async (id: string, status: string) => {
@@ -228,9 +236,20 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
         projectId={projectId}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onView={handleView}
         onStatusChange={handleStatusChange}
         onDataChange={handleReorder}
         isLoading={isLoading}
+      />
+
+      <PhaseDetailsModal
+        phase={viewingPhase}
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false)
+          setViewingPhase(null)
+        }}
+        projectId={projectId}
       />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
