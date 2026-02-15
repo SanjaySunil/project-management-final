@@ -19,10 +19,10 @@ interface Reminder {
   title: string
   description: string | null
   remind_at: string
-  is_sent: boolean
+  is_sent: boolean | null
   task_id: string | null
   link: string | null
-  created_at: string
+  created_at: string | null
 }
 
 export default function RemindersPage() {
@@ -42,7 +42,7 @@ export default function RemindersPage() {
         .order('remind_at', { ascending: true })
 
       if (error) throw error
-      setReminders(data || [])
+      setReminders(data as Reminder[] || [])
     } catch (error: any) {
       toast.error("Failed to fetch reminders: " + error.message)
     } finally {
@@ -70,7 +70,7 @@ export default function RemindersPage() {
   }
 
   const upcomingReminders = reminders.filter(r => !r.is_sent)
-  const pastReminders = reminders.filter(r => r.is_sent)
+  const pastReminders = reminders.filter(r => !!r.is_sent)
 
   return (
     <PageContainer>
@@ -174,8 +174,9 @@ function ReminderCard({
   reminder: Reminder, 
   onDelete: (id: string) => void 
 }) {
+  const isSent = !!reminder.is_sent;
   return (
-    <Card className={reminder.is_sent ? "bg-muted/30" : "bg-card"}>
+    <Card className={isSent ? "bg-muted/30" : "bg-card"}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start gap-2">
           <CardTitle className="text-base line-clamp-1">{reminder.title}</CardTitle>
@@ -207,7 +208,7 @@ function ReminderCard({
               Reference Link
             </Link>
           )}
-          {reminder.is_sent && (
+          {isSent && (
             <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1">Sent</Badge>
           )}
         </div>

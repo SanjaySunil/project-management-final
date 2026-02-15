@@ -10,7 +10,6 @@ import {
 } from "@tabler/icons-react"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
@@ -65,7 +64,7 @@ export function DocumentsTable({
       header: "Preview",
       cell: ({ row }) => {
         const content = row.original.content || ""
-        const isConverted = row.original.is_converted
+        const isConverted = !!row.original.is_converted
         const lines = content.split("\n").filter(l => l.trim() !== "")
         return (
           <div className="max-w-[400px] truncate text-muted-foreground text-sm">
@@ -121,7 +120,7 @@ export function DocumentsTable({
             {onConvertToTasks && (
               <DropdownMenuItem 
                 onClick={() => onConvertToTasks(row.original)}
-                disabled={row.original.is_converted}
+                disabled={row.original.is_converted ?? false}
               >
                 <IconLayoutKanban className="mr-2 h-4 w-4" /> 
                 {row.original.is_converted ? "Already Converted" : "Convert to Tasks"}

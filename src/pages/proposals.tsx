@@ -1,5 +1,4 @@
 import * as React from "react"
-import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/use-auth"
@@ -12,7 +11,6 @@ import type { Tables } from "@/lib/database.types"
 type Phase = Tables<"phases">
 
 export default function ProposalsPage() {
-  const navigate = useNavigate()
   const { user, role, loading: authLoading } = useAuth()
   const [phases, setPhases] = React.useState<any[]>([])
   const [isLoading, setIsLoading] = React.useState(true)

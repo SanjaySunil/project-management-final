@@ -256,6 +256,7 @@ export type Database = {
           content: string | null
           created_at: string | null
           id: string
+          is_converted: boolean | null
           project_id: string
           title: string
           updated_at: string | null
@@ -265,6 +266,7 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           id?: string
+          is_converted?: boolean | null
           project_id: string
           title: string
           updated_at?: string | null
@@ -274,6 +276,7 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           id?: string
+          is_converted?: boolean | null
           project_id?: string
           title?: string
           updated_at?: string | null
@@ -808,36 +811,39 @@ export type Database = {
       }
       reminders: {
         Row: {
-          created_at: string
+          created_at: string | null
           description: string | null
           id: string
-          is_sent: boolean
+          is_sent: boolean | null
           link: string | null
           remind_at: string
           task_id: string | null
           title: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
-          is_sent?: boolean
+          is_sent?: boolean | null
           link?: string | null
           remind_at: string
           task_id?: string | null
           title: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
-          is_sent?: boolean
+          is_sent?: boolean | null
           link?: string | null
           remind_at?: string
           task_id?: string | null
           title?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -859,7 +865,7 @@ export type Database = {
       }
       revisions: {
         Row: {
-          client_id: string
+          client_id: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -870,7 +876,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          client_id: string
+          client_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -881,7 +887,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          client_id?: string
+          client_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
