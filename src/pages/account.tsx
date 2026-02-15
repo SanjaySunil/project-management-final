@@ -209,7 +209,7 @@ export default function AccountPage() {
                 <CardHeader>
                   <CardTitle>Security PIN</CardTitle>
                   <CardDescription>
-                    Update your 4-digit security PIN for page refreshes.
+                    Update your 4-digit security PIN for account access.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 flex flex-col items-center">

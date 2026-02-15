@@ -45,6 +45,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRef.current = user
     roleRef.current = role
     organizationIdRef.current = organizationId
+    
+    // Check localStorage for PIN verification status when user changes
+    if (user) {
+      const isVerified = localStorage.getItem(`pin_verified_${user.id}`) === 'true'
+      if (isVerified) {
+        setIsPinVerified(true)
+      }
+    }
   }, [user, role, organizationId])
 
   const isPinBlacklisted = useCallback((pinToCheck: string) => {
@@ -131,6 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       fetchDataWithTimeout();
     } else {
+      if (userRef.current) {
+        localStorage.removeItem(`pin_verified_${userRef.current.id}`)
+      }
       setRole(null)
       setOrganizationId(null)
       setPinState(null)
@@ -200,14 +211,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [role])
 
   const signOut = async () => {
+    if (user) {
+      localStorage.removeItem(`pin_verified_${user.id}`)
+    }
     await supabase.auth.signOut()
   }
 
   const verifyPin = async (enteredPin: string) => {
     const success = enteredPin === pin
     await logPinAttempt(enteredPin, 'verification', success)
-    if (success) {
+    if (success && user) {
       setIsPinVerified(true)
+      localStorage.setItem(`pin_verified_${user.id}`, 'true')
     }
     return success
   }
@@ -234,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await logPinAttempt(sanitizedPin, isInitial ? 'setup' : 'update', true)
     setPinState(sanitizedPin)
     setIsPinVerified(true)
+    localStorage.setItem(`pin_verified_${user.id}`, 'true')
   }
 
   const resetPin = async (password: string) => {
@@ -264,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await logPinAttempt('', 'reset_success', true)
     setPinState(null)
     setIsPinVerified(false)
+    localStorage.removeItem(`pin_verified_${user.id}`)
   }
 
   const value = {
