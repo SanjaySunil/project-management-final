@@ -5,10 +5,13 @@ import {
   IconTrash,
   IconEdit,
   IconCalendar,
-  IconLayoutKanban
+  IconLayoutKanban,
+  IconCheck
 } from "@tabler/icons-react"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +49,14 @@ export function DocumentsTable({
           <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/10 text-primary">
             <IconFileText className="h-4 w-4" />
           </div>
-          <span className="font-medium">{row.original.title}</span>
+          <div className="flex flex-col">
+            <span className="font-medium">{row.original.title}</span>
+            {row.original.is_converted && (
+              <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5">
+                <IconCheck className="h-2.5 w-2.5" /> Converted to Tasks
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
@@ -55,6 +65,7 @@ export function DocumentsTable({
       header: "Preview",
       cell: ({ row }) => {
         const content = row.original.content || ""
+        const isConverted = row.original.is_converted
         const lines = content.split("\n").filter(l => l.trim() !== "")
         return (
           <div className="max-w-[400px] truncate text-muted-foreground text-sm">
@@ -62,8 +73,12 @@ export function DocumentsTable({
               <div className="flex flex-col gap-0.5">
                 {lines.slice(0, 2).map((line, i) => (
                   <div key={i} className="flex items-center gap-2 truncate">
-                    <div className="h-1 w-1 rounded-full bg-muted-foreground shrink-0" />
-                    <span className="truncate">{line}</span>
+                    {isConverted ? (
+                      <IconCheck className="h-3 w-3 text-green-500 shrink-0" />
+                    ) : (
+                      <div className="h-1 w-1 rounded-full bg-muted-foreground shrink-0" />
+                    )}
+                    <span className={cn("truncate", isConverted && "text-muted-foreground/70")}>{line}</span>
                   </div>
                 ))}
                 {lines.length > 2 && <span className="text-xs ml-3">+{lines.length - 2} more...</span>}
@@ -104,8 +119,12 @@ export function DocumentsTable({
               <IconEdit className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
             {onConvertToTasks && (
-              <DropdownMenuItem onClick={() => onConvertToTasks(row.original)}>
-                <IconLayoutKanban className="mr-2 h-4 w-4" /> Convert to Tasks
+              <DropdownMenuItem 
+                onClick={() => onConvertToTasks(row.original)}
+                disabled={row.original.is_converted}
+              >
+                <IconLayoutKanban className="mr-2 h-4 w-4" /> 
+                {row.original.is_converted ? "Already Converted" : "Convert to Tasks"}
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />

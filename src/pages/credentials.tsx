@@ -31,7 +31,7 @@ export default function CredentialsPage() {
       const { data, error } = await supabase
         .from("credentials")
         .select("*, projects(name)")
-        .is("user_id", null)
+        .not("project_id", "is", null)
         .order("created_at", { ascending: false })
 
       if (error) throw error

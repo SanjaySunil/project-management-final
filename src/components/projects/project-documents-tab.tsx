@@ -131,9 +131,16 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
 
       if (error) throw error
 
+      // Mark document as converted
+      await supabase
+        .from("documents")
+        .update({ is_converted: true })
+        .eq("id", convertingDocument.id)
+
       toast.success(`Successfully converted ${lines.length} bullet points to tasks.`)
       setIsConvertDialogOpen(false)
       setConvertingDocument(null)
+      fetchDocuments()
     } catch (error: any) {
       toast.error("Failed to convert to tasks: " + error.message)
     } finally {
