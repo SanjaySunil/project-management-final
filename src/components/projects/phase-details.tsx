@@ -774,7 +774,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         </div>
 
         {isStaff && (
-          <TabsContent value="kanban" className="flex-1 min-h-0">
+          <TabsContent value="kanban" className="flex-1 min-h-0 flex flex-col">
             <div className="flex flex-col h-full overflow-hidden">
               <KanbanBoard 
                 tasks={tasks} 

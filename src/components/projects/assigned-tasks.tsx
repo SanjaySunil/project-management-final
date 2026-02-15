@@ -53,6 +53,7 @@ export function AssignedTasks({
   const targetUserId = (role === "client") ? currentUser?.id : (userId || currentUser?.id)
   
   const [mode, setMode] = React.useState<"project" | "personal">("project")
+  const [selectedProjectId, setSelectedProjectId] = React.useState<string>("all")
   const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
@@ -60,6 +61,23 @@ export function AssignedTasks({
   const [isLoading, setIsLoading] = React.useState(true)
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
+
+  // Memoize projects that have tasks assigned to this user
+  const projectsWithTasks = React.useMemo(() => {
+    if (mode !== "project") return []
+    const projectMap = new Map<string, { id: string, name: string }>()
+    tasks.forEach(task => {
+      const project = (task.phases as any)?.projects
+      if (project?.id && project?.name) {
+        projectMap.set(project.id, {
+          id: project.id,
+          name: project.name
+        })
+      }
+    })
+    return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [tasks, mode])
+
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
@@ -124,6 +142,7 @@ export function AssignedTasks({
               title,
               project_id,
               projects (
+                id,
                 name
               )
             ),
@@ -193,6 +212,7 @@ export function AssignedTasks({
                     title,
                     project_id,
                     projects (
+                      id,
                       name
                     )
                   ),
@@ -246,12 +266,19 @@ export function AssignedTasks({
   }, [targetUserId, mode, members])
 
   const filteredTasks = React.useMemo(() => {
-    if (statusFilter === "all") return tasks
-    if (statusFilter === "active") return tasks.filter(t => t.status !== "complete")
-    if (statusFilter === "complete") return tasks.filter(t => t.status === "complete")
+    let filtered = tasks
+
+    // Filter by project if in project mode
+    if (mode === "project" && selectedProjectId !== "all") {
+      filtered = filtered.filter(t => (t.phases as any)?.projects?.id === selectedProjectId)
+    }
+
+    if (statusFilter === "all") return filtered
+    if (statusFilter === "active") return filtered.filter(t => t.status !== "complete")
+    if (statusFilter === "complete") return filtered.filter(t => t.status === "complete")
     // If it's a specific status (e.g. "in progress")
-    return tasks.filter(t => t.status === statusFilter)
-  }, [tasks, statusFilter])
+    return filtered.filter(t => t.status === statusFilter)
+  }, [tasks, statusFilter, selectedProjectId, mode])
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
@@ -315,6 +342,7 @@ export function AssignedTasks({
             title,
             project_id,
             projects (
+              id,
               name
             )
           ),
@@ -341,7 +369,7 @@ export function AssignedTasks({
         
         const { data: createdSubtasks, error: subtasksError } = await (supabase.from as any)(table)
           .insert(subtasksToInsert)
-          .select(mode === "project" ? `*, phases(id, title, project_id, projects(name)), task_attachments(*)` : `*`)
+          .select(mode === "project" ? `*, phases(id, title, project_id, projects(id, name)), task_attachments(*)` : `*`)
 
         if (subtasksError) throw subtasksError
         
@@ -502,6 +530,7 @@ export function AssignedTasks({
             title,
             project_id,
             projects (
+              id,
               name
             )
           ),
@@ -556,7 +585,7 @@ export function AssignedTasks({
   }, [targetUserId, currentUser?.id, targetUser, mode])
 
   return (
-    <div className="flex flex-col gap-6 h-full overflow-hidden">
+    <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-hidden">
       {!hideHeader && (
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
           <div>
@@ -568,7 +597,10 @@ export function AssignedTasks({
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Tabs value={mode} onValueChange={(v) => setMode(v as "project" | "personal")}>
+            <Tabs value={mode} onValueChange={(v) => {
+              setMode(v as "project" | "personal")
+              setSelectedProjectId("all")
+            }}>
               <TabsList>
                 <TabsTrigger value="project" className="flex items-center gap-2">
                   <IconBriefcase className="size-4" />
@@ -612,8 +644,11 @@ export function AssignedTasks({
       )}
 
       {hideHeader && (
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as "project" | "personal")}>
+        <div className="flex items-center justify-between shrink-0">
+          <Tabs value={mode} onValueChange={(v) => {
+            setMode(v as "project" | "personal")
+            setSelectedProjectId("all")
+          }}>
             <TabsList>
               <TabsTrigger value="project" className="flex items-center gap-2">
                 <IconBriefcase className="size-4" />
@@ -625,6 +660,30 @@ export function AssignedTasks({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+        </div>
+      )}
+
+      {mode === "project" && projectsWithTasks.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar shrink-0 px-1">
+          <Button
+            variant={selectedProjectId === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedProjectId("all")}
+            className="rounded-full px-4 h-8 text-xs"
+          >
+            All Projects
+          </Button>
+          {projectsWithTasks.map((project) => (
+            <Button
+              key={project.id}
+              variant={selectedProjectId === project.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedProjectId(project.id)}
+              className="rounded-full px-4 h-8 text-xs whitespace-nowrap"
+            >
+              {project.name}
+            </Button>
+          ))}
         </div>
       )}
 
@@ -656,7 +715,7 @@ export function AssignedTasks({
           )}
         </Empty>
       ) : (
-        <div className="flex-1 overflow-hidden min-h-0">
+        <div className="flex flex-1 flex-col overflow-hidden min-h-0">
           <KanbanBoard 
             tasks={filteredTasks}
             members={members}
@@ -688,6 +747,7 @@ export function AssignedTasks({
               }
             }}
             hideControls
+            disablePadding
           />
         </div>
       )}

@@ -114,6 +114,7 @@ interface KanbanBoardProps {
   isLoading?: boolean
   mode?: KanbanMode
   onModeChange?: (mode: KanbanMode) => void
+  disablePadding?: boolean
 }
 
 const COLUMNS = [
@@ -137,7 +138,8 @@ export function KanbanBoard({
   hideCreate = false,
   isLoading = false,
   mode = "development",
-  onModeChange
+  onModeChange,
+  disablePadding = false
 }: KanbanBoardProps) {
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks)
   const [activeTask, setActiveTask] = React.useState<Task | null>(null)
@@ -362,7 +364,10 @@ export function KanbanBoard({
   return (
     <div className="flex flex-1 flex-col gap-3 min-h-0 overflow-hidden">
       {!hideControls && (
-        <div className="flex items-center justify-between shrink-0 px-4 lg:px-6">
+        <div className={cn(
+          "flex items-center justify-between shrink-0",
+          !disablePadding && "px-4 lg:px-6"
+        )}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm font-medium">
               <IconLayoutKanban className="size-4" />
@@ -396,7 +401,10 @@ export function KanbanBoard({
       )}
 
       {isLoading ? (
-        <div className="flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0 px-4 lg:px-6">
+        <div className={cn(
+          "flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0",
+          !disablePadding && "px-4 lg:px-6"
+        )}>
           {COLUMNS.map((column) => (
             <div key={column.id} className="flex h-full w-80 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2">
               <div className="flex items-center justify-between px-1">
@@ -426,7 +434,10 @@ export function KanbanBoard({
           ))}
         </div>
       ) : (
-        <div className="flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0 px-4 lg:px-6">
+        <div className={cn(
+          "flex flex-1 gap-3 overflow-x-auto pb-3 min-h-0",
+          !disablePadding && "px-4 lg:px-6"
+        )}>
           <DndContext
             sensors={sensors}
             collisionDetection={customCollisionDetection}

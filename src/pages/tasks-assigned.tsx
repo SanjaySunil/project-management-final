@@ -10,7 +10,7 @@ export default function AssignedTasksPage() {
   return (
     <PageContainer className="h-full overflow-hidden">
       <SEO title="Assigned Tasks" />
-      <div className="flex flex-1 flex-col gap-4 h-full overflow-hidden">
+      <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
         <AssignedTasks userId={userId} />
       </div>
     </PageContainer>

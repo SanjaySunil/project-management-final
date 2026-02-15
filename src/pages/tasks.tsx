@@ -585,7 +585,7 @@ export default function TasksPage() {
   }
 
   return (
-    <PageContainer className="min-h-0 overflow-hidden">
+    <PageContainer className="h-full overflow-hidden">
       <SEO title="Tasks - Kanban Board" />
       <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-hidden">
         <div className="flex flex-col gap-2 shrink-0">
@@ -623,7 +623,7 @@ export default function TasksPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
           {viewMode === "kanban" ? (
             <KanbanBoard 
               tasks={tasks} 
@@ -636,6 +636,7 @@ export default function TasksPage() {
               isLoading={isLoading}
               mode={kanbanMode}
               onModeChange={setKanbanMode}
+              disablePadding
             />
           ) : (
             <TasksTable 
