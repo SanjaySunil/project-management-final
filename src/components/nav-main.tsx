@@ -10,6 +10,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -26,6 +27,7 @@ export function NavMain({
     url: string
     icon?: LucideIcon
     isActive?: boolean
+    badge?: string | number
     items?: {
       title: string
       url: string
@@ -55,6 +57,7 @@ export function NavMain({
                     <span>{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
+                {item.badge && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
               </SidebarMenuItem>
             )
           }
@@ -74,6 +77,7 @@ export function NavMain({
                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
+                {item.badge && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {item.items?.map((subItem) => (

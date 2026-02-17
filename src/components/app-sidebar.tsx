@@ -34,6 +34,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/hooks/use-auth"
 import { useOrganization } from "@/hooks/use-organization"
+import { useNotifications } from "@/hooks/use-notifications"
 
 interface SidebarItem {
   title: string
@@ -42,6 +43,7 @@ interface SidebarItem {
   permission?: { action: string; resource: string }
   items?: SidebarItem[]
   isActive?: boolean
+  badge?: string | number
 }
 
 export function SidebarSkeleton() {
@@ -189,6 +191,7 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, role, checkPermission, loading: authLoading } = useAuth()
   const { organization, loading: orgLoading } = useOrganization()
+  const { unreadCount } = useNotifications()
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -275,6 +278,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     })
   }
 
+  // Transform platform based on state
+  const getPlatformNav = () => {
+    const items = filterByPermission(sidebarGroups.platform)
+    return items.map((item: SidebarItem) => {
+      if (item.title === "Notifications" && unreadCount > 0) {
+        return { ...item, badge: unreadCount }
+      }
+      return item
+    })
+  }
+
   // Transform operations based on context
   const getOperationsNav = () => {
     const items = filterByPermission(sidebarGroups.operations)
@@ -334,7 +348,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={filterByPermission(sidebarGroups.platform)} label="Platform" />
+        <NavMain items={getPlatformNav()} label="Platform" />
         <NavMain items={getOperationsNav()} label="Operations" />
         <NavMain items={getCollaborationNav()} label="Collaboration" />
         <NavMain items={filterByPermission(sidebarGroups.configuration)} label="Configuration" />
