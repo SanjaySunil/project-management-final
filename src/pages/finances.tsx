@@ -43,7 +43,8 @@ export default function FinancesPage() {
       const [
         { data: phases },
         { data: expenses },
-        { data: projectsData }
+        { data: projectsData },
+        { count: pendingInvoicesCount }
       ] = await Promise.all([
         supabase
           .from("phases")
@@ -56,7 +57,11 @@ export default function FinancesPage() {
         supabase
           .from("projects")
           .select("id, name")
-          .order("name")
+          .order("name"),
+        supabase
+          .from("invoices")
+          .select("*", { count: 'exact', head: true })
+          .neq("status", "paid")
       ])
 
       const totalRevenue = phases?.reduce((acc, p) => acc + (Number(p.net_amount ?? p.amount) || 0), 0) || 0
@@ -70,7 +75,7 @@ export default function FinancesPage() {
         totalRevenue,
         totalExpenses,
         netProfit: totalRevenue - totalExpenses,
-        pendingInvoices: phases?.filter(p => p.status === "sent").length || 0
+        pendingInvoices: pendingInvoicesCount || 0
       })
     } catch (error) {
       console.error("Error fetching finance data:", error)
@@ -126,7 +131,8 @@ export default function FinancesPage() {
       header: "Client",
       cell: ({ row }: any) => {
         const client = row.original.projects?.clients
-        return client ? `${client.first_name} ${client.last_name || ""}` : "N/A"
+        if (!client) return "N/A"
+        return [client.first_name?.trim(), client.last_name?.trim()].filter(Boolean).join(" ")
       }
     },
     {
@@ -330,7 +336,7 @@ export default function FinancesPage() {
                         <div className="ml-4 space-y-1">
                           <p className="text-sm font-medium leading-none">{item.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {item.projects?.clients?.first_name} {item.projects?.clients?.last_name}
+                            {[item.projects?.clients?.first_name?.trim(), item.projects?.clients?.last_name?.trim()].filter(Boolean).join(" ")}
                           </p>
                         </div>
                         <div className="ml-auto font-medium text-emerald-600">

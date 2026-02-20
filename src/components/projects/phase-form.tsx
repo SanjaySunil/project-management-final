@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DeliverablesManager, type Deliverable } from "./deliverables-manager"
+import { LineItemsManager, type LineItem } from "./line-items-manager"
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
 
@@ -12,7 +13,7 @@ type Phase = Tables<"phases">
 interface PhaseFormProps {
   initialData?: Phase | null
   initialDeliverables?: Deliverable[]
-  onSubmit: (values: any, deliverables: Deliverable[]) => Promise<void>
+  onSubmit: (values: any, deliverables: Deliverable[], lineItems: LineItem[]) => Promise<void>
   onCancel: () => void
   isSubmitting?: boolean
 }
@@ -27,6 +28,7 @@ export function PhaseForm({
   const { role } = useAuth()
   const isAdmin = role === "admin"
   const [deliverables, setDeliverables] = React.useState<Deliverable[]>(initialDeliverables)
+  const [lineItems, setLineItems] = React.useState<LineItem[]>((initialData as any)?.invoice_line_items || [])
   const [orderSource, setOrderSource] = React.useState<string>(initialData?.order_source || "direct")
   const [amount, setAmount] = React.useState<number>(Number(initialData?.amount) || 0)
 
@@ -55,7 +57,7 @@ export function PhaseForm({
       values.net_amount = netAmount
     }
 
-    await onSubmit(values, deliverables)
+    await onSubmit(values, deliverables, lineItems)
   }
 
   return (
@@ -151,6 +153,13 @@ export function PhaseForm({
       <DeliverablesManager 
         deliverables={deliverables} 
         onChange={setDeliverables} 
+      />
+
+      <hr className="border-border" />
+
+      <LineItemsManager
+        lineItems={lineItems}
+        onChange={setLineItems}
       />
 
       <div className="flex justify-end gap-3 pt-4 border-t">

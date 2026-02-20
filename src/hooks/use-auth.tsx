@@ -7,6 +7,9 @@ interface AuthContextType {
   session: Session | null
   user: User | null
   role: string | null
+  isAdmin: boolean
+  isEmployee: boolean
+  isClient: boolean
   organizationId: string | null
   pin: string | null
   isPinVerified: boolean
@@ -287,6 +290,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user,
     role,
+    isAdmin: role === 'admin',
+    isEmployee: role === 'employee',
+    isClient: role === 'client',
     organizationId,
     pin,
     isPinVerified,

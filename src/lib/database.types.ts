@@ -350,6 +350,83 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          amount: number
+          client_id: string | null
+          created_at: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          line_items: Json | null
+          notes: string | null
+          phase_id: string | null
+          project_id: string | null
+          status: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number
+          client_id?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          line_items?: Json | null
+          notes?: string | null
+          phase_id?: string | null
+          project_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          client_id?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          line_items?: Json | null
+          notes?: string | null
+          phase_id?: string | null
+          project_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "phases"
+            referencedColumns: [ "id" ]
+          },
+          {
+            foreignKeyName: "invoices_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           channel_id: string | null
@@ -569,6 +646,8 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          invoice_id: string | null
+          invoice_line_items: Json | null
           net_amount: number | null
           order_index: number | null
           order_source: string | null
@@ -585,6 +664,8 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          invoice_id?: string | null
+          invoice_line_items?: Json | null
           net_amount?: number | null
           order_index?: number | null
           order_source?: string | null
@@ -601,6 +682,8 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          invoice_id?: string | null
+          invoice_line_items?: Json | null
           net_amount?: number | null
           order_index?: number | null
           order_source?: string | null
@@ -611,6 +694,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "phases_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "phases_project_id_fkey"
             columns: ["project_id"]
@@ -1197,6 +1287,7 @@ export type Database = {
         Args: { user_id_to_delete: string }
         Returns: undefined
       }
+      process_reminders: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

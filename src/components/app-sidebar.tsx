@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Settings2,
   Ticket,
+  FileText,
 } from "lucide-react"
 import { IconFileText } from "@tabler/icons-react"
 
@@ -123,6 +124,12 @@ const sidebarGroups: Record<string, SidebarItem[]> = {
       title: "Finances",
       url: "/dashboard/finances",
       icon: DollarSign,
+      permission: { action: "read", resource: "finances" },
+    },
+    {
+      title: "Invoices",
+      url: "/dashboard/invoices",
+      icon: FileText,
       permission: { action: "read", resource: "finances" },
     },
     {

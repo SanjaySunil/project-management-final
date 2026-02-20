@@ -181,12 +181,15 @@ export function ProjectsTable({
     {
       id: "client",
       header: "Client",
-      accessorFn: (row) => row.clients ? `${row.clients.first_name} ${row.clients.last_name || ""}`.trim() : "No Client",
+      accessorFn: (row) => {
+        const client = row.clients
+        if (!client) return "No Client"
+        return [client.first_name?.trim(), client.last_name?.trim()].filter(Boolean).join(" ")
+      },
       cell: ({ row }) => {
         const client = row.original.clients
-        return client 
-          ? `${client.first_name} ${client.last_name || ""}`.trim()
-          : "No Client"
+        if (!client) return "No Client"
+        return [client.first_name?.trim(), client.last_name?.trim()].filter(Boolean).join(" ")
       },
     },
     {

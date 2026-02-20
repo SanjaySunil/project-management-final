@@ -40,8 +40,11 @@ interface PhasesTableProps {
   onDelete: (id: string) => void
   onView?: (phase: Phase) => void
   onStatusChange?: (id: string, status: string) => void
+  onGenerateInvoice?: (phase: Phase) => void
+  onRowSelectionChange?: (rowSelection: any) => void
   onDataChange?: (data: Phase[]) => void
   isLoading?: boolean
+  toolbar?: React.ReactNode
 }
 
 export function PhasesTable({ 
@@ -51,8 +54,11 @@ export function PhasesTable({
   onDelete, 
   onView, 
   onStatusChange, 
+  onGenerateInvoice,
+  onRowSelectionChange,
   onDataChange,
-  isLoading 
+  isLoading,
+  toolbar
 }: PhasesTableProps) {
   const { role, checkPermission } = useAuth()
   const isAdmin = role === "admin"
@@ -284,6 +290,12 @@ export function PhasesTable({
               <DropdownMenuItem onClick={() => onEdit(row.original)}>Edit</DropdownMenuItem>
             )}
 
+            {isAdmin && onGenerateInvoice && row.original.amount && row.original.order_source !== "fiverr" && (
+              <DropdownMenuItem onClick={() => onGenerateInvoice(row.original)}>
+                <IconFileText className="mr-2 h-4 w-4" /> Generate Invoice
+              </DropdownMenuItem>
+            )}
+
             <DropdownMenuItem onClick={() => {
                  navigator.clipboard.writeText(row.original.id)
                  toast.success("ID copied to clipboard")
@@ -317,6 +329,8 @@ export function PhasesTable({
       enableReordering={canUpdate}
       onDataChange={onDataChange}
       onRowClick={onView}
+      onRowSelectionChange={onRowSelectionChange}
+      toolbar={toolbar}
       defaultSorting={[{ id: "title", desc: false }]}
     />
   )

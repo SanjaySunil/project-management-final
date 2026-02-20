@@ -202,6 +202,8 @@ export interface DataTableProps<TData extends { id: string | number }> {
 
   toolbar?: React.ReactNode
 
+  onRowSelectionChange?: (rowSelection: any) => void
+
   defaultSorting?: SortingState
 
 }
@@ -240,6 +242,8 @@ export function DataTable<TData extends { id: string | number }> ({
 
   toolbar,
 
+  onRowSelectionChange,
+
   defaultSorting = [],
 
 }: DataTableProps<TData>) {
@@ -250,6 +254,13 @@ export function DataTable<TData extends { id: string | number }> ({
   }, [initialData])
 
   const [rowSelection, setRowSelection] = React.useState({})
+  
+  const handleRowSelectionChange = (updater: any) => {
+    const nextSelection = typeof updater === 'function' ? updater(rowSelection) : updater
+    setRowSelection(nextSelection)
+    onRowSelectionChange?.(nextSelection)
+  }
+
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -306,7 +317,7 @@ export function DataTable<TData extends { id: string | number }> ({
     },
     getRowId: (row) => row.id.toString(),
     enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: handleRowSelectionChange,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: (value) => {

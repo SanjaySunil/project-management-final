@@ -24,6 +24,7 @@ import OrganizationPage from "@/pages/organization"
 import NotificationsPage from "@/pages/notifications"
 import RemindersPage from "@/pages/reminders"
 import FinancesPage from "@/pages/finances"
+import InvoicesPage from "@/pages/invoices"
 import TicketsPage from "@/pages/tickets"
 import { Toaster } from "@/components/ui/sonner"
 import ReloadPrompt from "@/components/reload-prompt"
@@ -80,6 +81,7 @@ function AppRoutes() {
         <Route path="tasks/assigned" element={<AssignedTasksPage />} />
         <Route path="credentials" element={<CredentialsPage />} />
         <Route path="finances" element={<FinancesPage />} />
+        <Route path="invoices" element={<InvoicesPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="pin-logs" element={<PinLogsPage />} />

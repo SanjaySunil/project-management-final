@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PhaseForm } from "@/components/projects/phase-form"
 import type { Deliverable } from "@/components/projects/deliverables-manager"
+import type { LineItem } from "@/components/projects/line-items-manager"
 import {
   Dialog,
   DialogContent,
@@ -283,13 +284,16 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   }, [phaseId, members])
 
   // --- Phase Actions ---
-  const handlePhaseSubmit = async (values: any, updatedDeliverables: Deliverable[]) => {
+  const handlePhaseSubmit = async (values: any, updatedDeliverables: Deliverable[], lineItems: LineItem[]) => {
     try {
       setIsSubmitting(true)
 
       const { error } = await supabase
         .from("phases")
-        .update(values)
+        .update({
+          ...values,
+          invoice_line_items: lineItems
+        })
         .eq("id", phaseId)
       
       if (error) throw error
@@ -840,7 +844,13 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
             <DialogTitle>Edit Phase</DialogTitle>
             <DialogDescription>Update the phase's information and deliverables.</DialogDescription>
           </DialogHeader>
-          <PhaseForm initialData={phase} initialDeliverables={deliverables} onSubmit={handlePhaseSubmit} onCancel={() => setIsDialogOpen(false)} isSubmitting={isSubmitting} />
+          <PhaseForm 
+            initialData={phase} 
+            initialDeliverables={deliverables} 
+            onSubmit={handlePhaseSubmit} 
+            onCancel={() => setIsDialogOpen(false)} 
+            isSubmitting={isSubmitting} 
+          />
         </DialogContent>
       </Dialog>
 
