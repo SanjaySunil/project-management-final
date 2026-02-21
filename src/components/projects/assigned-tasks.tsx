@@ -1,6 +1,6 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { IconFilter, IconClipboardList, IconUser, IconBriefcase, IconPlus } from "@tabler/icons-react"
+import { IconFilter, IconClipboardList, IconBriefcase, IconPlus, IconShieldLock } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
@@ -52,9 +52,10 @@ export function AssignedTasks({
   // If client, force targetUserId to be the currentUser.id
   const targetUserId = (role === "client") ? currentUser?.id : (userId || currentUser?.id)
   
-  const [mode, setMode] = React.useState<"project" | "personal">("project")
+  const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
   const [selectedProjectId, setSelectedProjectId] = React.useState<string>("all")
   const [tasks, setTasks] = React.useState<Task[]>([])
+  const [personalTasks, setPersonalTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
   const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
@@ -64,10 +65,10 @@ export function AssignedTasks({
 
   // Memoize projects that have tasks assigned to this user
   const projectsWithTasks = React.useMemo(() => {
-    if (mode !== "project") return []
+    if (kanbanMode !== "development") return []
     const projectMap = new Map<string, { id: string, name: string }>()
     tasks.forEach(task => {
-      const project = (task.phases as any)?.projects
+      const project = (task as any).projects || (task.phases as any)?.projects
       if (project?.id && project?.name) {
         projectMap.set(project.id, {
           id: project.id,
@@ -76,7 +77,7 @@ export function AssignedTasks({
       }
     })
     return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [tasks, mode])
+  }, [tasks, kanbanMode])
 
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
@@ -114,7 +115,7 @@ export function AssignedTasks({
     try {
       setIsLoading(true)
       
-      const [membersRes, phasesRes, projectsRes] = await Promise.all([
+      const [membersRes, phasesRes, projectsRes, membershipsRes, clientProjectsRes, memberTasksRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("*")
@@ -128,47 +129,105 @@ export function AssignedTasks({
         supabase
           .from("projects")
           .select("*")
-          .order("name", { ascending: true })
+          .order("name", { ascending: true }),
+        supabase
+          .from("project_members")
+          .select("project_id")
+          .eq("user_id", targetUserId),
+        supabase
+          .from("projects")
+          .select("id, clients!inner(user_id)")
+          .eq("clients.user_id", targetUserId),
+        supabase
+          .from("task_members")
+          .select("task_id")
+          .eq("user_id", targetUserId)
       ])
 
-      let tasksRes
-      if (mode === "project") {
-        tasksRes = await supabase
-          .from("tasks")
-          .select(`
-            *,
-            phases (
+      const memberTaskIds = (memberTasksRes.data || []).map(m => m.task_id)
+
+      // Pull project tasks where user is assigned or member
+      let tasksQuery = supabase
+        .from("tasks")
+        .select(`
+          *,
+          projects (
+            id,
+            name,
+            status
+          ),
+          phases (
+            id,
+            title,
+            project_id,
+            projects (
               id,
-              title,
-              project_id,
-              projects (
-                id,
-                name
-              )
-            ),
-            task_attachments (*)
-          `)
-          .eq("user_id", targetUserId)
-          .order("order_index", { ascending: true })
+              name,
+              status
+            )
+          ),
+          task_attachments (*),
+          task_members (
+            user_id,
+            profiles (
+              id,
+              full_name,
+              avatar_url,
+              email,
+              role
+            )
+          )
+        `)
+
+      if (memberTaskIds.length > 0) {
+        tasksQuery = tasksQuery.or(`user_id.eq.${targetUserId},id.in.(${memberTaskIds.join(",")})`)
       } else {
-        tasksRes = await (supabase.from as any)("personal_tasks")
-          .select("*")
-          .eq("user_id", targetUserId)
-          .order("order_index", { ascending: true })
+        tasksQuery = tasksQuery.eq("user_id", targetUserId)
       }
 
-      if (tasksRes.error) throw tasksRes.error
+      const projectTasksRes = await tasksQuery.order("order_index", { ascending: true })
+
+      // Pull personal tasks
+      const personalTasksRes = await (supabase.from as any)("personal_tasks")
+        .select("*")
+        .eq("user_id", targetUserId)
+        .order("order_index", { ascending: true })
+
+      if (projectTasksRes.error) throw projectTasksRes.error
+      if (personalTasksRes.error) throw personalTasksRes.error
       if (membersRes.error) throw membersRes.error
       if (phasesRes.error) throw phasesRes.error
       if (projectsRes.error) throw projectsRes.error
+      if (membershipsRes.error) throw membershipsRes.error
+
+      const memberProjectIds = (membershipsRes.data || []).map(m => m.project_id)
+      const clientProjectIds = (clientProjectsRes.data || []).map(p => p.id)
+      const allAllowedProjectIds = Array.from(new Set([...memberProjectIds, ...clientProjectIds]))
 
       const fetchedMembers = membersRes.data || []
-      const fetchedTasks = (tasksRes.data || []).map((task: any) => ({
+      
+      const fetchedProjectTasks = (projectTasksRes.data || []).map((task: any) => ({
         ...task,
         profiles: fetchedMembers.find(m => m.id === task.user_id) || null
+      })).filter((task: any) => {
+        const project = task.projects || task.phases?.projects
+        const projectId = task.project_id || task.phases?.project_id
+        
+        // Filter by project status - only show active projects
+        if (project && project.status !== 'active') return false
+        
+        // Filter by membership - only show projects user is assigned to
+        return projectId ? allAllowedProjectIds.includes(projectId) : true // Allow tasks without project
+      })
+
+      const fetchedPersonalTasks = (personalTasksRes.data || []).map((task: any) => ({
+        ...task,
+        profiles: fetchedMembers.find(m => m.id === task.user_id) || null,
+        is_personal: true
       }))
 
-      setTasks(fetchedTasks as Task[])
+      setTasks(fetchedProjectTasks as Task[])
+      setPersonalTasks(fetchedPersonalTasks as Task[])
       setMembers(fetchedMembers)
       setPhases(phasesRes.data || [])
       setProjects(projectsRes.data || [])
@@ -179,7 +238,7 @@ export function AssignedTasks({
     } finally {
       setIsLoading(false)
     }
-  }, [targetUserId, mode])
+  }, [targetUserId])
 
   React.useEffect(() => {
     fetchTasks()
@@ -188,53 +247,56 @@ export function AssignedTasks({
   React.useEffect(() => {
     if (!targetUserId) return
 
-    const table = mode === "project" ? "tasks" : "personal_tasks"
-    const channel = supabase
-      .channel(`assigned-tasks-${table}-${targetUserId}`)
+    // Listen to project tasks
+    const projectChannel = supabase
+      .channel(`assigned-project-tasks-${targetUserId}`)
       .on(
         "postgres_changes",
         { 
           event: "*", 
           schema: "public", 
-          table: table,
+          table: "tasks",
           filter: `user_id=eq.${targetUserId}`
         },
         async (payload) => {
           if (payload.eventType === "INSERT") {
-            let data, error
-            if (mode === "project") {
-              const res = await supabase
-                .from("tasks")
-                .select(`
-                  *,
-                  phases (
+            const res = await supabase
+              .from("tasks")
+              .select(`
+                *,
+                phases (
+                  id,
+                  title,
+                  project_id,
+                  projects (
                     id,
-                    title,
-                    project_id,
-                    projects (
-                      id,
-                      name
-                    )
-                  ),
-                  task_attachments (*)
-                `)
-                .eq("id", payload.new.id)
-                .single()
-              data = res.data
-              error = res.error
-            } else {
-              const res = await (supabase.from as any)("personal_tasks")
-                .select("*")
-                .eq("id", payload.new.id)
-                .single()
-              data = res.data
-              error = res.error
-            }
-
-            if (!error && data) {
+                    name,
+                    status
+                  )
+                ),
+                task_attachments (*),
+                task_members (
+                  user_id,
+                              profiles (
+                                id,
+                                full_name,
+                                avatar_url,
+                                email,
+                                role
+                              )                )
+              `)
+              .eq("id", payload.new.id)
+              .single()
+            
+            if (!res.error && res.data) {
+              const project = (res.data.phases as any)?.projects
+              
+              // Skip if not active
+              if (project && project.status !== 'active') return
+              
               const newTask = {
-                ...data,
-                profiles: members.find(m => m.id === data.user_id) || null
+                ...res.data,
+                profiles: members.find(m => m.id === res.data.user_id) || null
               }
               setTasks(prev => {
                 if (prev.some(t => t.id === newTask.id)) return prev
@@ -260,17 +322,86 @@ export function AssignedTasks({
       )
       .subscribe()
 
+    // Listen to personal tasks
+    const personalChannel = supabase
+      .channel(`assigned-personal-tasks-${targetUserId}`)
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "personal_tasks",
+          filter: `user_id=eq.${targetUserId}`
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const res = await (supabase.from as any)("personal_tasks")
+              .select("*")
+              .eq("id", payload.new.id)
+              .single()
+
+            if (!res.error && res.data) {
+              const newTask = {
+                ...res.data,
+                profiles: members.find(m => m.id === res.data.user_id) || null,
+                is_personal: true
+              }
+              setPersonalTasks(prev => {
+                if (prev.some(t => t.id === newTask.id)) return prev
+                return [...prev, newTask as Task]
+              })
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const updatedTask = payload.new as any
+            setPersonalTasks(prev => prev.map(t => {
+              if (t.id === updatedTask.id) {
+                return {
+                  ...t,
+                  ...updatedTask,
+                  profiles: members.find(m => m.id === updatedTask.user_id) || null,
+                  is_personal: true
+                }
+              }
+              return t
+            }))
+          } else if (payload.eventType === "DELETE") {
+            setPersonalTasks(prev => prev.filter(t => t.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(projectChannel)
+      supabase.removeChannel(personalChannel)
     }
-  }, [targetUserId, mode, members])
+  }, [targetUserId, members])
 
   const filteredTasks = React.useMemo(() => {
-    let filtered = tasks
+    const projectPool = tasks
+    const personalPool = personalTasks
 
-    // Filter by project if in project mode
-    if (mode === "project" && selectedProjectId !== "all") {
-      filtered = filtered.filter(t => (t.phases as any)?.projects?.id === selectedProjectId)
+    // Filter project tasks by mode
+    const filteredProjectTasks = projectPool.filter(task => {
+      const hasAdmin = (task as any).task_members?.some((m: any) => m.profiles?.role === 'admin')
+      const isAdminType = task.type === 'admin'
+      if (kanbanMode === 'admin') {
+        return hasAdmin || isAdminType
+      }
+      return !hasAdmin && !isAdminType
+    })
+
+    // Personal tasks only show in admin mode
+    const filteredPersonalTasks = kanbanMode === 'admin' ? personalPool : []
+
+    let filtered = [...filteredProjectTasks, ...filteredPersonalTasks]
+
+    // Filter by project if in development mode
+    if (kanbanMode === "development" && selectedProjectId !== "all") {
+      filtered = filtered.filter(t => {
+        const projectId = (t as any).project_id || (t.phases as any)?.project_id
+        return projectId === selectedProjectId
+      })
     }
 
     if (statusFilter === "all") return filtered
@@ -278,23 +409,32 @@ export function AssignedTasks({
     if (statusFilter === "complete") return filtered.filter(t => t.status === "complete")
     // If it's a specific status (e.g. "in progress")
     return filtered.filter(t => t.status === statusFilter)
-  }, [tasks, statusFilter, selectedProjectId, mode])
+  }, [tasks, personalTasks, statusFilter, selectedProjectId, kanbanMode])
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
+      const task = [...tasks, ...personalTasks].find(t => t.id === taskId)
+      if (!task) return
+
+      const isPersonal = (task as any).is_personal
+
       const updatedData = { ...updates }
       if ("user_id" in updates) {
         (updatedData as Record<string, unknown>).profiles = members.find(m => m.id === updates.user_id) || null
       }
 
-      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const table = isPersonal ? "personal_tasks" : "tasks"
       const { error } = await (supabase.from as any)(table)
         .update(updates)
         .eq("id", taskId)
 
       if (error) throw error
       
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
+      if (isPersonal) {
+        setPersonalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
+      } else {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
+      }
     } catch (error: any) {
       console.error("Update task error:", error)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
@@ -315,7 +455,8 @@ export function AssignedTasks({
 
     try {
       setIsSubmitting(true)
-      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const isPersonal = kanbanMode === "admin" && !values.project_id && !values.phase_id
+      const table = isPersonal ? "personal_tasks" : "tasks"
       
       const payload: any = {
         title: values.title,
@@ -323,18 +464,19 @@ export function AssignedTasks({
         type: values.type || 'feature',
         user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
         status: finalStatus,
-        order_index: tasks.filter(t => t.status === finalStatus).length,
+        order_index: (isPersonal ? personalTasks : tasks).filter(t => t.status === finalStatus).length,
         parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId)
       }
 
-      if (mode === "project") {
+      if (!isPersonal) {
+        payload.project_id = values.project_id === "none" ? null : values.project_id
         payload.phase_id = values.phase_id === "none" ? null : values.phase_id
       }
 
       const query = (supabase.from as any)(table).insert([payload])
       
       let res
-      if (mode === "project") {
+      if (!isPersonal) {
         res = await query.select(`
           *,
           phases (
@@ -346,7 +488,17 @@ export function AssignedTasks({
               name
             )
           ),
-          task_attachments (*)
+          task_attachments (*),
+          task_members (
+            user_id,
+            profiles (
+              id,
+              full_name,
+              avatar_url,
+              email,
+              role
+            )
+          )
         `).single()
       } else {
         res = await query.select("*").single()
@@ -363,27 +515,32 @@ export function AssignedTasks({
           status: "todo",
           parent_id: taskId,
           user_id: targetUserId,
-          phase_id: mode === "project" ? res.data.phase_id : null,
+          phase_id: !isPersonal ? res.data.phase_id : null,
           order_index: index
         }))
         
         const { data: createdSubtasks, error: subtasksError } = await (supabase.from as any)(table)
           .insert(subtasksToInsert)
-          .select(mode === "project" ? `*, phases(id, title, project_id, projects(id, name)), task_attachments(*)` : `*`)
+          .select(!isPersonal ? `*, phases(id, title, project_id, projects(id, name)), task_attachments(*)` : `*`)
 
         if (subtasksError) throw subtasksError
         
         if (createdSubtasks) {
           const formattedSubtasks = (createdSubtasks as any[]).map(st => ({
             ...st,
-            profiles: members.find(m => m.id === st.user_id) || null
+            profiles: members.find(m => m.id === st.user_id) || null,
+            is_personal: isPersonal
           }))
-          setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
+          if (isPersonal) {
+            setPersonalTasks(prev => [...prev, ...formattedSubtasks as Task[]])
+          } else {
+            setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
+          }
         }
       }
 
       // Handle attachments (only for project tasks)
-      if (mode === "project" && values.files && values.files.length > 0 && typeof window !== 'undefined') {
+      if (!isPersonal && values.files && values.files.length > 0 && typeof window !== 'undefined') {
         const { default: imageCompression } = await import("browser-image-compression")
         
         for (const file of values.files as File[]) {
@@ -436,13 +593,21 @@ export function AssignedTasks({
 
       const newTask = {
         ...res.data,
-        profiles: members.find(m => m.id === res.data.user_id) || null
+        profiles: members.find(m => m.id === res.data.user_id) || null,
+        is_personal: isPersonal
       }
 
-      setTasks(prev => {
-        if (prev.some(t => t.id === newTask.id)) return prev
-        return [...prev, newTask as Task]
-      })
+      if (isPersonal) {
+        setPersonalTasks(prev => {
+          if (prev.some(t => t.id === newTask.id)) return prev
+          return [...prev, newTask as Task]
+        })
+      } else {
+        setTasks(prev => {
+          if (prev.some(t => t.id === newTask.id)) return prev
+          return [...prev, newTask as Task]
+        })
+      }
       
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
@@ -461,6 +626,7 @@ export function AssignedTasks({
 
     try {
       setIsSubmitting(true)
+      const isPersonal = (editingTask as any).is_personal
       const updates: any = {
         title: values.title,
         description: values.description || null,
@@ -470,22 +636,29 @@ export function AssignedTasks({
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null)
       }
 
-      if (mode === "project") {
+      if (!isPersonal) {
+        updates.project_id = values.project_id === "none" ? null : (values.project_id || null)
         updates.phase_id = values.phase_id === "none" ? null : (values.phase_id || null)
       }
 
-      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const table = isPersonal ? "personal_tasks" : "tasks"
       const { error } = await (supabase.from as any)(table)
         .update(updates)
         .eq("id", editingTask.id)
 
       if (error) throw error
 
-      setTasks(prev => prev.map(t => t.id === editingTask.id ? { 
-        ...t, 
+      const updatedTask = { 
+        ...editingTask, 
         ...updates,
         profiles: members.find(m => m.id === updates.user_id) || null,
-      } : t))
+      }
+
+      if (isPersonal) {
+        setPersonalTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t))
+      } else {
+        setTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t))
+      }
       
       setIsEditDialogOpen(false)
       setEditingTask(null)
@@ -503,26 +676,27 @@ export function AssignedTasks({
     if (!targetUserId) return
 
     try {
-      const table = mode === "project" ? "tasks" : "personal_tasks"
-      const parentTask = tasks.find(t => t.id === parentId)
+      const task = [...tasks, ...personalTasks].find(t => t.id === parentId)
+      const isPersonal = (task as any)?.is_personal
+      const table = isPersonal ? "personal_tasks" : "tasks"
       
       const payload: any = {
         title,
         status,
-        type: parentTask?.type || 'feature',
+        type: task?.type || 'feature',
         parent_id: parentId,
         user_id: targetUserId,
-        order_index: tasks.filter(t => t.parent_id === parentId).length
+        order_index: (isPersonal ? personalTasks : tasks).filter(t => t.parent_id === parentId).length
       }
 
-      if (mode === "project") {
-        payload.phase_id = parentTask?.phase_id || null
+      if (!isPersonal) {
+        payload.phase_id = task?.phase_id || null
       }
 
       const query = (supabase.from as any)(table).insert([payload])
       
       let res
-      if (mode === "project") {
+      if (!isPersonal) {
         res = await query.select(`
           *,
           phases (
@@ -544,10 +718,15 @@ export function AssignedTasks({
 
       const newTask = {
         ...res.data,
-        profiles: members.find(m => m.id === res.data.user_id) || null
+        profiles: members.find(m => m.id === res.data.user_id) || null,
+        is_personal: isPersonal
       }
 
-      setTasks(prev => [...prev, newTask as Task])
+      if (isPersonal) {
+        setPersonalTasks(prev => [...prev, newTask as Task])
+      } else {
+        setTasks(prev => [...prev, newTask as Task])
+      }
       toast.success("Subtask added")
     } catch (error: any) {
       console.error("Quick create task error:", error)
@@ -558,14 +737,21 @@ export function AssignedTasks({
 
   const handleTaskDelete = async (taskId: string) => {
     try {
-      const table = mode === "project" ? "tasks" : "personal_tasks"
+      const task = [...tasks, ...personalTasks].find(t => t.id === taskId)
+      const isPersonal = (task as any)?.is_personal
+      const table = isPersonal ? "personal_tasks" : "tasks"
+      
       const { error } = await (supabase.from as any)(table)
         .delete()
         .eq("id", taskId)
 
       if (error) throw error
 
-      setTasks(prev => prev.filter(t => t.id !== taskId))
+      if (isPersonal) {
+        setPersonalTasks(prev => prev.filter(t => t.id !== taskId))
+      } else {
+        setTasks(prev => prev.filter(t => t.id !== taskId))
+      }
       toast.success("Task deleted successfully")
     } catch (error: any) {
       console.error("Delete task error:", error)
@@ -579,10 +765,10 @@ export function AssignedTasks({
   }, [members, targetUserId])
 
   const title = React.useMemo(() => {
-    const modePrefix = mode === "project" ? "Project Tasks" : "Personal Tasks"
+    const modePrefix = kanbanMode === "development" ? "Development Tasks" : "Admin Tasks"
     if (!targetUserId || targetUserId === currentUser?.id) return modePrefix
     return targetUser?.full_name ? `${modePrefix} - ${targetUser.full_name}` : modePrefix
-  }, [targetUserId, currentUser?.id, targetUser, mode])
+  }, [targetUserId, currentUser?.id, targetUser, kanbanMode])
 
   return (
     <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-hidden">
@@ -591,24 +777,24 @@ export function AssignedTasks({
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">
-              {mode === "project" 
+              {kanbanMode === "development" 
                 ? "Manage tasks that are specifically assigned to you in projects."
-                : "Manage your private personal tasks and todos."}
+                : "Manage administrative and personal tasks."}
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Tabs value={mode} onValueChange={(v) => {
-              setMode(v as "project" | "personal")
+            <Tabs value={kanbanMode} onValueChange={(v) => {
+              setKanbanMode(v as "development" | "admin")
               setSelectedProjectId("all")
             }}>
               <TabsList>
-                <TabsTrigger value="project" className="flex items-center gap-2">
+                <TabsTrigger value="development" className="flex items-center gap-2">
                   <IconBriefcase className="size-4" />
-                  Project
+                  Development Tasks
                 </TabsTrigger>
-                <TabsTrigger value="personal" className="flex items-center gap-2">
-                  <IconUser className="size-4" />
-                  Personal
+                <TabsTrigger value="admin" className="flex items-center gap-2">
+                  <IconShieldLock className="size-4" />
+                  Admin Tasks
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -645,25 +831,25 @@ export function AssignedTasks({
 
       {hideHeader && (
         <div className="flex items-center justify-between shrink-0">
-          <Tabs value={mode} onValueChange={(v) => {
-            setMode(v as "project" | "personal")
+          <Tabs value={kanbanMode} onValueChange={(v) => {
+            setKanbanMode(v as "development" | "admin")
             setSelectedProjectId("all")
           }}>
             <TabsList>
-              <TabsTrigger value="project" className="flex items-center gap-2">
+              <TabsTrigger value="development" className="flex items-center gap-2">
                 <IconBriefcase className="size-4" />
-                Project
+                Development Tasks
               </TabsTrigger>
-              <TabsTrigger value="personal" className="flex items-center gap-2">
-                <IconUser className="size-4" />
-                Personal
+              <TabsTrigger value="admin" className="flex items-center gap-2">
+                <IconShieldLock className="size-4" />
+                Admin Tasks
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       )}
 
-      {mode === "project" && projectsWithTasks.length > 0 && (
+      {kanbanMode === "development" && projectsWithTasks.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar shrink-0 px-1">
           <Button
             variant={selectedProjectId === "all" ? "default" : "outline"}
@@ -708,9 +894,9 @@ export function AssignedTasks({
                 : `No tasks found with status "${statusFilter}".`}
             </EmptyDescription>
           </EmptyHeader>
-          {mode === "personal" && (
+          {kanbanMode === "admin" && (
             <Button onClick={() => handleTaskCreateTrigger(statusFilter === "all" || statusFilter === "active" ? "todo" : statusFilter)} className="mt-4">
-              Add {statusFilter === "active" ? "an Active" : statusFilter === "in progress" ? "a Working" : "a"} Personal Task
+              Add {statusFilter === "active" ? "an Active" : statusFilter === "in progress" ? "a Working" : "a"} Admin Task
             </Button>
           )}
         </Empty>
@@ -748,6 +934,7 @@ export function AssignedTasks({
             }}
             hideControls
             disablePadding
+            mode={kanbanMode}
           />
         </div>
       )}
@@ -755,7 +942,7 @@ export function AssignedTasks({
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create New {mode === "personal" ? "Personal" : "Project"} Task</DialogTitle>
+            <DialogTitle>Create New {kanbanMode === "admin" ? "Admin" : "Development"} Task</DialogTitle>
             <DialogDescription>
               Add a new task to the {creatingStatus} column.
             </DialogDescription>
@@ -770,8 +957,8 @@ export function AssignedTasks({
             members={members}
             phases={phases}
             projects={projects}
-            tasks={tasks}
-            hideAssignee={mode === "personal"}
+            tasks={[...tasks, ...personalTasks]}
+            hideAssignee={kanbanMode === "admin" && !creatingParentId}
             defaultValues={{
               user_id: targetUserId,
               parent_id: creatingParentId
@@ -783,7 +970,7 @@ export function AssignedTasks({
       <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit {mode === "personal" ? "Personal" : "Project"} Task</DialogTitle>
+            <DialogTitle>Edit {kanbanMode === "admin" ? "Admin" : "Development"} Task</DialogTitle>
             <DialogDescription>
               Update the details of this task.
             </DialogDescription>
@@ -817,8 +1004,8 @@ export function AssignedTasks({
               members={members}
               phases={phases}
               projects={projects}
-              tasks={tasks}
-              hideAssignee={mode === "personal"}
+              tasks={[...tasks, ...personalTasks]}
+              hideAssignee={(editingTask as any).is_personal}
               defaultValues={{
                 id: editingTask.id,
                 title: editingTask.title,
@@ -826,6 +1013,7 @@ export function AssignedTasks({
                 status: editingTask.status,
                 type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id,
+                project_id: (editingTask as any).project_id,
                 phase_id: editingTask.phase_id,
                 parent_id: editingTask.parent_id,
               }}
@@ -836,5 +1024,3 @@ export function AssignedTasks({
     </div>
   )
 }
-
-

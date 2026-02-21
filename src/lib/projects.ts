@@ -20,8 +20,12 @@ export async function updateProjectStatus(projectId: string) {
     if (phases && phases.length > 0) {
       // "active" or "sent" phases mean the project is active
       const hasActive = phases.some((p) => p.status === "active" || p.status === "sent");
+      const hasOnHold = phases.some((p) => p.status === "on_hold");
+      
       if (hasActive) {
         newStatus = "active";
+      } else if (hasOnHold) {
+        newStatus = "on-hold";
       } else {
         newStatus = "completed";
       }

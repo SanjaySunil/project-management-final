@@ -32,15 +32,19 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { usePresence } from "@/hooks/use-presence"
 
 type Client = Tables<"clients">
+type ClientWithProjects = Client & {
+  projects: { status: string | null }[]
+}
 
 export default function ClientsPage() {
   const { checkPermission, organizationId } = useAuth()
   const { isOnline } = usePresence()
-  const [clients, setClients] = React.useState<Client[]>([])
+  const [clients, setClients] = React.useState<ClientWithProjects[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
+  const [activeTab, setActiveTab] = React.useState("all")
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
-  const [editingClient, setEditingClient] = React.useState<Client | null>(null)
-  const [viewingClient, setViewingClient] = React.useState<Client | null>(null)
+  const [editingClient, setEditingClient] = React.useState<ClientWithProjects | null>(null)
+  const [viewingClient, setViewingClient] = React.useState<ClientWithProjects | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [clientToDelete, setClientToDelete] = React.useState<string | null>(null)
@@ -63,11 +67,16 @@ export default function ClientsPage() {
       setIsLoading(true)
       const { data, error } = await supabase
         .from("clients")
-        .select("*")
+        .select(`
+          *,
+          projects (
+            status
+          )
+        `)
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setClients(data || [])
+      setClients((data as any) || [])
     } catch (error: any) {
       toast.error("Failed to fetch clients: " + error.message)
     } finally {
@@ -84,12 +93,12 @@ export default function ClientsPage() {
     setIsDialogOpen(true)
   }, [])
 
-  const handleEditClient = React.useCallback((client: Client) => {
+  const handleEditClient = React.useCallback((client: ClientWithProjects) => {
     setEditingClient(client)
     setIsDialogOpen(true)
   }, [])
 
-  const handleViewClient = React.useCallback((client: Client) => {
+  const handleViewClient = React.useCallback((client: ClientWithProjects) => {
     setViewingClient(client)
     setIsDetailsModalOpen(true)
   }, [])
@@ -237,7 +246,7 @@ export default function ClientsPage() {
     }
   }
 
-  const columns: ColumnDef<Client>[] = React.useMemo(() => [
+  const columns: ColumnDef<ClientWithProjects>[] = React.useMemo(() => [
     {
       id: "user",
       header: "User",
@@ -347,6 +356,23 @@ export default function ClientsPage() {
     },
   ], [baseTime, canUpdate, canDelete, handleViewClient, handleEditClient, handleDeleteClient, isOnline])
 
+  const filteredClients = React.useMemo(() => {
+    if (activeTab === "all") return clients
+    if (activeTab === "active") {
+      return clients.filter(c => c.projects?.some(p => p.status === 'active'))
+    }
+    if (activeTab === "inactive") {
+      return clients.filter(c => !c.projects?.some(p => p.status === 'active'))
+    }
+    return clients
+  }, [clients, activeTab])
+
+  const tabs = React.useMemo(() => [
+    { value: "all", label: "All", badge: clients.length },
+    { value: "active", label: "Active", badge: clients.filter(c => c.projects?.some(p => p.status === 'active')).length },
+    { value: "inactive", label: "Inactive", badge: clients.filter(c => !c.projects?.some(p => p.status === 'active')).length },
+  ], [clients])
+
   return (
     <PageContainer>
       <SEO title="Clients" description="View and manage your client database and relationships." />
@@ -358,12 +384,15 @@ export default function ClientsPage() {
         <div className="flex-1">
           <DataTable 
             columns={columns} 
-            data={clients} 
+            data={filteredClients} 
             isLoading={isLoading}
             searchPlaceholder="Search clients..."
             addLabel="Add Client"
             onAdd={canCreate ? handleAddClient : undefined}
             onRowClick={handleViewClient}
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
             toolbar={
               <div className="flex items-center gap-2 rounded-md border bg-background px-2 h-8">
                 <Clock className="h-4 w-4 text-muted-foreground" />

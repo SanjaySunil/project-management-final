@@ -2,7 +2,7 @@ import * as React from "react"
 import { useNavigate } from "react-router-dom"
 import { LoginForm } from "@/components/login-form"
 import { SEO } from "@/components/seo"
-import { GalleryVerticalEnd } from "lucide-react"
+import { Logo } from "@/components/logo"
 import { useAuth } from "@/hooks/use-auth"
 
 export default function LoginPage() {
@@ -25,10 +25,8 @@ export default function LoginPage() {
       />
       <div className="w-full max-w-sm">
         <div className="flex justify-center gap-2 mb-6">
-          <a href="#" className="flex items-center gap-2 font-medium">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <GalleryVerticalEnd className="size-4" />
-            </div>
+          <a href="#" className="flex items-center gap-2 font-medium text-xl">
+            <Logo className="h-8 w-auto" />
             Arehsoft
           </a>
         </div>

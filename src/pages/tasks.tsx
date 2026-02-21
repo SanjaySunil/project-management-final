@@ -51,27 +51,41 @@ export default function TasksPage() {
         .from("tasks")
         .select(`
           *,
-          phases!inner (
+          projects (
+            id,
+            name,
+            client_id,
+            clients (
+              user_id
+            )
+          ),
+          phases (
             id,
             title,
             project_id,
-            projects!inner (
+            projects (
               id,
-              name,
-              client_id,
-              clients!inner (
-                user_id
-              )
+              name
             )
           ),
-          task_attachments (*)
+          task_attachments (*),
+          task_members (
+            user_id,
+            profiles (
+              id,
+              full_name,
+              avatar_url,
+              email,
+              role
+            )
+          )
         `)
       
-      let phasesQuery = supabase.from("phases").select("*, projects!inner(clients!inner(user_id))")
-      let projectsQuery = supabase.from("projects").select("*, clients!inner(user_id)")
+      let phasesQuery = supabase.from("phases").select("*, projects(clients(user_id))")
+      let projectsQuery = supabase.from("projects").select("*, clients(user_id)")
 
       if (isClient) {
-        tasksQuery = tasksQuery.eq("phases.projects.clients.user_id", user.id)
+        tasksQuery = tasksQuery.or(`projects.clients.user_id.eq.${user.id},phases.projects.clients.user_id.eq.${user.id}`)
         
         // For phases and projects, we need to join through clients table
         phasesQuery = phasesQuery.eq("projects.clients.user_id", user.id)
@@ -164,7 +178,17 @@ export default function TasksPage() {
                     name
                   )
                 ),
-                task_attachments (*)
+                task_attachments (*),
+                task_members (
+                  user_id,
+                  profiles (
+                    id,
+                    full_name,
+                    avatar_url,
+                    email,
+                    role
+                  )
+                )
               `)
               .eq("id", payload.new.id)
               .single()
@@ -264,6 +288,7 @@ export default function TasksPage() {
           description: values.description,
           type: values.type || 'feature',
           user_id: finalUserId,
+          project_id: values.project_id === "none" ? null : values.project_id,
           phase_id: values.phase_id === "none" ? null : values.phase_id,
           parent_id: (values.parent_id === "none" ? null : values.parent_id) || creatingParentId,
           status: finalStatus,
@@ -449,6 +474,7 @@ export default function TasksPage() {
         status: values.status || editingTask.status,
         type: values.type || editingTask.type || 'feature',
         user_id: finalUserId,
+        project_id: values.project_id === "none" ? null : (values.project_id || null),
         phase_id: values.phase_id === "none" ? null : (values.phase_id || null),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
@@ -737,6 +763,7 @@ export default function TasksPage() {
                 status: editingTask.status,
                 type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id,
+                project_id: (editingTask as any).project_id,
                 phase_id: editingTask.phase_id,
                 parent_id: editingTask.parent_id,
               }}

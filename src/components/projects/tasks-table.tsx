@@ -4,6 +4,7 @@ import {
   IconRocket, 
   IconBug, 
   IconGitPullRequest, 
+  IconShieldLock,
   IconDotsVertical,
   IconPencil,
   IconTrash,
@@ -93,6 +94,8 @@ export function TasksTable({
                 <IconBug className="size-3.5 text-destructive" />
               ) : type === 'revision' ? (
                 <IconGitPullRequest className="size-3.5 text-orange-600" />
+              ) : type === 'admin' ? (
+                <IconShieldLock className="size-3.5 text-purple-600" />
               ) : (
                 <IconRocket className="size-3.5 text-blue-600" />
               )}
@@ -158,7 +161,7 @@ export function TasksTable({
         header: "Project / Phase",
         cell: ({ row }) => {
           const task = row.original
-          const projectName = task.phases?.projects?.name
+          const projectName = (task as any).projects?.name || task.phases?.projects?.name
           const phaseTitle = task.phases?.title
 
           if (!projectName && !phaseTitle) return <span className="text-xs text-muted-foreground">-</span>

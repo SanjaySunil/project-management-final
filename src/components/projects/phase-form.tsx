@@ -107,6 +107,7 @@ export function PhaseForm({
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
               <option value="active">Active</option>
+              <option value="on_hold">On Hold</option>
               <option value="complete">Complete</option>
               <option value="rejected">Rejected</option>
             </select>

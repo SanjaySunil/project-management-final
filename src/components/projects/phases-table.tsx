@@ -7,7 +7,8 @@ import {
   IconFileText,
   IconExternalLink,
   IconSend,
-  IconX
+  IconX,
+  IconPlayerPause
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { DataTable, DragHandle } from "@/components/data-table"
@@ -203,8 +204,10 @@ export function PhasesTable({
                 <IconSend className="size-4 text-orange-500 mr-2" />
               ) : status === "rejected" ? (
                 <IconX className="size-4 text-red-500 mr-2" />
+              ) : status === "on_hold" ? (
+                <IconPlayerPause className="size-4 text-yellow-500 mr-2" />
               ) : null}
-              <span className="capitalize">{status}</span>
+              <span className="capitalize">{status.replace("_", " ")}</span>
             </div>
           )
         }
@@ -227,8 +230,10 @@ export function PhasesTable({
                     <IconSend className="size-4 text-orange-500 mr-2" />
                   ) : status === "rejected" ? (
                     <IconX className="size-4 text-red-500 mr-2" />
+                  ) : status === "on_hold" ? (
+                    <IconPlayerPause className="size-4 text-yellow-500 mr-2" />
                   ) : null}
-                  {status}
+                  {status.replace("_", " ")}
                 </div>
               </SelectValue>
             </SelectTrigger>
@@ -236,6 +241,7 @@ export function PhasesTable({
               <SelectItem value="draft" className="capitalize">Draft</SelectItem>
               <SelectItem value="sent" className="capitalize">Sent</SelectItem>
               <SelectItem value="active" className="capitalize">Active</SelectItem>
+              <SelectItem value="on_hold" className="capitalize">On Hold</SelectItem>
               <SelectItem value="complete" className="capitalize">Complete</SelectItem>
               <SelectItem value="rejected" className="capitalize">Rejected</SelectItem>
             </SelectContent>

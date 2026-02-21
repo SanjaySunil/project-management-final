@@ -162,6 +162,7 @@ export function TaskForm({
     
     return base.filter(phase => 
       phase.status?.toLowerCase() === "active" || 
+      phase.status?.toLowerCase() === "on_hold" || 
       phase.id === defaultValues?.phase_id
     )
   }, [selectedProjectId, phases, defaultValues?.phase_id])
@@ -636,6 +637,12 @@ export function TaskForm({
                         <div className="flex items-center gap-2">
                           <IconGitPullRequest className="size-4 text-orange-600" />
                           <span>Revision</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="admin">
+                        <div className="flex items-center gap-2">
+                          <IconShieldLock className="size-4 text-purple-600" />
+                          <span>Admin</span>
                         </div>
                       </SelectItem>
                     </SelectContent>

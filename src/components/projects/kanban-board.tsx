@@ -71,11 +71,13 @@ export type Task = {
   parent_id: string | null
   deliverable_id: string | null
   phase_id: string | null
+  project_id: string | null
   phases?: {
     id: string
     title: string
     project_id?: string | null
     projects?: {
+      id: string
       name: string
     } | null
   } | null
@@ -96,6 +98,7 @@ export type Task = {
       role?: string | null
     } | null
   }[]
+  is_personal?: boolean
 }
 
 export type KanbanMode = "development" | "admin"
@@ -178,12 +181,14 @@ export function KanbanBoard({
     
     // Filter tasks based on mode
     const filteredTasks = tasks.filter(task => {
+      const isPersonal = (task as any).is_personal
       const hasAdmin = task.task_members?.some(m => m.profiles?.role === 'admin')
+      const isAdminType = task.type === 'admin'
       if (mode === 'admin') {
-        return hasAdmin
+        return hasAdmin || isPersonal || isAdminType
       }
-      // In development mode, show tasks that don't have admins
-      return !hasAdmin
+      // In development mode, show tasks that don't have admins, are not personal, and are not admin type
+      return !hasAdmin && !isPersonal && !isAdminType
     })
 
     // Only include tasks that are top-level OR whose parent is NOT in this list
@@ -207,9 +212,11 @@ export function KanbanBoard({
   const getSubtasks = React.useCallback((taskId: string) => {
     return tasks.filter(t => {
       if (t.parent_id !== taskId) return false
+      const isPersonal = (t as any).is_personal
       const hasAdmin = t.task_members?.some(m => m.profiles?.role === 'admin')
-      if (mode === 'admin') return hasAdmin
-      return !hasAdmin
+      const isAdminType = t.type === 'admin'
+      if (mode === 'admin') return hasAdmin || isPersonal || isAdminType
+      return !hasAdmin && !isPersonal && !isAdminType
     })
   }, [tasks, mode])
 
@@ -717,6 +724,11 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                     <IconGitPullRequest className="size-2.5" />
                     Revision
                   </Badge>
+                ) : task.type === 'admin' ? (
+                  <Badge variant="outline" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 border-purple-200 uppercase font-bold tracking-wider">
+                    <IconShieldLock className="size-2.5" />
+                    Admin
+                  </Badge>
                 ) : (
                   <Badge variant="secondary" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-transparent uppercase font-bold tracking-wider">
                     <IconRocket className="size-2.5" />
@@ -737,6 +749,10 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { type: 'revision' }) }}>
                 <IconGitPullRequest className="size-3.5 mr-2 text-orange-600" />
                 <span>Revision</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { type: 'admin' }) }}>
+                <IconShieldLock className="size-3.5 mr-2 text-purple-600" />
+                <span>Admin</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -384,6 +384,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
           description: values.description,
           type: values.type || 'feature',
           user_id: finalUserId,
+          project_id: projectId,
           phase_id: phaseId,
           parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId),
           status: finalStatus,
@@ -545,6 +546,8 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         status: values.status || editingTask.status,
         type: values.type || editingTask.type || 'feature',
         user_id: finalUserId,
+        project_id: values.project_id === "none" ? null : (values.project_id || projectId),
+        phase_id: values.phase_id === "none" ? null : (values.phase_id || phaseId),
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null),
       }
 
@@ -671,6 +674,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
     switch (status) {
       case "active": return <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
       case "complete": return <Badge className="bg-blue-500 hover:bg-blue-600">Complete</Badge>
+      case "on_hold": return <Badge variant="outline" className="text-yellow-600 border-yellow-600">On Hold</Badge>
       case "draft": return <Badge variant="secondary">Draft</Badge>
       case "sent": return <Badge variant="default">Sent</Badge>
       case "rejected": return <Badge variant="destructive">Rejected</Badge>
@@ -917,6 +921,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
                 status: editingTask.status,
                 type: editingTask.type ?? undefined,
                 user_id: editingTask.user_id, 
+                project_id: (editingTask as any).project_id,
                 phase_id: editingTask.phase_id,
                 parent_id: editingTask.parent_id
               }}

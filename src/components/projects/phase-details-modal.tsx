@@ -15,6 +15,7 @@ import type { Tables } from "@/lib/database.types"
 import { supabase } from "@/lib/supabase"
 import type { Deliverable } from "./deliverables-manager"
 import { useAuth } from "@/hooks/use-auth"
+import { cn } from "@/lib/utils"
 
 interface PhaseDetailsModalProps {
   phase: Tables<"phases"> | null
@@ -65,8 +66,15 @@ export function PhaseDetailsModal({ phase, isOpen, onClose, projectId }: PhaseDe
               </div>
               <DialogTitle className="text-xl truncate">{phase.title}</DialogTitle>
             </div>
-            <Badge variant={phase.status === 'complete' ? 'default' : 'outline'} className="capitalize shrink-0">
-              {phase.status || 'draft'}
+            <Badge variant={
+              phase.status === 'complete' ? 'default' : 
+              phase.status === 'on_hold' ? 'outline' : 
+              'outline'
+            } className={cn(
+              "capitalize shrink-0",
+              phase.status === 'on_hold' && "text-yellow-600 border-yellow-600"
+            )}>
+              {(phase.status || 'draft').replace("_", " ")}
             </Badge>
           </div>
           <DialogDescription>
