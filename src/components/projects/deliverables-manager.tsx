@@ -16,7 +16,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { IconGripVertical, IconPlus, IconTrash } from "@tabler/icons-react"
+import { IconGripVertical, IconPlus, IconTrash, IconCopy } from "@tabler/icons-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -59,9 +60,8 @@ function SortableDeliverableItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-start gap-2 rounded-lg border bg-card p-3 ${
-        isDragging ? "opacity-50 ring-2 ring-primary" : ""
-      }`}
+      className={`flex items-start gap-2 rounded-lg border bg-card p-3 ${isDragging ? "opacity-50 ring-2 ring-primary" : ""
+        }`}
     >
       <button
         {...attributes}
@@ -158,16 +158,35 @@ export function DeliverablesManager({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Label className="text-base font-semibold">Deliverables</Label>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAdd}
-          className="h-8 gap-1"
-        >
-          <IconPlus className="size-3.5" />
-          Add Deliverable
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const text = deliverables
+                .filter(d => d.title)
+                .map((d, i) => `${i + 1}. ${d.title}${d.description ? `: ${d.description}` : ""}`)
+                .join("\n")
+              navigator.clipboard.writeText(text)
+              toast.success("Deliverables copied to clipboard")
+            }}
+            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <IconCopy className="size-3.5" />
+            Copy
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAdd}
+            className="h-8 gap-1"
+          >
+            <IconPlus className="size-3.5" />
+            Add Deliverable
+          </Button>
+        </div>
       </div>
 
       <DndContext

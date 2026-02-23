@@ -36,7 +36,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
         .select("*")
         .neq("role", "client")
         .order("full_name", { ascending: true })
-      
+
       if (error) throw error
       setProfiles(data || [])
     } catch (error: any) {
@@ -46,7 +46,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
 
   const fetchProjects = React.useCallback(async () => {
     if (!user || authLoading) return
-    
+
     try {
       setIsLoading(true)
       let query = supabase
@@ -65,13 +65,14 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
             )
           ),
           phases (
+            status,
             tasks (
               status
             )
           )
         `)
         .eq("client_id", clientId)
-      
+
       const normalizedRole = role?.toLowerCase()
       const isAdmin = normalizedRole === "admin"
       if (!isAdmin) {
@@ -82,7 +83,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
 
       if (error) throw error
       const projectsData = (data as any) || []
-      
+
       setProjects(projectsData)
     } catch (error: any) {
       toast.error("Failed to fetch projects: " + error.message)
@@ -124,10 +125,10 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
         .from("profiles")
         .select("id")
         .eq("role", "admin")
-      
+
       if (adminsError) throw adminsError
       const adminIds = admins?.map(a => a.id) || []
-      
+
       // Combine employee IDs from the UI with all admin IDs
       const allMemberIds = Array.from(new Set([...memberIds, ...adminIds]))
 
@@ -136,7 +137,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
         .from("project_members")
         .delete()
         .eq("project_id", projectId)
-      
+
       if (deleteError) throw deleteError
 
       if (allMemberIds.length > 0) {
@@ -186,7 +187,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
     }
 
     const { member_ids, ...projectValues } = values
-    
+
     try {
       let projectId: string
       const projectData = {
@@ -201,7 +202,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
           .update(projectData)
           .eq("id", projectId)
         if (error) throw error
-        
+
         // Update members using the helper logic (which now includes admins)
         await handleAssignMembers(projectId, member_ids || [])
       } else {
@@ -241,7 +242,7 @@ export function ClientProjectsTab({ clientId }: ClientProjectsTabProps) {
   return (
     <div className="flex flex-1 flex-col gap-4 py-4">
       <div className="flex-1">
-        <ProjectsTable 
+        <ProjectsTable
           data={projects}
           profiles={profiles}
           isLoading={isLoading}

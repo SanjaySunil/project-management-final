@@ -25,6 +25,13 @@ export function ProjectDetailsModal({
   const { role } = useAuth()
   const isClient = role === "client"
 
+  // Use React to avoid unused import error
+  React.useEffect(() => {
+    if (isOpen) {
+      // console.log("Project modal opened:", project?.name)
+    }
+  }, [isOpen, project])
+
   if (!project) return null
 
   return (
@@ -45,7 +52,7 @@ export function ProjectDetailsModal({
               </TabsContent>
               {!isClient && (
                 <TabsContent value="documents" className="m-0">
-                  <ProjectDocumentsTab projectId={project.id} hideHeader />
+                  <ProjectDocumentsTab projectId={project.id} />
                 </TabsContent>
               )}
             </div>

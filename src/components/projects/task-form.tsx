@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket, IconGitPullRequest, IconAlarm } from "@tabler/icons-react"
+import { IconCircle, IconCircleCheck, IconPlus, IconPaperclip, IconX, IconLoader2, IconShare, IconBug, IconRocket, IconGitPullRequest, IconAlarm, IconShieldLock } from "@tabler/icons-react"
 import type { Tables } from "@/lib/database.types"
 import type { Task } from "./kanban-board"
 import { supabase } from "@/lib/supabase"

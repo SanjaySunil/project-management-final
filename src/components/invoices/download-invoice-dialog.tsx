@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 import { useOrganization } from "@/hooks/use-organization"
+import { AREHSOFT_LOGO_BASE64 } from "@/lib/logo-base64"
 
 interface DownloadInvoiceDialogProps {
   invoice: any
@@ -35,13 +36,13 @@ export function DownloadInvoiceDialog({
       const doc = new jsPDF()
       
       // Header
-      doc.setFontSize(20)
-      doc.text(organization.name || "Invoice", 20, 20)
+      doc.addImage(AREHSOFT_LOGO_BASE64, "PNG", 20, 10, 15, 15)
       
       doc.setFontSize(10)
       doc.setTextColor(100)
-      doc.text(organization.email || "contact@arehsoft.com", 20, 28)
-      doc.text(organization.website || "arehsoft.com", 20, 33)
+      doc.text(organization.name || "Arehsoft", 20, 30)
+      doc.text(organization.email || "contact@arehsoft.com", 20, 35)
+      doc.text(organization.website || "arehsoft.com", 20, 40)
       
       // Invoice Label
       doc.setFontSize(24)
@@ -57,15 +58,15 @@ export function DownloadInvoiceDialog({
       
       // Client Info
       doc.setFontSize(12)
-      doc.text("Bill To:", 20, 50)
+      doc.text("Bill To:", 20, 55)
       doc.setFontSize(10)
       const client = invoice.clients
       if (client) {
         const fullName = [client.first_name?.trim(), client.last_name?.trim()].filter(Boolean).join(" ")
-        doc.text(fullName, 20, 57)
-        if (client.email) doc.text(client.email, 20, 62)
+        doc.text(fullName, 20, 62)
+        if (client.email) doc.text(client.email, 20, 67)
       } else {
-        doc.text("N/A", 20, 57)
+        doc.text("N/A", 20, 62)
       }
       
       // Table

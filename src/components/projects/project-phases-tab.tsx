@@ -24,6 +24,7 @@ import { updateProjectStatus } from "@/lib/projects"
 import { slugify } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { GenerateInvoiceDialog } from "./generate-invoice-dialog"
+import { AREHSOFT_LOGO_BASE64 } from "@/lib/logo-base64"
 
 type Phase = Tables<"phases">
 
@@ -58,6 +59,183 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
   const handleGenerateInvoice = async (phase: Phase) => {
     setPhaseForInvoice(phase)
     setIsInvoiceDialogOpen(true)
+  }
+
+  const handleExportProposal = async (phase: Phase) => {
+    try {
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select(`
+          name,
+          clients (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq("id", projectId)
+        .single()
+
+      if (projectError) throw projectError
+
+      const { data: deliverables, error: deliverablesError } = await supabase
+        .from("deliverables")
+        .select("*")
+        .eq("phase_id", phase.id)
+        .order("order_index", { ascending: true })
+
+      if (deliverablesError) throw deliverablesError
+
+      const doc = new jsPDF()
+      const client: any = project.clients
+
+      // Header
+      doc.addImage(AREHSOFT_LOGO_BASE64, "PNG", 20, 10, 15, 15)
+
+      doc.setFontSize(22)
+      doc.setTextColor(0, 0, 0)
+      doc.text("PROJECT PROPOSAL", 190, 20, { align: "right" })
+
+      doc.setFontSize(10)
+      doc.setTextColor(100)
+      doc.text(organization.name || "Arehsoft", 20, 30)
+      doc.text(organization.email || "contact@arehsoft.com", 20, 35)
+
+      // Proposal Date
+      doc.setFontSize(10)
+      doc.setTextColor(0)
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 190, 30, { align: "right" })
+
+      // Client Info
+      doc.setFontSize(12)
+      doc.text("Prepared For:", 20, 50)
+      doc.setFontSize(10)
+      if (client) {
+        const fullName = [client.first_name?.trim(), client.last_name?.trim()].filter(Boolean).join(" ")
+        doc.text(fullName, 20, 57)
+      } else {
+        doc.text("N/A", 20, 57)
+      }
+
+      // Project Info
+      doc.setFontSize(12)
+      doc.text("Project:", 120, 50)
+      doc.setFontSize(10)
+      doc.text(project.name, 120, 57)
+      doc.text(`Phase: ${phase.title}`, 120, 62)
+
+      // Summary
+      doc.setFontSize(14)
+      doc.text("Executive Summary", 20, 80)
+      doc.setFontSize(10)
+      const splitDescription = doc.splitTextToSize(phase.description || "No description provided.", 170)
+      doc.text(splitDescription, 20, 87)
+
+      const summaryHeight = splitDescription.length * 5
+      let nextY = 87 + summaryHeight + 15
+
+      // Deliverables
+      if (deliverables && deliverables.length > 0) {
+        doc.setFontSize(14)
+        doc.text("Deliverables", 20, nextY)
+        nextY += 7
+
+        const deliverableData = deliverables.map((d: any, index: number) => [
+          (index + 1).toString(),
+          d.title,
+          d.description || ""
+        ])
+
+        autoTable(doc, {
+          startY: nextY,
+          head: [["#", "Deliverable", "Description"]],
+          body: deliverableData,
+          theme: "grid",
+          headStyles: { fillColor: [0, 0, 0] },
+          margin: { left: 20, right: 20 },
+          styles: { fontSize: 9 },
+          columnStyles: {
+            0: { cellWidth: 10 },
+            1: { cellWidth: 50 },
+            2: { cellWidth: "auto" }
+          }
+        })
+
+        nextY = (doc as any).lastAutoTable.finalY + 15
+      }
+
+      // Technical Stack & Architecture
+      if (phase.tech_stack) {
+        if (nextY > 250) {
+          doc.addPage()
+          nextY = 20
+        }
+        doc.setFontSize(14)
+        doc.text("Technical Stack & Architecture", 20, nextY)
+        nextY += 7
+        doc.setFontSize(10)
+        const splitTechStack = doc.splitTextToSize(phase.tech_stack, 170)
+        doc.text(splitTechStack, 20, nextY)
+        nextY += (splitTechStack.length * 5) + 15
+      }
+
+      // Project Timeline & Milestones
+      if (phase.timeline) {
+        if (nextY > 250) {
+          doc.addPage()
+          nextY = 20
+        }
+        doc.setFontSize(14)
+        doc.text("Project Timeline & Milestones", 20, nextY)
+        nextY += 7
+        doc.setFontSize(10)
+        const splitTimeline = doc.splitTextToSize(phase.timeline, 170)
+        doc.text(splitTimeline, 20, nextY)
+        nextY += (splitTimeline.length * 5) + 15
+      }
+
+      // Payment Schedule
+      if (phase.payment_schedule) {
+        if (nextY > 250) {
+          doc.addPage()
+          nextY = 20
+        }
+        doc.setFontSize(14)
+        doc.text("Payment Schedule", 20, nextY)
+        nextY += 7
+        doc.setFontSize(10)
+        const splitPayment = doc.splitTextToSize(phase.payment_schedule, 170)
+        doc.text(splitPayment, 20, nextY)
+        nextY += (splitPayment.length * 5) + 15
+      }
+
+      // Investment
+      if (nextY > 250) {
+        doc.addPage()
+        nextY = 20
+      }
+
+      doc.setFontSize(14)
+      doc.text("Investment", 20, nextY)
+      nextY += 7
+
+      doc.setFontSize(10)
+      doc.text("The total investment for this phase is:", 20, nextY)
+      doc.setFontSize(16)
+      doc.text(`$${Number(phase.amount).toLocaleString()} USD`, 20, nextY + 10)
+
+      // Footer
+      doc.setFontSize(10)
+      doc.setTextColor(100)
+      const footerY = 280
+      doc.text("Thank you for considering our proposal.", 20, footerY)
+      doc.text("Valid for 30 days.", 190, footerY, { align: "right" })
+
+      doc.save(`Proposal-${project.name}-${phase.title}.pdf`)
+      toast.success("Proposal exported successfully")
+    } catch (error: any) {
+      toast.error("Failed to export proposal: " + error.message)
+    }
   }
 
   const handleConfirmInvoice = async (invoiceNumber: string, hideLineItems: boolean) => {
@@ -115,60 +293,60 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
 
       const doc = new jsPDF()
       const client: any = project.clients
-      
+
       // Header
-      doc.setFontSize(20)
-      doc.text(organization.name || "Invoice", 20, 20)
-      
+      doc.addImage(AREHSOFT_LOGO_BASE64, "PNG", 20, 10, 15, 15)
+
       doc.setFontSize(10)
       doc.setTextColor(100)
-      doc.text(organization.email || "contact@arehsoft.com", 20, 28)
-      doc.text(organization.website || "arehsoft.com", 20, 33)
-      
+      doc.text(organization.name || "Arehsoft", 20, 30)
+      doc.text(organization.email || "contact@arehsoft.com", 20, 35)
+      doc.text(organization.website || "arehsoft.com", 20, 40)
+
       // Invoice Label
       doc.setFontSize(24)
       doc.setTextColor(0)
       doc.text("INVOICE", 190, 20, { align: "right" })
-      
+
       doc.setFontSize(10)
       doc.text(`Invoice #: ${invoiceNumber}`, 190, 30, { align: "right" })
       doc.text(`Date: ${new Date().toLocaleDateString()}`, 190, 35, { align: "right" })
-      
+
       // Client Info
       doc.setFontSize(12)
-      doc.text("Bill To:", 20, 50)
+      doc.text("Bill To:", 20, 55)
       doc.setFontSize(10)
       if (client) {
         const fullName = [client.first_name?.trim(), client.last_name?.trim()].filter(Boolean).join(" ")
-        doc.text(fullName, 20, 57)
-        if (client.email) doc.text(client.email, 20, 62)
+        doc.text(fullName, 20, 62)
+        if (client.email) doc.text(client.email, 20, 67)
       } else {
-        doc.text("N/A", 20, 57)
+        doc.text("N/A", 20, 62)
       }
-      
+
       // Table
-      const tableData = lineItems.length > 0 
+      const tableData = lineItems.length > 0
         ? lineItems.map(item => {
-            const row = [item.description, item.details]
+          const row = [item.description, item.details]
+          if (!hideLineItems) {
+            row.push(`$${Number(item.price).toLocaleString()}`)
+            row.push(item.quantity.toString())
+            row.push(`$${(Number(item.price) * Number(item.quantity)).toLocaleString()}`)
+          }
+          return row
+        })
+        : [
+          (() => {
+            const row = [phaseForInvoice.title, phaseForInvoice.description || "Project Phase"]
             if (!hideLineItems) {
-              row.push(`$${Number(item.price).toLocaleString()}`)
-              row.push(item.quantity.toString())
-              row.push(`$${(Number(item.price) * Number(item.quantity)).toLocaleString()}`)
+              row.push(`$${Number(phaseForInvoice.amount).toLocaleString()}`)
+              row.push("1")
+              row.push(`$${Number(phaseForInvoice.amount).toLocaleString()}`)
             }
             return row
-          })
-        : [
-            (() => {
-              const row = [phaseForInvoice.title, phaseForInvoice.description || "Project Phase"]
-              if (!hideLineItems) {
-                row.push(`$${Number(phaseForInvoice.amount).toLocaleString()}`)
-                row.push("1")
-                row.push(`$${Number(phaseForInvoice.amount).toLocaleString()}`)
-              }
-              return row
-            })()
-          ]
-      
+          })()
+        ]
+
       const head = ["Description", "Details"]
       if (!hideLineItems) {
         head.push("Price (USD)", "Qty", "Total (USD)")
@@ -188,21 +366,21 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
           4: { halign: 'right' }
         }
       })
-      
+
       const finalY = (doc as any).lastAutoTable.finalY + 15
-      
+
       doc.setFontSize(10)
       doc.setTextColor(100)
       doc.text("Total Amount (USD)", 190, finalY, { align: "right" })
       doc.setFontSize(16)
       doc.setTextColor(0)
       doc.text(`$${totalAmount.toLocaleString()}`, 190, finalY + 10, { align: "right" })
-      
+
       // Footer
       doc.setFontSize(10)
       doc.setTextColor(100)
       doc.text("Thank you for your business!", 20, finalY + 40)
-      
+
       doc.save(`Invoice-${project.name}-${phaseForInvoice.title}.pdf`)
       toast.success("Invoice generated and saved successfully")
       setIsInvoiceDialogOpen(false)
@@ -238,7 +416,7 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
     setPhases(newData)
 
     try {
-      const updatePromises = newData.map((phase, index) => 
+      const updatePromises = newData.map((phase, index) =>
         supabase
           .from("phases")
           .update({ order_index: index })
@@ -300,9 +478,9 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
         .eq("id", id)
 
       if (error) throw error
-      
+
       await updateProjectStatus(projectId)
-      
+
       toast.success("Phase status updated")
       fetchPhases()
     } catch (error: any) {
@@ -321,9 +499,9 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
     try {
       const { error } = await supabase.from("phases").delete().eq("id", phaseToDelete)
       if (error) throw error
-      
+
       await updateProjectStatus(projectId)
-      
+
       toast.success("Phase deleted successfully")
       fetchPhases()
     } catch (error: any) {
@@ -379,7 +557,7 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
           .from("deliverables")
           .delete()
           .eq("phase_id", phaseId)
-        
+
         if (deleteError) throw deleteError
 
         if (updatedDeliverables.length > 0) {
@@ -393,7 +571,7 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
           const { error: insertError } = await supabase
             .from("deliverables")
             .insert(deliverablesToInsert)
-          
+
           if (insertError) throw insertError
         }
       }
@@ -410,35 +588,53 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <PhasesTable 
-        data={phases} 
+    <div className="flex flex-1 flex-col gap-4 min-h-0">
+      <PhasesTable
+        data={phases}
         projectId={projectId}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onView={handleView}
         onStatusChange={handleStatusChange}
         onGenerateInvoice={handleGenerateInvoice}
+        onExportProposal={handleExportProposal}
         onRowSelectionChange={setRowSelection}
         onDataChange={handleReorder}
         isLoading={isLoading}
         toolbar={
           isAdmin && selectedPhases.length > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                if (selectedPhases.length === 1) {
-                  handleGenerateInvoice(selectedPhases[0])
-                } else {
-                  toast.info("Generating multiple invoices is not yet supported. Generating for the first selected phase.")
-                  handleGenerateInvoice(selectedPhases[0])
-                }
-              }}
-            >
-              <IconFileText className="mr-2 h-4 w-4" />
-              Generate Invoice ({selectedPhases.length})
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedPhases.length === 1) {
+                    handleExportProposal(selectedPhases[0])
+                  } else {
+                    toast.info("Generating multiple proposals is not yet supported. Exporting the first selected phase.")
+                    handleExportProposal(selectedPhases[0])
+                  }
+                }}
+              >
+                <IconFileText className="mr-2 h-4 w-4" />
+                Export Proposal ({selectedPhases.length})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedPhases.length === 1) {
+                    handleGenerateInvoice(selectedPhases[0])
+                  } else {
+                    toast.info("Generating multiple invoices is not yet supported. Generating for the first selected phase.")
+                    handleGenerateInvoice(selectedPhases[0])
+                  }
+                }}
+              >
+                <IconFileText className="mr-2 h-4 w-4" />
+                Generate Invoice ({selectedPhases.length})
+              </Button>
+            </div>
           )
         }
       />
@@ -470,7 +666,7 @@ export function ProjectPhasesTab({ projectId }: ProjectPhasesTabProps) {
                 : "Fill in the details to create a new phase for this project."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <PhaseForm
             initialData={editingPhase}
             initialDeliverables={deliverables}

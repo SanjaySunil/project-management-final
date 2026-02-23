@@ -760,6 +760,80 @@ export function AssignedTasks({
     }
   }
 
+  const handleTaskConvert = async (task: Task) => {
+    try {
+      const isPersonal = (task as any).is_personal
+      const isAdmin = task.type === 'admin'
+      
+      if (isPersonal) {
+        // Personal tasks are always in Admin tab. 
+        // Converting them always means moving to Development tab (tasks table, type feature).
+        const newType = 'feature'
+        
+        const { data: newTask, error } = await supabase
+          .from("tasks")
+          .insert([{
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            type: newType,
+            user_id: task.user_id,
+            order_index: tasks.filter(t => t.status === task.status).length,
+          }])
+          .select(`
+            *,
+            phases (
+              id,
+              title,
+              project_id,
+              projects (
+                id,
+                name,
+                status
+              )
+            ),
+            task_attachments (*),
+            task_members (
+              user_id,
+              profiles (
+                id,
+                full_name,
+                avatar_url,
+                email,
+                role
+              )
+            )
+          `)
+          .single()
+
+        if (error) throw error
+
+        // Delete from personal_tasks
+        await (supabase.from as any)("personal_tasks").delete().eq("id", task.id)
+        
+        setPersonalTasks(prev => prev.filter(t => t.id !== task.id))
+        setTasks(prev => [...prev, { ...newTask, profiles: members.find(m => m.id === newTask.user_id) || null } as Task])
+        toast.success("Converted to development task")
+      } else {
+        // Project task. Toggle between admin and feature type to move between tabs.
+        const newType = isAdmin ? 'feature' : 'admin'
+        
+        const { error } = await supabase
+          .from("tasks")
+          .update({ type: newType })
+          .eq("id", task.id)
+
+        if (error) throw error
+
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, type: newType } : t))
+        toast.success(`Converted to ${newType === 'admin' ? 'admin' : 'development'} task`)
+      }
+    } catch (error: any) {
+      console.error("Convert task error:", error)
+      toast.error("Failed to convert task: " + error.message)
+    }
+  }
+
   const targetUser = React.useMemo(() => {
     return members.find(m => m.id === targetUserId)
   }, [members, targetUserId])
@@ -906,6 +980,7 @@ export function AssignedTasks({
             tasks={filteredTasks}
             members={members}
             onTaskUpdate={handleTaskUpdate}
+            onTaskConvert={handleTaskConvert}
             onTaskCreate={handleTaskCreateTrigger}
             onTaskQuickCreate={handleTaskQuickCreate}
             onTaskEdit={(task) => {

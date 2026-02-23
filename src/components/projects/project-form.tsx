@@ -1,8 +1,10 @@
 import * as React from "react"
 import { useForm } from "react-hook-form"
+import { Link } from "react-router-dom"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { toast } from "sonner"
+import { IconExternalLink } from "@tabler/icons-react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +40,7 @@ type ProjectFormValues = z.infer<typeof projectSchema>
 
 interface ProjectFormProps {
   initialValues?: Partial<{
+    id: string
     name: string
     description: string | null
     source_repo: string | null
@@ -108,7 +111,7 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
 
         if (clientsRes.error) throw clientsRes.error
         if (profilesRes.error) throw profilesRes.error
-        
+
         setClients(clientsRes.data || [])
         setProfiles(profilesRes.data || [])
       } catch (error: any) {
@@ -154,10 +157,10 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
                 <FormControl>
                   <div className="flex items-center">
                     <span className="px-3 py-2 text-sm text-muted-foreground bg-muted border border-r-0 rounded-l-md">arehsoft/</span>
-                    <Input 
-                      placeholder="repo-name" 
-                      {...field} 
-                      value={field.value || ''} 
+                    <Input
+                      placeholder="repo-name"
+                      {...field}
+                      value={field.value || ''}
                       className="rounded-l-none"
                     />
                   </div>
@@ -166,7 +169,7 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="client_id"
@@ -221,8 +224,8 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Status</FormLabel>
-                <Select 
-                  onValueChange={field.onChange} 
+                <Select
+                  onValueChange={field.onChange}
                   defaultValue={field.value}
                   disabled={!!initialValues?.name}
                 >
@@ -239,8 +242,8 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
                   </SelectContent>
                 </Select>
                 <p className="text-[0.8rem] text-muted-foreground">
-                  {initialValues?.name 
-                    ? "Project status is automatically updated based on phases." 
+                  {initialValues?.name
+                    ? "Project status is automatically updated based on phases."
                     : "Initial status for the new project."}
                 </p>
                 <FormMessage />
@@ -262,15 +265,31 @@ export function ProjectForm({ initialValues, onSubmit, onCancel, isLoading }: Pr
             )}
           />
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            {!isClient && (
-              <Button type="submit" disabled={isLoading || isFetchingData}>
-                {isLoading ? "Saving..." : (initialValues?.name ? "Save Changes" : "Save Project")}
+          <div className="flex justify-between items-center pt-4">
+            <div className="flex gap-2">
+              {initialValues?.id && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  asChild
+                  className="gap-2"
+                >
+                  <Link to={`/dashboard/projects/${initialValues.id}/phases`}>
+                    <IconExternalLink className="h-4 w-4" /> Manage Phases
+                  </Link>
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
               </Button>
-            )}
+              {!isClient && (
+                <Button type="submit" disabled={isLoading || isFetchingData}>
+                  {isLoading ? "Saving..." : (initialValues?.name ? "Save Changes" : "Save Project")}
+                </Button>
+              )}
+            </div>
           </div>
         </fieldset>
       </form>

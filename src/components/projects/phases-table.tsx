@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom"
 import type { ColumnDef } from "@tanstack/react-table"
-import { 
-  IconCircleCheckFilled, 
-  IconLoader, 
+import {
+  IconCircleCheckFilled,
+  IconLoader,
   IconDotsVertical,
   IconFileText,
   IconExternalLink,
@@ -42,20 +42,22 @@ interface PhasesTableProps {
   onView?: (phase: Phase) => void
   onStatusChange?: (id: string, status: string) => void
   onGenerateInvoice?: (phase: Phase) => void
+  onExportProposal?: (phase: Phase) => void
   onRowSelectionChange?: (rowSelection: any) => void
   onDataChange?: (data: Phase[]) => void
   isLoading?: boolean
   toolbar?: React.ReactNode
 }
 
-export function PhasesTable({ 
-  data, 
-  projectId, 
-  onEdit, 
-  onDelete, 
-  onView, 
-  onStatusChange, 
+export function PhasesTable({
+  data,
+  projectId,
+  onEdit,
+  onDelete,
+  onView,
+  onStatusChange,
   onGenerateInvoice,
+  onExportProposal,
   onRowSelectionChange,
   onDataChange,
   isLoading,
@@ -63,7 +65,7 @@ export function PhasesTable({
 }: PhasesTableProps) {
   const { role, checkPermission } = useAuth()
   const isAdmin = role === "admin"
-  
+
   const canUpdate = checkPermission('update', 'phases')
   const canDelete = checkPermission('delete', 'phases')
   const canCreate = checkPermission('create', 'phases')
@@ -121,29 +123,23 @@ export function PhasesTable({
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => {
-        if (onView) {
-          return (
-            <div className="flex flex-col">
-              <button
-                onClick={() => onView(row.original)}
-                className="flex items-center gap-2 hover:underline text-primary font-medium text-left"
-              >
-                <IconFileText className="h-4 w-4 text-muted-foreground" />
-                {row.original.title}
-              </button>
-            </div>
-          )
+        const handleClick = () => {
+          if (canUpdate) {
+            onEdit(row.original)
+          } else if (onView) {
+            onView(row.original)
+          }
         }
+
         return (
           <div className="flex flex-col">
-            <Link 
-              to={`/dashboard/projects/${projectId}/phases/${row.original.id}`}
-              className="flex items-center gap-2 hover:underline text-primary font-medium"
+            <button
+              onClick={handleClick}
+              className="flex items-center gap-2 hover:underline text-primary font-medium text-left"
             >
               <IconFileText className="h-4 w-4 text-muted-foreground" />
               {row.original.title}
-              <IconExternalLink className="h-3 w-3" />
-            </Link>
+            </button>
           </div>
         )
       },
@@ -190,7 +186,7 @@ export function PhasesTable({
       header: "Status",
       cell: ({ row }) => {
         const status = row.original.status || "draft"
-        
+
         if (!canUpdate) {
           return (
             <div className="flex items-center px-3 py-1.5 text-sm">
@@ -273,7 +269,7 @@ export function PhasesTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => {
                 if (onView) {
                   onView(row.original)
@@ -291,7 +287,7 @@ export function PhasesTable({
                 </Link>
               )}
             </DropdownMenuItem>
-            
+
             {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(row.original)}>Edit</DropdownMenuItem>
             )}
@@ -302,19 +298,25 @@ export function PhasesTable({
               </DropdownMenuItem>
             )}
 
+            {isAdmin && onExportProposal && (
+              <DropdownMenuItem onClick={() => onExportProposal(row.original)}>
+                <IconFileText className="mr-2 h-4 w-4" /> Export Proposal
+              </DropdownMenuItem>
+            )}
+
             <DropdownMenuItem onClick={() => {
-                 navigator.clipboard.writeText(row.original.id)
-                 toast.success("ID copied to clipboard")
+              navigator.clipboard.writeText(row.original.id)
+              toast.success("ID copied to clipboard")
             }}>Copy ID</DropdownMenuItem>
-            
+
             {canDelete && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                    variant="destructive" 
-                    onClick={() => onDelete(row.original.id)}
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => onDelete(row.original.id)}
                 >
-                    Delete
+                  Delete
                 </DropdownMenuItem>
               </>
             )}
@@ -334,7 +336,7 @@ export function PhasesTable({
       isLoading={isLoading}
       enableReordering={canUpdate}
       onDataChange={onDataChange}
-      onRowClick={onView}
+      onRowClick={canUpdate ? onEdit : onView}
       onRowSelectionChange={onRowSelectionChange}
       toolbar={toolbar}
       defaultSorting={[{ id: "title", desc: false }]}

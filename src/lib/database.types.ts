@@ -409,7 +409,7 @@ export type Database = {
             columns: ["phase_id"]
             isOneToOne: false
             referencedRelation: "phases"
-            referencedColumns: [ "id" ]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "invoices_phase_id_fkey"
@@ -651,8 +651,11 @@ export type Database = {
           net_amount: number | null
           order_index: number | null
           order_source: string | null
+          payment_schedule: string | null
           project_id: string | null
           status: string | null
+          tech_stack: string | null
+          timeline: string | null
           title: string
           updated_at: string | null
           user_id: string | null
@@ -669,8 +672,11 @@ export type Database = {
           net_amount?: number | null
           order_index?: number | null
           order_source?: string | null
+          payment_schedule?: string | null
           project_id?: string | null
           status?: string | null
+          tech_stack?: string | null
+          timeline?: string | null
           title: string
           updated_at?: string | null
           user_id?: string | null
@@ -687,8 +693,11 @@ export type Database = {
           net_amount?: number | null
           order_index?: number | null
           order_source?: string | null
+          payment_schedule?: string | null
           project_id?: string | null
           status?: string | null
+          tech_stack?: string | null
+          timeline?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string | null
@@ -1114,6 +1123,7 @@ export type Database = {
           order_index: number | null
           parent_id: string | null
           phase_id: string | null
+          project_id: string | null
           status: string
           title: string
           type: string | null
@@ -1128,6 +1138,7 @@ export type Database = {
           order_index?: number | null
           parent_id?: string | null
           phase_id?: string | null
+          project_id?: string | null
           status?: string
           title: string
           type?: string | null
@@ -1142,6 +1153,7 @@ export type Database = {
           order_index?: number | null
           parent_id?: string | null
           phase_id?: string | null
+          project_id?: string | null
           status?: string
           title?: string
           type?: string | null
@@ -1175,6 +1187,13 @@ export type Database = {
             columns: ["phase_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

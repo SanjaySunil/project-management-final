@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { IconExternalLink, IconFileText, IconChecklist, IconCurrencyDollar } from "@tabler/icons-react"
+import { IconExternalLink, IconFileText, IconChecklist, IconCurrencyDollar, IconCopy } from "@tabler/icons-react"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -67,9 +68,9 @@ export function PhaseDetailsModal({ phase, isOpen, onClose, projectId }: PhaseDe
               <DialogTitle className="text-xl truncate">{phase.title}</DialogTitle>
             </div>
             <Badge variant={
-              phase.status === 'complete' ? 'default' : 
-              phase.status === 'on_hold' ? 'outline' : 
-              'outline'
+              phase.status === 'complete' ? 'default' :
+                phase.status === 'on_hold' ? 'outline' :
+                  'outline'
             } className={cn(
               "capitalize shrink-0",
               phase.status === 'on_hold' && "text-yellow-600 border-yellow-600"
@@ -84,13 +85,90 @@ export function PhaseDetailsModal({ phase, isOpen, onClose, projectId }: PhaseDe
 
         <div className="space-y-6 py-4">
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              Description
+            <h4 className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+              <span className="flex items-center gap-2">Description</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  navigator.clipboard.writeText(phase.description || "")
+                  toast.success("Description copied to clipboard")
+                }}
+              >
+                <IconCopy className="h-3.5 w-3.5" />
+              </Button>
             </h4>
             <p className="text-sm leading-relaxed whitespace-pre-wrap">
               {phase.description || "No description provided."}
             </p>
           </div>
+
+          {phase.tech_stack && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">Technical Stack & Architecture</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    navigator.clipboard.writeText(phase.tech_stack || "")
+                    toast.success("Technical stack copied to clipboard")
+                  }}
+                >
+                  <IconCopy className="h-3.5 w-3.5" />
+                </Button>
+              </h4>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {phase.tech_stack}
+              </p>
+            </div>
+          )}
+
+          {phase.timeline && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">Project Timeline & Milestones</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    navigator.clipboard.writeText(phase.timeline || "")
+                    toast.success("Timeline copied to clipboard")
+                  }}
+                >
+                  <IconCopy className="h-3.5 w-3.5" />
+                </Button>
+              </h4>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {phase.timeline}
+              </p>
+            </div>
+          )}
+
+          {phase.payment_schedule && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">Payment Schedule</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    navigator.clipboard.writeText(phase.payment_schedule || "")
+                    toast.success("Payment schedule copied to clipboard")
+                  }}
+                >
+                  <IconCopy className="h-3.5 w-3.5" />
+                </Button>
+              </h4>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {phase.payment_schedule}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {isAdmin && (
@@ -120,7 +198,7 @@ export function PhaseDetailsModal({ phase, isOpen, onClose, projectId }: PhaseDe
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-muted-foreground">Information</h4>
               <div className="grid gap-2">
@@ -141,9 +219,25 @@ export function PhaseDetailsModal({ phase, isOpen, onClose, projectId }: PhaseDe
           <Separator />
 
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <IconChecklist className="h-4 w-4 text-muted-foreground" />
-              <h4 className="text-sm font-medium">Deliverables</h4>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <IconChecklist className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-sm font-medium">Deliverables</h4>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  const text = deliverables
+                    .map((d, i) => `${i + 1}. ${d.title}${d.description ? `: ${d.description}` : ""}`)
+                    .join("\n")
+                  navigator.clipboard.writeText(text)
+                  toast.success("Deliverables copied to clipboard")
+                }}
+              >
+                <IconCopy className="h-3.5 w-3.5" />
+              </Button>
             </div>
             {isLoading ? (
               <div className="space-y-2">

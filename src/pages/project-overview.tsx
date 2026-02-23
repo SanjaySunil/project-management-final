@@ -11,7 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProjectPhasesTab } from "@/components/projects/project-phases-tab"
 import { ProjectDocumentsTab } from "@/components/projects/project-documents-tab"
+import { ProjectTasksTab } from "@/components/projects/project-tasks-tab"
 import { useAuth } from "@/hooks/use-auth"
+import { IconLayoutKanban } from "@tabler/icons-react"
 
 export default function ProjectOverviewPage() {
   const { projectId } = useParams()
@@ -26,7 +28,7 @@ export default function ProjectOverviewPage() {
   const pathParts = location.pathname.split('/')
   const lastPart = pathParts[pathParts.length - 1]
   const [activeTab, setActiveTab] = React.useState(
-    ["phases", "documents"].includes(lastPart) ? lastPart : "phases"
+    ["phases", "documents", "tasks"].includes(lastPart) ? lastPart : "phases"
   )
 
   const fetchProjectDetails = React.useCallback(async () => {
@@ -74,13 +76,13 @@ export default function ProjectOverviewPage() {
     const pathParts = location.pathname.split('/')
     const lastPart = pathParts[pathParts.length - 1]
     
-    if (isClient && lastPart === "documents") {
+    if (isClient && (lastPart === "documents" || lastPart === "tasks")) {
       setActiveTab("phases")
       navigate(`/dashboard/projects/${projectId}/phases`, { replace: true })
       return
     }
 
-    if (["phases", "documents"].includes(lastPart)) {
+    if (["phases", "documents", "tasks"].includes(lastPart)) {
       setActiveTab(lastPart)
     } else if (lastPart === projectId) {
       setActiveTab("phases")
@@ -122,10 +124,10 @@ export default function ProjectOverviewPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer className="overflow-hidden">
       <SEO title={`Project: ${project.name}`} />
-      <div className="flex flex-1 flex-col gap-6">
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-1 flex-col gap-6 min-h-0">
+        <div className="flex flex-col gap-2 shrink-0">
           <Button asChild variant="ghost" className="w-fit -ml-2 h-8 text-muted-foreground">
             <Link to="/dashboard/projects">
               <IconArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
@@ -144,11 +146,16 @@ export default function ProjectOverviewPage() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col gap-4">
-          <TabsList className="w-fit">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col gap-4 min-h-0">
+          <TabsList className="w-fit shrink-0">
             <TabsTrigger value="phases" className="gap-2">
               <IconFileText className="h-4 w-4" /> Phases
             </TabsTrigger>
+            {!isClient && (
+              <TabsTrigger value="tasks" className="gap-2">
+                <IconLayoutKanban className="h-4 w-4" /> Tasks
+              </TabsTrigger>
+            )}
             {!isClient && (
               <TabsTrigger value="documents" className="gap-2">
                 <IconFileText className="h-4 w-4" /> Documents
@@ -156,12 +163,17 @@ export default function ProjectOverviewPage() {
             )}
           </TabsList>
 
-          <div className="mt-2">
-            <TabsContent value="phases" className="m-0 border-none p-0">
+          <div className="flex-1 flex flex-col min-h-0">
+            <TabsContent value="phases" className="m-0 border-none p-0 flex-1 flex flex-col min-h-0">
               <ProjectPhasesTab projectId={projectId as string} />
             </TabsContent>
             {!isClient && (
-              <TabsContent value="documents" className="m-0 border-none p-0">
+              <TabsContent value="tasks" className="m-0 border-none p-0 flex-1 flex flex-col min-h-0">
+                <ProjectTasksTab projectId={projectId as string} />
+              </TabsContent>
+            )}
+            {!isClient && (
+              <TabsContent value="documents" className="m-0 border-none p-0 flex-1 flex flex-col min-h-0">
                 <ProjectDocumentsTab projectId={projectId as string} />
               </TabsContent>
             )}

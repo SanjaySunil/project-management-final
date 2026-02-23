@@ -205,7 +205,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4 min-h-0">
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold tracking-tight">Project Documents</h2>
         <p className="text-sm text-muted-foreground">

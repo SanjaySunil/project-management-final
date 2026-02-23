@@ -73,6 +73,7 @@ function AppRoutes() {
         <Route path="projects/:projectId" element={<Navigate to="phases" replace />} />
         <Route path="projects/:projectId/overview" element={<Navigate to="../phases" replace />} />
         <Route path="projects/:projectId/documents" element={<ProjectOverviewPage />} />
+        <Route path="projects/:projectId/tasks" element={<ProjectOverviewPage />} />
         <Route path="projects/:projectId/phases" element={<ProjectOverviewPage />} />
         <Route path="projects/:projectId/phases/:phaseId" element={<PhaseOverviewPage />} />
         <Route path="projects/:projectId/chat" element={<ChatPage />} />

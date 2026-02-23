@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { 
+import {
   IconDotsVertical,
   IconEdit,
   IconTrash,
@@ -53,6 +53,7 @@ export type ProjectWithClient = Tables<"projects"> & {
     }
   }[]
   phases?: {
+    status: string
     tasks: {
       status: string
     }[]
@@ -74,12 +75,19 @@ interface ProjectsTableProps {
   defaultTab?: string
 }
 
-export function ProjectsTable({ 
-  data, 
+const isProjectActive = (project: ProjectWithClient) => {
+  if (project.status === "active") return true
+  return project.phases?.some(phase =>
+    ['draft', 'sent', 'active'].includes(phase.status)
+  ) || false
+}
+
+export function ProjectsTable({
+  data,
   profiles = [],
-  isLoading, 
-  onEdit, 
-  onDelete, 
+  isLoading,
+  onEdit,
+  onDelete,
   onAdd,
   onViewPhases,
   disablePadding = true,
@@ -95,19 +103,23 @@ export function ProjectsTable({
   const canUpdate = checkPermission('update', 'projects')
   const canDelete = checkPermission('delete', 'projects')
 
+
   const filteredData = React.useMemo(() => {
     if (activeTab === "all") return data
+    if (activeTab === "active") {
+      return data.filter(isProjectActive)
+    }
     return data.filter(project => project.status === activeTab)
   }, [data, activeTab])
 
   const tabs = [
     { value: "all", label: "All", badge: data.length },
-    { value: "active", label: "Active", badge: data.filter(p => p.status === "active").length },
+    { value: "active", label: "Active", badge: data.filter(isProjectActive).length },
     { value: "completed", label: "Completed", badge: data.filter(p => p.status === "completed").length },
     { value: "on-hold", label: "On Hold", badge: data.filter(p => p.status === "on-hold").length },
     { value: "cancelled", label: "Cancelled", badge: data.filter(p => p.status === "cancelled").length },
   ]
-  
+
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case "active":
@@ -197,14 +209,14 @@ export function ProjectsTable({
       header: "GitHub Repo",
       cell: ({ row }) => {
         const source = row.original.source_repo
-        
+
         if (!source) return <span className="text-muted-foreground text-xs italic">N/A</span>
-        
+
         return (
           <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-            <a 
-              href={`https://github.com/${source}`} 
-              target="_blank" 
+            <a
+              href={`https://github.com/${source}`}
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-sm text-primary hover:underline"
             >
@@ -221,7 +233,7 @@ export function ProjectsTable({
       accessorFn: (row) => {
         const phases = row.phases || []
         return phases.reduce((total, phase) => {
-          return total + (phase.tasks?.filter(task => 
+          return total + (phase.tasks?.filter(task =>
             task.status === "todo" || task.status === "in progress"
           ).length || 0)
         }, 0)
@@ -229,7 +241,7 @@ export function ProjectsTable({
       cell: ({ row }) => {
         const phases = row.original.phases || []
         const activeTasksCount = phases.reduce((total, phase) => {
-          return total + (phase.tasks?.filter(task => 
+          return total + (phase.tasks?.filter(task =>
             task.status === "todo" || task.status === "in progress"
           ).length || 0)
         }, 0)
@@ -251,7 +263,7 @@ export function ProjectsTable({
       cell: ({ row }) => {
         const members = row.original.project_members || []
         const currentMemberIds = members.map(m => m.user_id)
-        
+
         return (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <div className="flex -space-x-2 overflow-hidden">
@@ -272,13 +284,13 @@ export function ProjectsTable({
                 </div>
               )}
             </div>
-            
+
             {canUpdate && onAssignMembers && (
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="h-7 w-7 rounded-full border border-dashed border-muted-foreground/50 hover:border-muted-foreground"
                   >
                     <IconPlus className="h-3.5 w-3.5" />
@@ -326,7 +338,7 @@ export function ProjectsTable({
                 </PopoverContent>
               </Popover>
             )}
-            
+
             {members.length === 0 && !canUpdate && (
               <span className="text-muted-foreground text-xs italic">Unassigned</span>
             )}
@@ -346,7 +358,7 @@ export function ProjectsTable({
       cell: ({ row }) => {
         const date = row.original.updated_at || row.original.created_at
         if (!date) return "N/A"
-        
+
         const d = new Date(date)
         return (
           <div className="flex flex-col">
@@ -376,7 +388,7 @@ export function ProjectsTable({
             <DropdownMenuItem onClick={() => onViewPhases(row.original)}>
               <IconExternalLink className="mr-2 h-4 w-4" /> View Phases
             </DropdownMenuItem>
-            
+
             {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(row.original)}>
                 <IconEdit className="mr-2 h-4 w-4" /> Edit

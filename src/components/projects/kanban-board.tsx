@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock, IconAlarm } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock, IconAlarm, IconArrowsRightLeft } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
@@ -69,9 +69,9 @@ export type Task = {
   order_index: number | null
   user_id: string | null
   parent_id: string | null
-  deliverable_id: string | null
-  phase_id: string | null
-  project_id: string | null
+  deliverable_id?: string | null
+  phase_id?: string | null
+  project_id?: string | null
   phases?: {
     id: string
     title: string
@@ -107,6 +107,7 @@ interface KanbanBoardProps {
   tasks: Task[]
   members: Tables<"profiles">[]
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onTaskConvert?: (task: Task) => void | Promise<void>
   onTaskCreate: (status: string, parentId?: string) => void
   onTaskQuickCreate?: (status: string, parentId: string, title: string) => void | Promise<void>
   onTaskEdit: (task: Task) => void | Promise<void>
@@ -118,6 +119,7 @@ interface KanbanBoardProps {
   mode?: KanbanMode
   onModeChange?: (mode: KanbanMode) => void
   disablePadding?: boolean
+  extraControls?: React.ReactNode
 }
 
 const COLUMNS = [
@@ -132,6 +134,7 @@ export function KanbanBoard({
   tasks: initialTasks,
   members,
   onTaskUpdate,
+  onTaskConvert,
   onTaskCreate,
   onTaskQuickCreate,
   onTaskEdit,
@@ -142,7 +145,8 @@ export function KanbanBoard({
   isLoading = false,
   mode = "development",
   onModeChange,
-  disablePadding = false
+  disablePadding = false,
+  extraControls
 }: KanbanBoardProps) {
   const [tasks, setTasks] = React.useState<Task[]>(initialTasks)
   const [activeTask, setActiveTask] = React.useState<Task | null>(null)
@@ -398,12 +402,15 @@ export function KanbanBoard({
             </ToggleGroup>
           </div>
           
-          {!hideCreate && (
-            <Button onClick={() => onTaskCreate("todo")} size="sm" disabled={isLoading}>
-              <IconPlus className="size-4 mr-2" />
-              Add Task
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {extraControls}
+            {!hideCreate && (
+              <Button onClick={() => onTaskCreate("todo")} size="sm" disabled={isLoading}>
+                <IconPlus className="size-4 mr-2" />
+                Add Task
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -464,6 +471,7 @@ export function KanbanBoard({
                 onQuickAddSubtask={!hideCreate && onTaskQuickCreate ? (parentId, title) => onTaskQuickCreate(column.id, parentId, title) : undefined}
                 onTaskEdit={onTaskEdit}
                 onTaskUpdate={onTaskUpdate}
+                onTaskConvert={onTaskConvert}
                 onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
                 onShare={handleShare}
                 getSubtasks={getSubtasks}
@@ -478,6 +486,7 @@ export function KanbanBoard({
                   members={members} 
                   onEdit={onTaskEdit}
                   onUpdate={onTaskUpdate}
+                  onConvert={onTaskConvert}
                   onDelete={() => setIsDeleteDialogOpen(activeTask.id)}
                   onShare={handleShare}
                   subtasks={getSubtasks(activeTask.id)}
@@ -514,12 +523,13 @@ interface KanbanColumnProps {
   onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onTaskConvert?: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
   onShare: (task: Task) => void
   getSubtasks: (taskId: string) => Task[]
 }
 
-function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskDelete, onShare, getSubtasks }: KanbanColumnProps) {
+function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskConvert, onTaskDelete, onShare, getSubtasks }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: id,
   })
@@ -561,6 +571,7 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
               members={members}
               onEdit={onTaskEdit}
               onUpdate={onTaskUpdate}
+              onConvert={onTaskConvert}
               onTaskDelete={onTaskDelete}
               onAddSubtask={onAddSubtask}
               onQuickAddSubtask={onQuickAddSubtask}
@@ -596,6 +607,7 @@ interface SortableTaskCardProps {
   members: Tables<"profiles">[]
   onEdit: (task: Task) => void | Promise<void>
   onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onConvert?: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
   onAddSubtask?: (parentId: string) => void
   onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
@@ -603,7 +615,7 @@ interface SortableTaskCardProps {
   subtasks: Task[]
 }
 
-function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAddSubtask, onQuickAddSubtask, onShare, subtasks }: SortableTaskCardProps) {
+function SortableTaskCard({ task, members, onEdit, onUpdate, onConvert, onTaskDelete, onAddSubtask, onQuickAddSubtask, onShare, subtasks }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -640,6 +652,7 @@ function SortableTaskCard({ task, members, onEdit, onUpdate, onTaskDelete, onAdd
         members={members} 
         onEdit={onEdit}
         onUpdate={onUpdate}
+        onConvert={onConvert}
         onDelete={() => onTaskDelete(task.id)}
         onAddSubtask={onAddSubtask}
         onQuickAddSubtask={onQuickAddSubtask}
@@ -656,6 +669,7 @@ interface TaskCardProps {
   members: Tables<"profiles">[]
   onEdit: (task: Task) => void | Promise<void>
   onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onConvert?: (task: Task) => void | Promise<void>
   onDelete: () => void
   onAddSubtask?: (parentId: string) => void
   onQuickAddSubtask?: (parentId: string, title: string) => void | Promise<void>
@@ -663,7 +677,7 @@ interface TaskCardProps {
   subtasks: Task[]
 }
 
-function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddSubtask, onQuickAddSubtask, onShare, subtasks }: TaskCardProps) {
+function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onConvert, onDelete, onAddSubtask, onQuickAddSubtask, onShare, subtasks }: TaskCardProps) {
   const [isAddingSubtask, setIsAddingSubtask] = React.useState(false)
   const [newSubtaskTitle, setNewSubtaskTitle] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -720,12 +734,12 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
                     Bug
                   </Badge>
                 ) : task.type === 'revision' ? (
-                  <Badge variant="outline" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-200 uppercase font-bold tracking-wider">
+                  <Badge variant="secondary" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-transparent uppercase font-bold tracking-wider">
                     <IconGitPullRequest className="size-2.5" />
                     Revision
                   </Badge>
                 ) : task.type === 'admin' ? (
-                  <Badge variant="outline" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 border-purple-200 uppercase font-bold tracking-wider">
+                  <Badge variant="secondary" className="h-4 px-1 text-[9px] gap-0.5 flex items-center bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 border-transparent uppercase font-bold tracking-wider">
                     <IconShieldLock className="size-2.5" />
                     Admin
                   </Badge>
@@ -824,6 +838,34 @@ function TaskCard({ task, isOverlay, members, onEdit, onUpdate, onDelete, onAddS
               >
                 <IconShare className="size-3" />
               </Button>
+              {onConvert && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 -mt-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 transition-opacity"
+                    >
+                      <IconArrowsRightLeft className="size-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConvert(task) }}>
+                      {task.is_personal || task.type === 'admin' ? (
+                        <>
+                          <IconCode className="size-3.5 mr-2" />
+                          <span>Convert to Development Task</span>
+                        </>
+                      ) : (
+                        <>
+                          <IconShieldLock className="size-3.5 mr-2" />
+                          <span>Convert to Admin Task</span>
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

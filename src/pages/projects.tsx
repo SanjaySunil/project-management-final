@@ -27,7 +27,7 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = React.useState<ProjectWithClient | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null)
-  
+
   const fetchProfiles = React.useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -35,7 +35,7 @@ export default function ProjectsPage() {
         .select("*")
         .neq("role", "client")
         .order("full_name", { ascending: true })
-      
+
       if (error) throw error
       setProfiles(data || [])
     } catch (error: any) {
@@ -45,12 +45,12 @@ export default function ProjectsPage() {
 
   const fetchProjects = React.useCallback(async () => {
     if (!user || authLoading) return
-    
+
     try {
       setIsLoading(true)
-      
+
       const normalizedRole = role?.toLowerCase()
-      
+
       // If client, we can use an inner join to projects to filter by their user_id in clients table
       // This is more efficient and handles the case where they might not have a client record yet
       if (normalizedRole === "client") {
@@ -72,6 +72,7 @@ export default function ProjectsPage() {
               )
             ),
             phases (
+              status,
               tasks (
                 status
               )
@@ -81,9 +82,9 @@ export default function ProjectsPage() {
           .order("order_index", { ascending: true })
 
         if (error) throw error
-        
+
         const projectsWithSync = (data as any) || []
-        
+
         setProjects(projectsWithSync)
         return
       }
@@ -105,12 +106,13 @@ export default function ProjectsPage() {
             )
           ),
           phases (
+            status,
             tasks (
               status
             )
           )
         `)
-      
+
       if (normalizedRole !== "admin") {
         // Employee sees projects they are members of
         query = query.filter("project_members.user_id", "eq", user.id)
@@ -119,9 +121,9 @@ export default function ProjectsPage() {
       const { data, error } = await query.order("order_index", { ascending: true })
 
       if (error) throw error
-      
+
       const projectsWithSync = (data as any) || []
-      
+
       setProjects(projectsWithSync)
     } catch (error: any) {
       console.error("Failed to fetch projects:", error)
@@ -189,10 +191,10 @@ export default function ProjectsPage() {
         .from("profiles")
         .select("id")
         .eq("role", "admin")
-      
+
       if (adminsError) throw adminsError
       const adminIds = admins?.map(a => a.id) || []
-      
+
       // Combine employee IDs from the UI with all admin IDs
       const allMemberIds = Array.from(new Set([...memberIds, ...adminIds]))
 
@@ -201,7 +203,7 @@ export default function ProjectsPage() {
         .from("project_members")
         .delete()
         .eq("project_id", projectId)
-      
+
       if (deleteError) throw deleteError
 
       if (allMemberIds.length > 0) {
@@ -250,12 +252,12 @@ export default function ProjectsPage() {
       toast.error("Clients are not authorized to create or edit projects")
       return
     }
-    
+
     const { member_ids, ...projectValues } = values
-    
+
     try {
       let projectId: string
-      
+
       if (editingProject) {
         projectId = editingProject.id
         const { error } = await supabase
@@ -263,16 +265,16 @@ export default function ProjectsPage() {
           .update(projectValues)
           .eq("id", projectId)
         if (error) throw error
-        
+
         // Update members using the helper logic (which now includes admins)
         await handleAssignMembers(projectId, member_ids || [])
       } else {
         // For new projects, set order_index to the end of the list
         const { data, error } = await supabase
           .from("projects")
-          .insert([{ 
+          .insert([{
             ...projectValues,
-            order_index: projects.length 
+            order_index: projects.length
           }])
           .select()
           .single()
@@ -310,7 +312,7 @@ export default function ProjectsPage() {
         </div>
 
         <div className="flex-1">
-          <ProjectsTable 
+          <ProjectsTable
             data={projects}
             profiles={profiles}
             isLoading={isLoading}
@@ -318,7 +320,7 @@ export default function ProjectsPage() {
             onDelete={handleDeleteProject}
             onAdd={handleAddProject}
             onViewPhases={handleViewDetails}
-            onRowClick={handleViewDetails}
+            onRowClick={handleEditProject}
             onAssignMembers={handleAssignMembers}
             onReorder={handleReorder}
             defaultTab="active"
