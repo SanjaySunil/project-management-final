@@ -36,7 +36,7 @@ const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional().nullable(),
   status: z.string().optional(),
-  type: z.string().optional(),
+  type: z.string().nullable().optional(),
   user_id: z.string().nullable().optional(),
   assignee_ids: z.array(z.string()),
   project_id: z.string().nullable().optional(),
@@ -708,26 +708,40 @@ export function TaskForm({
 
           <div className="grid grid-cols-2 gap-4 pb-2">
             {projects.length > 0 && (
-              <FormField
-                control={form.control}
-                name="project_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project</FormLabel>
-                    <Select 
-                      onValueChange={(val) => {
-                        field.onChange(val)
-                        // Reset phase when project changes
-                        form.setValue("phase_id", "none")
-                      }} 
-                      value={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select project" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                          <FormField
+                            control={form.control}
+                            name="project_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Project</FormLabel>
+                                <Select 
+                                  onValueChange={(val) => {
+                                    field.onChange(val)
+                                    
+                                    if (val && val !== "none") {
+                                      // Find the first active phase of the selected project
+                                      // The phases array is already sorted by order_index from the parent fetch
+                                      const firstActivePhase = phases.find(p => 
+                                        p.project_id === val && 
+                                        p.status?.toLowerCase() === "active"
+                                      )
+              
+                                      if (firstActivePhase) {
+                                        form.setValue("phase_id", firstActivePhase.id)
+                                      } else {
+                                        form.setValue("phase_id", "none")
+                                      }
+                                    } else {
+                                      form.setValue("phase_id", "none")
+                                    }
+                                  }} 
+                                  value={field.value || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select project" />
+                                    </SelectTrigger>
+                                  </FormControl>                      <SelectContent>
                         <SelectItem value="none">None</SelectItem>
                         {visibleProjects.map((project) => (
                           <SelectItem key={project.id} value={project.id}>

@@ -19,16 +19,16 @@ import {
 import { TaskForm, type TaskFormValues } from "@/components/projects/task-form"
 import { useAuth } from "@/hooks/use-auth"
 import { useSearchParams } from "react-router-dom"
+import { useTasks } from "@/hooks/use-tasks"
 
 export default function TasksPage() {
   const { user, role, loading: authLoading } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const taskIdParam = searchParams.get("taskId")
-  const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
   const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const [isLoadingMetadata, setIsLoadingMetadata] = React.useState(true)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
@@ -38,62 +38,27 @@ export default function TasksPage() {
   const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
   const [viewMode, setViewMode] = React.useState<"kanban" | "table">("kanban")
 
-  const fetchInitialData = React.useCallback(async () => {
+  const { tasks, isLoading: isTasksLoading, setTasks } = useTasks()
+
+  const fetchMetadata = React.useCallback(async () => {
     if (!user || authLoading) return
 
     try {
-      setIsLoading(true)
+      setIsLoadingMetadata(true)
       
       const normalizedRole = role?.toLowerCase()
       const isClient = normalizedRole === "client"
 
-      let tasksQuery = supabase
-        .from("tasks")
-        .select(`
-          *,
-          projects (
-            id,
-            name,
-            client_id,
-            clients (
-              user_id
-            )
-          ),
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              id,
-              name
-            )
-          ),
-          task_attachments (*),
-          task_members (
-            user_id,
-            profiles (
-              id,
-              full_name,
-              avatar_url,
-              email,
-              role
-            )
-          )
-        `)
-      
       let phasesQuery = supabase.from("phases").select("*, projects(clients(user_id))")
       let projectsQuery = supabase.from("projects").select("*, clients(user_id)")
 
       if (isClient) {
-        tasksQuery = tasksQuery.or(`projects.clients.user_id.eq.${user.id},phases.projects.clients.user_id.eq.${user.id}`)
-        
         // For phases and projects, we need to join through clients table
         phasesQuery = phasesQuery.eq("projects.clients.user_id", user.id)
         projectsQuery = projectsQuery.eq("clients.user_id", user.id)
       }
 
-      const [tasksRes, membersRes, phasesRes, projectsRes] = await Promise.all([
-        tasksQuery.order("order_index", { ascending: true }),
+      const [membersRes, phasesRes, projectsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("*")
@@ -106,33 +71,26 @@ export default function TasksPage() {
           .order("name", { ascending: true })
       ])
 
-      if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
       if (phasesRes.error) throw phasesRes.error
       if (projectsRes.error) throw projectsRes.error
 
-      const fetchedMembers = membersRes.data || []
-      const fetchedTasks = (tasksRes.data || []).map(task => ({
-        ...task,
-        profiles: fetchedMembers.find(m => m.id === task.user_id) || null
-      }))
-
-      setTasks(fetchedTasks as Task[])
-      setMembers(fetchedMembers)
+      setMembers(membersRes.data || [])
       setPhases(phasesRes.data || [])
       setProjects(projectsRes.data || [])
     } catch (error: any) {
-      console.error("Fetch tasks error:", error)
-      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
-      toast.error("Failed to fetch data: " + message)
+      console.error("Fetch metadata error:", error)
+      toast.error("Failed to fetch metadata")
     } finally {
-      setIsLoading(false)
+      setIsLoadingMetadata(false)
     }
   }, [user, role, authLoading])
 
   React.useEffect(() => {
-    fetchInitialData()
-  }, [fetchInitialData])
+    fetchMetadata()
+  }, [fetchMetadata])
+
+  const isLoading = isLoadingMetadata || isTasksLoading
 
   // Handle deep linking for tasks
   React.useEffect(() => {
@@ -158,91 +116,25 @@ export default function TasksPage() {
     }
   }
 
-  React.useEffect(() => {
-    const channel = supabase
-      .channel("tasks-all-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        async (payload) => {
-          if (payload.eventType === "INSERT") {
-            const { data, error } = await supabase
-              .from("tasks")
-              .select(`
-                *,
-                phases (
-                  id,
-                  title,
-                  project_id,
-                  projects (
-                    name
-                  )
-                ),
-                task_attachments (*),
-                task_members (
-                  user_id,
-                  profiles (
-                    id,
-                    full_name,
-                    avatar_url,
-                    email,
-                    role
-                  )
-                )
-              `)
-              .eq("id", payload.new.id)
-              .single()
-
-            if (!error && data) {
-              const newTask = {
-                ...data,
-                profiles: members.find(m => m.id === data.user_id) || null
-              }
-              setTasks(prev => {
-                if (prev.some(t => t.id === newTask.id)) return prev
-                return [...prev, newTask as Task]
-              })
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const updatedTask = payload.new as Task
-            setTasks(prev => prev.map(t => {
-              if (t.id === updatedTask.id) {
-                return {
-                  ...t,
-                  ...updatedTask,
-                  profiles: members.find(m => m.id === updatedTask.user_id) || null
-                }
-              }
-              return t
-            }))
-          } else if (payload.eventType === "DELETE") {
-            setTasks(prev => prev.filter(t => t.id !== payload.old.id))
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [members])
-
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
-      // If user_id is changed, we need to update the profiles object locally as well
-      const updatedData = { ...updates }
-      if ("user_id" in updates) {
-        (updatedData as Record<string, unknown>).profiles = members.find(m => m.id === updates.user_id) || null
-      }
+      // Optimistic update
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t))
+
+      // Clean up updates to only include database columns
+      const dbUpdates = { ...updates } as any
+      delete dbUpdates.phases
+      delete dbUpdates.profiles
+      delete dbUpdates.task_attachments
+      delete dbUpdates.task_members
+      delete dbUpdates.projects
 
       const { error } = await supabase
         .from("tasks")
-        .update(updates)
+        .update(dbUpdates)
         .eq("id", taskId)
 
       if (error) throw error
-      
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
     } catch (error: any) {
       console.error("Update task error:", error)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
@@ -294,18 +186,7 @@ export default function TasksPage() {
           status: finalStatus,
           order_index: tasks.filter(t => t.status === finalStatus).length
         }])
-        .select(`
-          *,
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              name
-            )
-          ),
-          task_attachments (*)
-        `)
+        .select()
         .single()
 
       if (error) throw error
@@ -332,45 +213,9 @@ export default function TasksPage() {
           order_index: index
         }))
         
-        const { data: createdSubtasks, error: subtasksError } = await supabase
+        await supabase
           .from("tasks")
           .insert(subtasksToInsert)
-          .select(`
-            *,
-            phases (
-              id,
-              title,
-              project_id,
-              projects (
-                name
-              )
-            ),
-            task_attachments (*)
-          `)
-
-        if (subtasksError) throw subtasksError
-        
-        if (createdSubtasks) {
-          if (assigneeIds.length > 0) {
-            const subtaskAssignments = createdSubtasks.flatMap(st => 
-              assigneeIds.map(userId => ({
-                task_id: st.id,
-                user_id: userId
-              }))
-            )
-            await supabase.from("task_members").insert(subtaskAssignments)
-          }
-
-          const formattedSubtasks = createdSubtasks.map(st => ({
-            ...st,
-            profiles: members.find(m => m.id === st.user_id) || null,
-            task_members: assigneeIds.map(userId => ({
-              user_id: userId,
-              profiles: members.find(m => m.id === userId) || null
-            }))
-          }))
-          setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
-        }
       }
 
       // Handle attachments
@@ -406,7 +251,7 @@ export default function TasksPage() {
 
           if (!user) throw new Error("Not authenticated")
 
-          const { data: attachment, error: dbError } = await supabase
+          await supabase
             .from('task_attachments')
             .insert([{
               task_id: taskId,
@@ -416,38 +261,9 @@ export default function TasksPage() {
               file_type: file.type,
               file_size: fileToUpload.size
             }])
-            .select()
-            .single()
-
-          if (dbError) throw dbError
-          
-          // Update the task in state to include the new attachment
-          setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-              return {
-                ...t,
-                task_attachments: [...(t.task_attachments || []), attachment]
-              }
-            }
-            return t
-          }))
         }
       }
 
-      const newTask = {
-        ...data,
-        profiles: members.find(m => m.id === data.user_id) || null,
-        task_members: assigneeIds.map(userId => ({
-          user_id: userId,
-          profiles: members.find(m => m.id === userId) || null
-        }))
-      }
-
-      setTasks(prev => {
-        if (prev.some(t => t.id === newTask.id)) return prev
-        return [...prev, newTask as Task]
-      })
-      
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
@@ -497,21 +313,6 @@ export default function TasksPage() {
         await supabase.from("task_members").insert(assignments)
       }
 
-      setTasks(prev => prev.map(t => {
-        if (t.id === editingTask.id) {
-          return { 
-            ...t, 
-            ...updates,
-            profiles: members.find(m => m.id === updates.user_id) || null,
-            task_members: assigneeIds.map(userId => ({
-              user_id: userId,
-              profiles: members.find(m => m.id === userId) || null
-            }))
-          }
-        }
-        return t
-      }))
-      
       setIsEditDialogOpen(false)
       setEditingTask(null)
       toast.success("Task updated successfully")
@@ -526,6 +327,9 @@ export default function TasksPage() {
 
   const handleTaskDelete = async (taskId: string) => {
     try {
+      // Optimistic delete
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+
       const { error } = await supabase
         .from("tasks")
         .delete()
@@ -533,12 +337,30 @@ export default function TasksPage() {
 
       if (error) throw error
 
-      setTasks(prev => prev.filter(t => t.id !== taskId))
       toast.success("Task deleted successfully")
     } catch (error: any) {
       console.error("Delete task error:", error)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
       toast.error("Failed to delete task: " + message)
+    }
+  }
+
+  const handleMoveAllTasks = async (taskIds: string[], targetStatus: string) => {
+    try {
+      // Optimistic update
+      setTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: targetStatus } : t))
+
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: targetStatus })
+        .in("id", taskIds)
+
+      if (error) throw error
+
+      toast.success(`Moved ${taskIds.length} tasks to ${targetStatus}`)
+    } catch (error: any) {
+      console.error("Move all tasks error:", error)
+      toast.error("Failed to move tasks")
     }
   }
 
@@ -567,18 +389,7 @@ export default function TasksPage() {
           phase_id: parentTask?.phase_id || null,
           order_index: tasks.filter(t => t.parent_id === parentId).length
         }])
-        .select(`
-          *,
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              name
-            )
-          ),
-          task_attachments (*)
-        `)
+        .select()
         .single()
 
       if (error) throw error
@@ -592,16 +403,6 @@ export default function TasksPage() {
         await supabase.from("task_members").insert(assignments)
       }
 
-      const newTask = {
-        ...data,
-        profiles: members.find(m => m.id === data.user_id) || null,
-        task_members: assigneeIds.map(userId => ({
-          user_id: userId,
-          profiles: members.find(m => m.id === userId) || null
-        }))
-      }
-
-      setTasks(prev => [...prev, newTask as Task])
       toast.success("Subtask added")
     } catch (error: any) {
       console.error("Quick create task error:", error)
@@ -659,6 +460,7 @@ export default function TasksPage() {
               onTaskQuickCreate={handleTaskQuickCreate}
               onTaskEdit={handleTaskEditTrigger}
               onTaskDelete={handleTaskDelete}
+              onMoveAllTasks={handleMoveAllTasks}
               isLoading={isLoading}
               mode={kanbanMode}
               onModeChange={setKanbanMode}

@@ -26,6 +26,8 @@ import { slugify, getErrorMessage } from "@/lib/utils"
 import { PhaseChat } from "./phase-chat"
 import { RevisionsManager } from "./revisions-manager"
 
+import { useTasks } from "@/hooks/use-tasks"
+
 type Phase = Tables<"phases">
 
 interface PhaseDetailsProps {
@@ -49,15 +51,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState("kanban")
 
-  // Set default tab for client
-  React.useEffect(() => {
-    if (role === 'client' && activeTab !== 'revisions') {
-      setActiveTab('revisions')
-    }
-  }, [role, activeTab])
-
   // Kanban state
-  const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [projectEmployees, setProjectEmployees] = React.useState<Tables<"profiles">[]>([])
   const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
@@ -67,6 +61,15 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   const [creatingStatus, setCreatingStatus] = React.useState<string | null>(null)
   const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isTaskSubmitting, setIsTaskSubmitting] = React.useState(false)
+
+  const { tasks, setTasks } = useTasks({ phaseId })
+
+  // Set default tab for client
+  React.useEffect(() => {
+    if (role === 'client' && activeTab !== 'revisions') {
+      setActiveTab('revisions')
+    }
+  }, [role, activeTab])
 
   // Handle deep linking for tasks
   React.useEffect(() => {
@@ -132,30 +135,10 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       setPhase(phaseData)
 
       // Fetch deliverables, tasks, and members in parallel
-      const [deliverablesRes, tasksRes, membersRes, projectMembersRes] = await Promise.all([
+      const [deliverablesRes, membersRes, projectMembersRes] = await Promise.all([
         supabase
           .from("deliverables")
           .select("*")
-          .eq("phase_id", phaseId)
-          .order("order_index", { ascending: true }),
-        supabase
-          .from("tasks")
-          .select(`
-            *,
-            phases (
-              id,
-              title,
-              project_id,
-              projects (
-                name
-              )
-            ),
-            task_attachments (*),
-            task_members (
-              *,
-              profiles (*)
-            )
-          `)
           .eq("phase_id", phaseId)
           .order("order_index", { ascending: true }),
         supabase
@@ -179,19 +162,11 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
       ])
 
       if (deliverablesRes.error) throw deliverablesRes.error
-      if (tasksRes.error) throw tasksRes.error
       if (membersRes.error) throw membersRes.error
       if (projectMembersRes.error) throw projectMembersRes.error
 
       setDeliverables(deliverablesRes.data || [])
-      
-      const fetchedMembers = membersRes.data || []
-      const fetchedTasks = (tasksRes.data || []).map(task => ({
-        ...task,
-        profiles: fetchedMembers.find(m => m.id === task.user_id) || null
-      }))
-      setTasks(fetchedTasks as Task[])
-      setMembers(fetchedMembers)
+      setMembers(membersRes.data || [])
 
       // Filter project members for employees only
       const employees = (projectMembersRes.data || [])
@@ -205,83 +180,13 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [phaseId])
+  }, [phaseId, isClient, user, projectId])
 
   React.useEffect(() => {
     if (phaseId) {
       fetchData()
     }
   }, [fetchData, phaseId])
-
-  React.useEffect(() => {
-    if (!phaseId) return
-
-    const channel = supabase
-      .channel(`phase-tasks-${phaseId}`)
-      .on(
-        "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
-          table: "tasks",
-          filter: `phase_id=eq.${phaseId}`
-        },
-        async (payload) => {
-          if (payload.eventType === "INSERT") {
-            const { data, error } = await supabase
-              .from("tasks")
-              .select(`
-                *,
-                phases (
-                  id,
-                  title,
-                  project_id,
-                  projects (
-                    name
-                  )
-                ),
-                task_attachments (*),
-                task_members (
-                  *,
-                  profiles (*)
-                )
-              `)
-              .eq("id", payload.new.id)
-              .single()
-
-            if (!error && data) {
-              const newTask = {
-                ...data,
-                profiles: members.find(m => m.id === data.user_id) || null
-              }
-              setTasks(prev => {
-                if (prev.some(t => t.id === newTask.id)) return prev
-                return [...prev, newTask as Task]
-              })
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const updatedTask = payload.new as Task
-            setTasks(prev => prev.map(t => {
-              if (t.id === updatedTask.id) {
-                return {
-                  ...t,
-                  ...updatedTask,
-                  profiles: members.find(m => m.id === updatedTask.user_id) || null
-                }
-              }
-              return t
-            }))
-          } else if (payload.eventType === "DELETE") {
-            setTasks(prev => prev.filter(t => t.id !== payload.old.id))
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [phaseId, members])
 
   // --- Phase Actions ---
   const handlePhaseSubmit = async (values: any, updatedDeliverables: Deliverable[], lineItems: LineItem[]) => {
@@ -331,16 +236,22 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
   }
 
   // --- Kanban Actions ---
-  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
-    try {
-      const updatedData = { ...updates }
-      if ("user_id" in updates) {
-        (updatedData as any).profiles = members.find(m => m.id === updates.user_id) || null
-      }
-      const { error } = await supabase.from("tasks").update(updates).eq("id", taskId)
-      if (error) throw error
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
-    } catch (error: any) {
+    const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+      try {
+        // Optimistic update
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t))
+  
+        // Clean up updates to only include database columns
+        const dbUpdates = { ...updates } as any
+        delete dbUpdates.phases
+        delete dbUpdates.profiles
+        delete dbUpdates.task_attachments
+        delete dbUpdates.task_members
+        delete dbUpdates.projects
+  
+        const { error } = await supabase.from("tasks").update(dbUpdates).eq("id", taskId)
+        if (error) throw error
+      } catch (error: any) {
       console.error("Update task error:", error)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
       toast.error("Failed to update task: " + message)
@@ -443,16 +354,6 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
             )
             await supabase.from("task_members").insert(subtaskAssignments)
           }
-
-          const formattedSubtasks = createdSubtasks.map(st => ({
-            ...st,
-            profiles: members.find(m => m.id === st.user_id) || null,
-            task_members: assigneeIds.map(userId => ({
-              user_id: userId,
-              profiles: members.find(m => m.id === userId) || null
-            }))
-          }))
-          setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
         }
       }
 
@@ -484,7 +385,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
 
           if (!user) throw new Error("Not authenticated")
 
-          const { data: attachment, error: dbError } = await supabase
+          await supabase
             .from('task_attachments')
             .insert([{
               task_id: taskId,
@@ -494,33 +395,9 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
               file_type: file.type,
               file_size: fileToUpload.size
             }])
-            .select()
-            .single()
-
-          if (dbError) throw dbError
-          
-          setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-              return { ...t, task_attachments: [...(t.task_attachments || []), attachment] }
-            }
-            return t
-          }))
         }
       }
 
-      const newTask = { 
-        ...data, 
-        profiles: members.find(m => m.id === data.user_id) || null,
-        task_members: assigneeIds.map(userId => ({
-          user_id: userId,
-          profiles: members.find(m => m.id === userId) || null
-        }))
-      }
-      setTasks(prev => {
-        if (prev.some(t => t.id === newTask.id)) return prev
-        return [...prev, newTask as Task]
-      })
-      
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
@@ -565,21 +442,6 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         await supabase.from("task_members").insert(assignments)
       }
 
-      setTasks(prev => prev.map(t => {
-        if (t.id === editingTask.id) {
-          return { 
-            ...t, 
-            ...updates, 
-            profiles: members.find(m => m.id === updates.user_id) || null,
-            task_members: assigneeIds.map(userId => ({
-              user_id: userId,
-              profiles: members.find(m => m.id === userId) || null
-            }))
-          }
-        }
-        return t
-      }))
-      
       setIsEditDialogOpen(false)
       setEditingTask(null)
       toast.success("Task updated successfully")
@@ -640,15 +502,6 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
         await supabase.from("task_members").insert(assignments)
       }
 
-      const newTask = { 
-        ...data, 
-        profiles: members.find(m => m.id === data.user_id) || null,
-        task_members: assigneeIds.map(userId => ({
-          user_id: userId,
-          profiles: members.find(m => m.id === userId) || null
-        }))
-      }
-      setTasks(prev => [...prev, newTask as Task])
       toast.success("Subtask added")
     } catch (error: any) {
       console.error("Quick create task error:", error)
@@ -659,14 +512,32 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
 
   const handleTaskDelete = async (taskId: string) => {
     try {
+      // Optimistic delete
+      setTasks(prev => prev.filter(t => t.id !== taskId))
       const { error } = await supabase.from("tasks").delete().eq("id", taskId)
       if (error) throw error
-      setTasks(prev => prev.filter(t => t.id !== taskId))
       toast.success("Task deleted successfully")
     } catch (error: any) {
       console.error("Delete task error:", error)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
       toast.error("Failed to delete task: " + message)
+    }
+  }
+
+  const handleMoveAllTasks = async (taskIds: string[], targetStatus: string) => {
+    try {
+      // Optimistic update
+      setTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: targetStatus } : t))
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: targetStatus })
+        .in("id", taskIds)
+
+      if (error) throw error
+      toast.success(`Moved ${taskIds.length} tasks to ${targetStatus}`)
+    } catch (error: any) {
+      console.error("Move all tasks error:", error)
+      toast.error("Failed to move tasks")
     }
   }
 
@@ -792,6 +663,7 @@ export function PhaseDetails({ projectId, phaseId }: PhaseDetailsProps) {
                 onTaskQuickCreate={handleTaskQuickCreate}
                 onTaskEdit={(task) => { setEditingTask(task); setIsEditDialogOpen(true); }}
                 onTaskDelete={handleTaskDelete}
+                onMoveAllTasks={handleMoveAllTasks}
                 onShare={(task) => {
                   const shareData = {
                     title: task.title,

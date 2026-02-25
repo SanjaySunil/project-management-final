@@ -40,6 +40,8 @@ interface AssignedTasksProps {
   defaultStatusFilter?: string
 }
 
+import { useTasks } from "@/hooks/use-tasks"
+
 export function AssignedTasks({ 
   userId, 
   hideHeader = false,
@@ -54,20 +56,29 @@ export function AssignedTasks({
   
   const [kanbanMode, setKanbanMode] = React.useState<"development" | "admin">("development")
   const [selectedProjectId, setSelectedProjectId] = React.useState<string>("all")
-  const [tasks, setTasks] = React.useState<Task[]>([])
-  const [personalTasks, setPersonalTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
   const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
   const [projects, setProjects] = React.useState<Tables<"projects">[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const [isLoadingMetadata, setIsLoadingMetadata] = React.useState(true)
   const [statusFilter, setStatusFilter] = React.useState<string>(defaultStatusFilter)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
+
+  const { tasks: projectTasks, isLoading: isProjectTasksLoading, setTasks: setProjectTasks } = useTasks({ 
+    userId: targetUserId, 
+    isPersonal: false,
+    broadSubscription: true // Use broad to catch changes in task_members too
+  })
+  
+  const { tasks: personalTasks, isLoading: isPersonalTasksLoading, setTasks: setPersonalTasks } = useTasks({ 
+    userId: targetUserId, 
+    isPersonal: true 
+  })
 
   // Memoize projects that have tasks assigned to this user
   const projectsWithTasks = React.useMemo(() => {
     if (kanbanMode !== "development") return []
     const projectMap = new Map<string, { id: string, name: string }>()
-    tasks.forEach(task => {
+    projectTasks.forEach(task => {
       const project = (task as any).projects || (task.phases as any)?.projects
       if (project?.id && project?.name) {
         projectMap.set(project.id, {
@@ -77,7 +88,7 @@ export function AssignedTasks({
       }
     })
     return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [tasks, kanbanMode])
+  }, [projectTasks, kanbanMode])
 
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false)
@@ -85,16 +96,61 @@ export function AssignedTasks({
   const [creatingParentId, setCreatingParentId] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
+  const fetchMetadata = React.useCallback(async () => {
+    if (!targetUserId) return
+
+    try {
+      setIsLoadingMetadata(true)
+      
+      const [membersRes, phasesRes, projectsRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("*")
+          .neq("role", "client")
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("phases")
+          .select("*")
+          .order("order_index", { ascending: true })
+          .order("title", { ascending: true }),
+        supabase
+          .from("projects")
+          .select("*")
+          .order("name", { ascending: true })
+      ])
+
+      if (membersRes.error) throw membersRes.error
+      if (phasesRes.error) throw phasesRes.error
+      if (projectsRes.error) throw projectsRes.error
+
+      setMembers(membersRes.data || [])
+      setPhases(phasesRes.data || [])
+      setProjects(projectsRes.data || [])
+    } catch (error: any) {
+      console.error("Fetch metadata error:", error)
+      toast.error("Failed to fetch metadata")
+    } finally {
+      setIsLoadingMetadata(false)
+    }
+  }, [targetUserId])
+
+  React.useEffect(() => {
+    fetchMetadata()
+  }, [fetchMetadata])
+
+  const isLoading = isLoadingMetadata || isProjectTasksLoading || isPersonalTasksLoading
+
   // Handle deep linking for tasks
   React.useEffect(() => {
-    if (taskIdParam && tasks.length > 0 && !editingTask) {
-      const task = tasks.find(t => t.id === taskIdParam)
+    const allTasks = [...projectTasks, ...personalTasks]
+    if (taskIdParam && allTasks.length > 0 && !editingTask) {
+      const task = allTasks.find(t => t.id === taskIdParam)
       if (task) {
         setEditingTask(task)
         setIsEditDialogOpen(true)
       }
     }
-  }, [taskIdParam, tasks, editingTask])
+  }, [taskIdParam, projectTasks, personalTasks, editingTask])
 
   // Clear taskId from URL when dialog is closed
   const handleEditDialogChange = (open: boolean) => {
@@ -109,280 +165,9 @@ export function AssignedTasks({
     }
   }
 
-  const fetchTasks = React.useCallback(async () => {
-    if (!targetUserId) return
-
-    try {
-      setIsLoading(true)
-      
-      const [membersRes, phasesRes, projectsRes, membershipsRes, clientProjectsRes, memberTasksRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("*")
-          .neq("role", "client")
-          .order("full_name", { ascending: true }),
-        supabase
-          .from("phases")
-          .select("*")
-          .order("order_index", { ascending: true })
-          .order("title", { ascending: true }),
-        supabase
-          .from("projects")
-          .select("*")
-          .order("name", { ascending: true }),
-        supabase
-          .from("project_members")
-          .select("project_id")
-          .eq("user_id", targetUserId),
-        supabase
-          .from("projects")
-          .select("id, clients!inner(user_id)")
-          .eq("clients.user_id", targetUserId),
-        supabase
-          .from("task_members")
-          .select("task_id")
-          .eq("user_id", targetUserId)
-      ])
-
-      const memberTaskIds = (memberTasksRes.data || []).map(m => m.task_id)
-
-      // Pull project tasks where user is assigned or member
-      let tasksQuery = supabase
-        .from("tasks")
-        .select(`
-          *,
-          projects (
-            id,
-            name,
-            status
-          ),
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              id,
-              name,
-              status
-            )
-          ),
-          task_attachments (*),
-          task_members (
-            user_id,
-            profiles (
-              id,
-              full_name,
-              avatar_url,
-              email,
-              role
-            )
-          )
-        `)
-
-      if (memberTaskIds.length > 0) {
-        tasksQuery = tasksQuery.or(`user_id.eq.${targetUserId},id.in.(${memberTaskIds.join(",")})`)
-      } else {
-        tasksQuery = tasksQuery.eq("user_id", targetUserId)
-      }
-
-      const projectTasksRes = await tasksQuery.order("order_index", { ascending: true })
-
-      // Pull personal tasks
-      const personalTasksRes = await (supabase.from as any)("personal_tasks")
-        .select("*")
-        .eq("user_id", targetUserId)
-        .order("order_index", { ascending: true })
-
-      if (projectTasksRes.error) throw projectTasksRes.error
-      if (personalTasksRes.error) throw personalTasksRes.error
-      if (membersRes.error) throw membersRes.error
-      if (phasesRes.error) throw phasesRes.error
-      if (projectsRes.error) throw projectsRes.error
-      if (membershipsRes.error) throw membershipsRes.error
-
-      const memberProjectIds = (membershipsRes.data || []).map(m => m.project_id)
-      const clientProjectIds = (clientProjectsRes.data || []).map(p => p.id)
-      const allAllowedProjectIds = Array.from(new Set([...memberProjectIds, ...clientProjectIds]))
-
-      const fetchedMembers = membersRes.data || []
-      
-      const fetchedProjectTasks = (projectTasksRes.data || []).map((task: any) => ({
-        ...task,
-        profiles: fetchedMembers.find(m => m.id === task.user_id) || null
-      })).filter((task: any) => {
-        const project = task.projects || task.phases?.projects
-        const projectId = task.project_id || task.phases?.project_id
-        
-        // Filter by project status - only show active projects
-        if (project && project.status !== 'active') return false
-        
-        // Filter by membership - only show projects user is assigned to
-        return projectId ? allAllowedProjectIds.includes(projectId) : true // Allow tasks without project
-      })
-
-      const fetchedPersonalTasks = (personalTasksRes.data || []).map((task: any) => ({
-        ...task,
-        profiles: fetchedMembers.find(m => m.id === task.user_id) || null,
-        is_personal: true
-      }))
-
-      setTasks(fetchedProjectTasks as Task[])
-      setPersonalTasks(fetchedPersonalTasks as Task[])
-      setMembers(fetchedMembers)
-      setPhases(phasesRes.data || [])
-      setProjects(projectsRes.data || [])
-    } catch (error: any) {
-      console.error("Fetch tasks error:", error)
-      const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
-      toast.error("Failed to fetch tasks: " + message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [targetUserId])
-
-  React.useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
-
-  React.useEffect(() => {
-    if (!targetUserId) return
-
-    // Listen to project tasks
-    const projectChannel = supabase
-      .channel(`assigned-project-tasks-${targetUserId}`)
-      .on(
-        "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
-          table: "tasks",
-          filter: `user_id=eq.${targetUserId}`
-        },
-        async (payload) => {
-          if (payload.eventType === "INSERT") {
-            const res = await supabase
-              .from("tasks")
-              .select(`
-                *,
-                phases (
-                  id,
-                  title,
-                  project_id,
-                  projects (
-                    id,
-                    name,
-                    status
-                  )
-                ),
-                task_attachments (*),
-                task_members (
-                  user_id,
-                              profiles (
-                                id,
-                                full_name,
-                                avatar_url,
-                                email,
-                                role
-                              )                )
-              `)
-              .eq("id", payload.new.id)
-              .single()
-            
-            if (!res.error && res.data) {
-              const project = (res.data.phases as any)?.projects
-              
-              // Skip if not active
-              if (project && project.status !== 'active') return
-              
-              const newTask = {
-                ...res.data,
-                profiles: members.find(m => m.id === res.data.user_id) || null
-              }
-              setTasks(prev => {
-                if (prev.some(t => t.id === newTask.id)) return prev
-                return [...prev, newTask as Task]
-              })
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const updatedTask = payload.new as any
-            setTasks(prev => prev.map(t => {
-              if (t.id === updatedTask.id) {
-                return {
-                  ...t,
-                  ...updatedTask,
-                  profiles: members.find(m => m.id === updatedTask.user_id) || null
-                }
-              }
-              return t
-            }))
-          } else if (payload.eventType === "DELETE") {
-            setTasks(prev => prev.filter(t => t.id !== payload.old.id))
-          }
-        }
-      )
-      .subscribe()
-
-    // Listen to personal tasks
-    const personalChannel = supabase
-      .channel(`assigned-personal-tasks-${targetUserId}`)
-      .on(
-        "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
-          table: "personal_tasks",
-          filter: `user_id=eq.${targetUserId}`
-        },
-        async (payload) => {
-          if (payload.eventType === "INSERT") {
-            const res = await (supabase.from as any)("personal_tasks")
-              .select("*")
-              .eq("id", payload.new.id)
-              .single()
-
-            if (!res.error && res.data) {
-              const newTask = {
-                ...res.data,
-                profiles: members.find(m => m.id === res.data.user_id) || null,
-                is_personal: true
-              }
-              setPersonalTasks(prev => {
-                if (prev.some(t => t.id === newTask.id)) return prev
-                return [...prev, newTask as Task]
-              })
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const updatedTask = payload.new as any
-            setPersonalTasks(prev => prev.map(t => {
-              if (t.id === updatedTask.id) {
-                return {
-                  ...t,
-                  ...updatedTask,
-                  profiles: members.find(m => m.id === updatedTask.user_id) || null,
-                  is_personal: true
-                }
-              }
-              return t
-            }))
-          } else if (payload.eventType === "DELETE") {
-            setPersonalTasks(prev => prev.filter(t => t.id !== payload.old.id))
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(projectChannel)
-      supabase.removeChannel(personalChannel)
-    }
-  }, [targetUserId, members])
-
   const filteredTasks = React.useMemo(() => {
-    const projectPool = tasks
-    const personalPool = personalTasks
-
     // Filter project tasks by mode
-    const filteredProjectTasks = projectPool.filter(task => {
+    const filteredProjectTasks = projectTasks.filter(task => {
       const hasAdmin = (task as any).task_members?.some((m: any) => m.profiles?.role === 'admin')
       const isAdminType = task.type === 'admin'
       if (kanbanMode === 'admin') {
@@ -392,7 +177,7 @@ export function AssignedTasks({
     })
 
     // Personal tasks only show in admin mode
-    const filteredPersonalTasks = kanbanMode === 'admin' ? personalPool : []
+    const filteredPersonalTasks = kanbanMode === 'admin' ? personalTasks : []
 
     let filtered = [...filteredProjectTasks, ...filteredPersonalTasks]
 
@@ -409,31 +194,47 @@ export function AssignedTasks({
     if (statusFilter === "complete") return filtered.filter(t => t.status === "complete")
     // If it's a specific status (e.g. "in progress")
     return filtered.filter(t => t.status === statusFilter)
-  }, [tasks, personalTasks, statusFilter, selectedProjectId, kanbanMode])
+  }, [projectTasks, personalTasks, statusFilter, selectedProjectId, kanbanMode])
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
-      const task = [...tasks, ...personalTasks].find(t => t.id === taskId)
+      const allTasks = [...projectTasks, ...personalTasks]
+      const task = allTasks.find(t => t.id === taskId)
       if (!task) return
 
       const isPersonal = (task as any).is_personal
 
-      const updatedData = { ...updates }
-      if ("user_id" in updates) {
-        (updatedData as Record<string, unknown>).profiles = members.find(m => m.id === updates.user_id) || null
+      // Optimistic update
+      if (isPersonal) {
+        setPersonalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t))
+      } else {
+        setProjectTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t))
       }
+
+      // Strip non-column fields
+      const dbUpdates = { ...updates } as any
+      delete dbUpdates.phases
+      delete dbUpdates.profiles
+      delete dbUpdates.task_attachments
+      delete dbUpdates.task_members
+      delete dbUpdates.projects
 
       const table = isPersonal ? "personal_tasks" : "tasks"
       const { error } = await (supabase.from as any)(table)
-        .update(updates)
+        .update(dbUpdates)
         .eq("id", taskId)
 
       if (error) throw error
-      
-      if (isPersonal) {
-        setPersonalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
-      } else {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedData } : t))
+
+      // Update task_members in DB if user_id changed
+      if (!isPersonal && "user_id" in updates) {
+        await supabase.from("task_members").delete().eq("task_id", taskId)
+        if (updates.user_id) {
+          await supabase.from("task_members").insert([{
+            task_id: taskId,
+            user_id: updates.user_id
+          }])
+        }
       }
     } catch (error: any) {
       console.error("Update task error:", error)
@@ -458,13 +259,16 @@ export function AssignedTasks({
       const isPersonal = kanbanMode === "admin" && !values.project_id && !values.phase_id
       const table = isPersonal ? "personal_tasks" : "tasks"
       
+      const assigneeIds = values.assignee_ids || []
+      const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : (values.user_id === "unassigned" ? null : (values.user_id || targetUserId))
+
       const payload: any = {
         title: values.title,
         description: values.description,
         type: values.type || 'feature',
-        user_id: values.user_id === "unassigned" ? null : (values.user_id || targetUserId),
+        user_id: finalUserId,
         status: finalStatus,
-        order_index: (isPersonal ? personalTasks : tasks).filter(t => t.status === finalStatus).length,
+        order_index: (isPersonal ? personalTasks : projectTasks).filter(t => t.status === finalStatus).length,
         parent_id: values.parent_id === "none" ? null : (values.parent_id || creatingParentId)
       }
 
@@ -473,40 +277,20 @@ export function AssignedTasks({
         payload.phase_id = values.phase_id === "none" ? null : values.phase_id
       }
 
-      const query = (supabase.from as any)(table).insert([payload])
-      
-      let res
-      if (!isPersonal) {
-        res = await query.select(`
-          *,
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              id,
-              name
-            )
-          ),
-          task_attachments (*),
-          task_members (
-            user_id,
-            profiles (
-              id,
-              full_name,
-              avatar_url,
-              email,
-              role
-            )
-          )
-        `).single()
-      } else {
-        res = await query.select("*").single()
+      const { data, error } = await (supabase.from as any)(table).insert([payload]).select().single()
+
+      if (error) throw error
+
+      const taskId = data.id
+
+      // Handle multiple assignees
+      if (!isPersonal && assigneeIds.length > 0) {
+        const assignments = assigneeIds.map(userId => ({
+          task_id: taskId,
+          user_id: userId
+        }))
+        await supabase.from("task_members").insert(assignments)
       }
-
-      if (res.error) throw res.error
-
-      const taskId = res.data.id
 
       // Handle subtasks
       if (values.subtasks && values.subtasks.length > 0) {
@@ -514,29 +298,12 @@ export function AssignedTasks({
           title,
           status: "todo",
           parent_id: taskId,
-          user_id: targetUserId,
-          phase_id: !isPersonal ? res.data.phase_id : null,
+          user_id: finalUserId,
+          phase_id: !isPersonal ? data.phase_id : null,
           order_index: index
         }))
         
-        const { data: createdSubtasks, error: subtasksError } = await (supabase.from as any)(table)
-          .insert(subtasksToInsert)
-          .select(!isPersonal ? `*, phases(id, title, project_id, projects(id, name)), task_attachments(*)` : `*`)
-
-        if (subtasksError) throw subtasksError
-        
-        if (createdSubtasks) {
-          const formattedSubtasks = (createdSubtasks as any[]).map(st => ({
-            ...st,
-            profiles: members.find(m => m.id === st.user_id) || null,
-            is_personal: isPersonal
-          }))
-          if (isPersonal) {
-            setPersonalTasks(prev => [...prev, ...formattedSubtasks as Task[]])
-          } else {
-            setTasks(prev => [...prev, ...formattedSubtasks as Task[]])
-          }
-        }
+        await (supabase.from as any)(table).insert(subtasksToInsert)
       }
 
       // Handle attachments (only for project tasks)
@@ -567,7 +334,7 @@ export function AssignedTasks({
 
           if (!currentUser) throw new Error("Not authenticated")
 
-          const { data: attachment, error: dbError } = await supabase
+          await supabase
             .from('task_attachments')
             .insert([{
               task_id: taskId,
@@ -577,38 +344,9 @@ export function AssignedTasks({
               file_type: file.type,
               file_size: fileToUpload.size
             }])
-            .select()
-            .single()
-
-          if (dbError) throw dbError
-          
-          setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-              return { ...t, task_attachments: [...(t.task_attachments || []), attachment] }
-            }
-            return t
-          }))
         }
       }
 
-      const newTask = {
-        ...res.data,
-        profiles: members.find(m => m.id === res.data.user_id) || null,
-        is_personal: isPersonal
-      }
-
-      if (isPersonal) {
-        setPersonalTasks(prev => {
-          if (prev.some(t => t.id === newTask.id)) return prev
-          return [...prev, newTask as Task]
-        })
-      } else {
-        setTasks(prev => {
-          if (prev.some(t => t.id === newTask.id)) return prev
-          return [...prev, newTask as Task]
-        })
-      }
-      
       setIsCreateDialogOpen(false)
       setCreatingParentId(null)
       toast.success("Task created successfully")
@@ -627,12 +365,16 @@ export function AssignedTasks({
     try {
       setIsSubmitting(true)
       const isPersonal = (editingTask as any).is_personal
+      
+      const assigneeIds = values.assignee_ids || []
+      const finalUserId = assigneeIds.length > 0 ? assigneeIds[0] : (values.user_id === "unassigned" ? null : (values.user_id || null))
+
       const updates: any = {
         title: values.title,
         description: values.description || null,
         status: values.status || editingTask.status,
         type: values.type || editingTask.type || 'feature',
-        user_id: values.user_id === "unassigned" ? null : (values.user_id || null),
+        user_id: finalUserId,
         parent_id: values.parent_id === "none" ? null : (values.parent_id || null)
       }
 
@@ -648,18 +390,19 @@ export function AssignedTasks({
 
       if (error) throw error
 
-      const updatedTask = { 
-        ...editingTask, 
-        ...updates,
-        profiles: members.find(m => m.id === updates.user_id) || null,
+      // Update task_members for project tasks
+      if (!isPersonal) {
+        await supabase.from("task_members").delete().eq("task_id", editingTask.id)
+        
+        if (assigneeIds.length > 0) {
+          const assignments = assigneeIds.map(userId => ({
+            task_id: editingTask.id,
+            user_id: userId
+          }))
+          await supabase.from("task_members").insert(assignments)
+        }
       }
 
-      if (isPersonal) {
-        setPersonalTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t))
-      } else {
-        setTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t))
-      }
-      
       setIsEditDialogOpen(false)
       setEditingTask(null)
       toast.success("Task updated successfully")
@@ -676,7 +419,8 @@ export function AssignedTasks({
     if (!targetUserId) return
 
     try {
-      const task = [...tasks, ...personalTasks].find(t => t.id === parentId)
+      const allTasks = [...projectTasks, ...personalTasks]
+      const task = allTasks.find(t => t.id === parentId)
       const isPersonal = (task as any)?.is_personal
       const table = isPersonal ? "personal_tasks" : "tasks"
       
@@ -686,47 +430,14 @@ export function AssignedTasks({
         type: task?.type || 'feature',
         parent_id: parentId,
         user_id: targetUserId,
-        order_index: (isPersonal ? personalTasks : tasks).filter(t => t.parent_id === parentId).length
+        order_index: (isPersonal ? personalTasks : projectTasks).filter(t => t.parent_id === parentId).length
       }
 
       if (!isPersonal) {
         payload.phase_id = task?.phase_id || null
       }
 
-      const query = (supabase.from as any)(table).insert([payload])
-      
-      let res
-      if (!isPersonal) {
-        res = await query.select(`
-          *,
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              id,
-              name
-            )
-          ),
-          task_attachments (*)
-        `).single()
-      } else {
-        res = await query.select("*").single()
-      }
-
-      if (res.error) throw res.error
-
-      const newTask = {
-        ...res.data,
-        profiles: members.find(m => m.id === res.data.user_id) || null,
-        is_personal: isPersonal
-      }
-
-      if (isPersonal) {
-        setPersonalTasks(prev => [...prev, newTask as Task])
-      } else {
-        setTasks(prev => [...prev, newTask as Task])
-      }
+      await (supabase.from as any)(table).insert([payload])
       toast.success("Subtask added")
     } catch (error: any) {
       console.error("Quick create task error:", error)
@@ -737,26 +448,63 @@ export function AssignedTasks({
 
   const handleTaskDelete = async (taskId: string) => {
     try {
-      const task = [...tasks, ...personalTasks].find(t => t.id === taskId)
+      const allTasks = [...projectTasks, ...personalTasks]
+      const task = allTasks.find(t => t.id === taskId)
       const isPersonal = (task as any)?.is_personal
-      const table = isPersonal ? "personal_tasks" : "tasks"
       
+      // Optimistic delete
+      if (isPersonal) {
+        setPersonalTasks(prev => prev.filter(t => t.id !== taskId))
+      } else {
+        setProjectTasks(prev => prev.filter(t => t.id !== taskId))
+      }
+
+      const table = isPersonal ? "personal_tasks" : "tasks"
       const { error } = await (supabase.from as any)(table)
         .delete()
         .eq("id", taskId)
 
       if (error) throw error
 
-      if (isPersonal) {
-        setPersonalTasks(prev => prev.filter(t => t.id !== taskId))
-      } else {
-        setTasks(prev => prev.filter(t => t.id !== taskId))
-      }
       toast.success("Task deleted successfully")
     } catch (error: any) {
       console.error("Delete task error:", error)
       const message = error.message || error.details || (typeof error === 'object' ? JSON.stringify(error) : String(error))
       toast.error("Failed to delete task: " + message)
+    }
+  }
+
+  const handleMoveAllTasks = async (taskIds: string[], targetStatus: string) => {
+    try {
+      const allTasks = [...projectTasks, ...personalTasks]
+      const tasksToUpdate = allTasks.filter(t => taskIds.includes(t.id))
+      
+      const projectTaskIds = tasksToUpdate.filter(t => !(t as any).is_personal).map(t => t.id)
+      const personalTaskIds = tasksToUpdate.filter(t => (t as any).is_personal).map(t => t.id)
+
+      // Optimistic update
+      setProjectTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: targetStatus } : t))
+      setPersonalTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: targetStatus } : t))
+
+      if (projectTaskIds.length > 0) {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ status: targetStatus })
+          .in("id", projectTaskIds)
+        if (error) throw error
+      }
+
+      if (personalTaskIds.length > 0) {
+        const { error } = await (supabase.from as any)("personal_tasks")
+          .update({ status: targetStatus })
+          .in("id", personalTaskIds)
+        if (error) throw error
+      }
+      
+      toast.success(`Moved ${taskIds.length} tasks to ${targetStatus}`)
+    } catch (error: any) {
+      console.error("Move all tasks error:", error)
+      toast.error("Failed to move tasks")
     }
   }
 
@@ -766,10 +514,7 @@ export function AssignedTasks({
       const isAdmin = task.type === 'admin'
       
       if (isPersonal) {
-        // Personal tasks are always in Admin tab. 
-        // Converting them always means moving to Development tab (tasks table, type feature).
         const newType = 'feature'
-        
         const { data: newTask, error } = await supabase
           .from("tasks")
           .insert([{
@@ -778,54 +523,30 @@ export function AssignedTasks({
             status: task.status,
             type: newType,
             user_id: task.user_id,
-            order_index: tasks.filter(t => t.status === task.status).length,
+            order_index: projectTasks.filter(t => t.status === task.status).length,
           }])
-          .select(`
-            *,
-            phases (
-              id,
-              title,
-              project_id,
-              projects (
-                id,
-                name,
-                status
-              )
-            ),
-            task_attachments (*),
-            task_members (
-              user_id,
-              profiles (
-                id,
-                full_name,
-                avatar_url,
-                email,
-                role
-              )
-            )
-          `)
+          .select()
           .single()
 
         if (error) throw error
 
-        // Delete from personal_tasks
+        if (newTask.user_id) {
+          await supabase.from("task_members").insert([{
+            task_id: newTask.id,
+            user_id: newTask.user_id
+          }])
+        }
+
         await (supabase.from as any)("personal_tasks").delete().eq("id", task.id)
-        
-        setPersonalTasks(prev => prev.filter(t => t.id !== task.id))
-        setTasks(prev => [...prev, { ...newTask, profiles: members.find(m => m.id === newTask.user_id) || null } as Task])
         toast.success("Converted to development task")
       } else {
-        // Project task. Toggle between admin and feature type to move between tabs.
         const newType = isAdmin ? 'feature' : 'admin'
-        
         const { error } = await supabase
           .from("tasks")
           .update({ type: newType })
           .eq("id", task.id)
 
         if (error) throw error
-
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, type: newType } : t))
         toast.success(`Converted to ${newType === 'admin' ? 'admin' : 'development'} task`)
       }
     } catch (error: any) {
@@ -988,6 +709,7 @@ export function AssignedTasks({
               setIsEditDialogOpen(true)
             }}
             onTaskDelete={handleTaskDelete}
+            onMoveAllTasks={handleMoveAllTasks}
             onShare={(task) => {
               const shareData = {
                 title: task.title,
@@ -1032,7 +754,7 @@ export function AssignedTasks({
             members={members}
             phases={phases}
             projects={projects}
-            tasks={[...tasks, ...personalTasks]}
+            tasks={[...projectTasks, ...personalTasks]}
             hideAssignee={kanbanMode === "admin" && !creatingParentId}
             defaultValues={{
               user_id: targetUserId,
@@ -1079,7 +801,7 @@ export function AssignedTasks({
               members={members}
               phases={phases}
               projects={projects}
-              tasks={[...tasks, ...personalTasks]}
+              tasks={[...projectTasks, ...personalTasks]}
               hideAssignee={(editingTask as any).is_personal}
               defaultValues={{
                 id: editingTask.id,

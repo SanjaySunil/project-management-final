@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable"
-import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock, IconAlarm, IconArrowsRightLeft } from "@tabler/icons-react"
+import { IconPlus, IconTrash, IconLayoutKanban, IconCircle, IconCircleCheck, IconShare, IconBug, IconRocket, IconGitPullRequest, IconCode, IconShieldLock, IconAlarm, IconArrowsRightLeft, IconDotsVertical, IconArrowRight } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card } from "@/components/ui/card"
@@ -112,6 +112,7 @@ interface KanbanBoardProps {
   onTaskQuickCreate?: (status: string, parentId: string, title: string) => void | Promise<void>
   onTaskEdit: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
+  onMoveAllTasks?: (taskIds: string[], targetStatus: string) => void | Promise<void>
   onShare?: (task: Task) => void
   hideControls?: boolean
   hideCreate?: boolean
@@ -139,6 +140,7 @@ export function KanbanBoard({
   onTaskQuickCreate,
   onTaskEdit,
   onTaskDelete,
+  onMoveAllTasks,
   onShare,
   hideControls = false,
   hideCreate = false,
@@ -473,6 +475,7 @@ export function KanbanBoard({
                 onTaskUpdate={onTaskUpdate}
                 onTaskConvert={onTaskConvert}
                 onTaskDelete={(id) => setIsDeleteDialogOpen(id)}
+                onMoveAllTasks={onMoveAllTasks}
                 onShare={handleShare}
                 getSubtasks={getSubtasks}
               />
@@ -525,11 +528,12 @@ interface KanbanColumnProps {
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onTaskConvert?: (task: Task) => void | Promise<void>
   onTaskDelete: (taskId: string) => void | Promise<void>
+  onMoveAllTasks?: (taskIds: string[], targetStatus: string) => void | Promise<void>
   onShare: (task: Task) => void
   getSubtasks: (taskId: string) => Task[]
 }
 
-function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskConvert, onTaskDelete, onShare, getSubtasks }: KanbanColumnProps) {
+function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQuickAddSubtask, onTaskEdit, onTaskUpdate, onTaskConvert, onTaskDelete, onMoveAllTasks, onShare, getSubtasks }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: id,
   })
@@ -546,16 +550,45 @@ function KanbanColumn({ id, title, tasks, members, onAddTask, onAddSubtask, onQu
             {tasks.length}
           </span>
         </div>
-        {onAddTask && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 text-muted-foreground hover:text-foreground"
-            onClick={onAddTask}
-          >
-            <IconPlus className="size-3.5" />
-          </Button>
-        )}
+        <div className="flex items-center gap-0.5">
+          {onMoveAllTasks && tasks.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground hover:text-foreground"
+                >
+                  <IconDotsVertical className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs">Move all tasks to...</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {COLUMNS.filter(col => col.id !== id).map(col => (
+                  <DropdownMenuItem 
+                    key={col.id}
+                    onClick={() => onMoveAllTasks(tasks.map(t => t.id), col.id)}
+                    className="text-xs"
+                  >
+                    <IconArrowRight className="size-3.5 mr-2 text-muted-foreground" />
+                    {col.title}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {onAddTask && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground hover:text-foreground"
+              onClick={onAddTask}
+            >
+              <IconPlus className="size-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <SortableContext

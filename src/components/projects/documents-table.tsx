@@ -146,6 +146,7 @@ export function DocumentsTable({
       searchPlaceholder="Search documents..."
       addLabel="New Document"
       onAdd={onAdd}
+      onRowClick={onEdit}
       isLoading={isLoading}
     />
   )

@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import type { Tables } from "@/lib/database.types"
 import { useAuth } from "@/hooks/use-auth"
 
+import { useTasks } from "@/hooks/use-tasks"
+
 interface ProjectTasksTabProps {
   projectId: string
 }
@@ -16,11 +18,14 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
   const { user } = useAuth()
   const [phases, setPhases] = React.useState<Tables<"phases">[]>([])
   const [selectedPhaseId, setSelectedPhaseId] = React.useState<string>("all")
-  const [tasks, setTasks] = React.useState<Task[]>([])
   const [members, setMembers] = React.useState<Tables<"profiles">[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
   const [mode, setMode] = React.useState<KanbanMode>("development")
   
+  const { tasks, isLoading, setTasks } = useTasks({ 
+    projectId, 
+    phaseId: selectedPhaseId === "all" ? undefined : selectedPhaseId 
+  })
+
   const [isTaskFormOpen, setIsTaskFormOpen] = React.useState(false)
   const [editingTask, setEditingTask] = React.useState<Task | null>(null)
   const [newTaskStatus, setNewTaskStatus] = React.useState<string>("todo")
@@ -59,79 +64,30 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
     }
   }, [projectId])
 
-  const fetchTasks = React.useCallback(async () => {
-    try {
-      setIsLoading(true)
-      let query = supabase
-        .from("tasks")
-        .select(`
-          *,
-          phases (
-            id,
-            title,
-            project_id,
-            projects (
-              id,
-              name
-            )
-          ),
-          task_members (
-            user_id,
-            profiles (
-              id,
-              full_name,
-              avatar_url,
-              email,
-              role
-            )
-          ),
-          task_attachments (*)
-        `)
-        .eq("project_id", projectId)
-
-      if (selectedPhaseId !== "all") {
-        query = query.eq("phase_id", selectedPhaseId)
-      }
-
-      const { data, error } = await query.order("order_index", { ascending: true })
-
-      if (error) throw error
-      
-      // Join profiles in memory since the database relationship might not be explicitly defined
-      const tasksWithProfiles = (data || []).map(task => ({
-        ...task,
-        profiles: members.find(m => m.id === task.user_id) || null
-      }))
-
-      setTasks(tasksWithProfiles as unknown as Task[])
-    } catch (error: any) {
-      toast.error("Failed to fetch tasks: " + error.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [projectId, selectedPhaseId, members])
-
   React.useEffect(() => {
     fetchPhases()
     fetchProjectMembers()
   }, [fetchPhases, fetchProjectMembers])
 
-  React.useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
-
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
+      // Optimistically update local state for better UX
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t))
+
+      // Clean up updates to only include database columns
+      const dbUpdates = { ...updates } as any
+      delete dbUpdates.phases
+      delete dbUpdates.profiles
+      delete dbUpdates.task_attachments
+      delete dbUpdates.task_members
+      delete dbUpdates.projects
+
       const { error } = await supabase
         .from("tasks")
-        .update(updates)
+        .update(dbUpdates)
         .eq("id", taskId)
 
       if (error) throw error
-      
-      // Update local state for immediate feedback if needed, 
-      // or just refetch. KanbanBoard already updates local state for reordering.
-      fetchTasks()
     } catch (error: any) {
       toast.error("Failed to update task: " + error.message)
     }
@@ -159,7 +115,6 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
         })
 
       if (error) throw error
-      fetchTasks()
     } catch (error: any) {
       toast.error("Failed to create subtask: " + error.message)
     }
@@ -172,6 +127,9 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
 
   const handleTaskDelete = async (taskId: string) => {
     try {
+      // Optimistic delete
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+
       const { error } = await supabase
         .from("tasks")
         .delete()
@@ -179,15 +137,31 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
 
       if (error) throw error
       toast.success("Task deleted")
-      fetchTasks()
     } catch (error: any) {
       toast.error("Failed to delete task: " + error.message)
     }
   }
 
+  const handleMoveAllTasks = async (taskIds: string[], targetStatus: string) => {
+    try {
+      // Optimistic update
+      setTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: targetStatus } : t))
+
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: targetStatus })
+        .in("id", taskIds)
+
+      if (error) throw error
+      toast.success(`Moved ${taskIds.length} tasks to ${targetStatus}`)
+    } catch (error: any) {
+      toast.error("Failed to move tasks: " + error.message)
+    }
+  }
+
   const handleFormSubmit = async (values: any) => {
     try {
-      const { assignee_ids, files, subtasks, ...rest } = values
+      const { assignee_ids, subtasks, files, ...rest } = values
       
       const taskData = {
         ...rest,
@@ -217,6 +191,69 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
           .single()
         if (error) throw error
         taskId = data.id
+
+        // Handle subtasks for new tasks
+        if (subtasks && subtasks.length > 0) {
+          const subtasksToInsert = subtasks.map((title: string, index: number) => ({
+            title,
+            status: "todo",
+            parent_id: taskId,
+            user_id: user?.id,
+            project_id: projectId,
+            phase_id: taskData.phase_id,
+            order_index: index
+          }))
+          
+          const { error: subtasksError } = await supabase
+            .from("tasks")
+            .insert(subtasksToInsert)
+          
+          if (subtasksError) console.error("Error creating subtasks:", subtasksError)
+        }
+
+        // Handle attachments for new tasks
+        if (files && files.length > 0 && typeof window !== 'undefined') {
+          const { default: imageCompression } = await import("browser-image-compression")
+          
+          for (const file of files as File[]) {
+            let fileToUpload = file
+
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true
+              }
+              try {
+                fileToUpload = await imageCompression(file, options)
+              } catch (error) {
+                console.error("Compression error:", error)
+              }
+            }
+
+            const fileExt = file.name.split('.').pop()
+            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+            const filePath = `${taskId}/${fileName}`
+
+            const { error: uploadError } = await supabase.storage
+              .from('task-attachments')
+              .upload(filePath, fileToUpload)
+
+            if (!uploadError && user) {
+              await supabase
+                .from('task_attachments')
+                .insert([{
+                  task_id: taskId,
+                  user_id: user.id,
+                  file_path: filePath,
+                  file_name: file.name,
+                  file_type: file.type,
+                  file_size: fileToUpload.size
+                }])
+            }
+          }
+        }
+
         toast.success("Task created")
       }
 
@@ -241,7 +278,6 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
       }
 
       setIsTaskFormOpen(false)
-      fetchTasks()
     } catch (error: any) {
       toast.error("Failed to save task: " + error.message)
     }
@@ -257,6 +293,7 @@ export function ProjectTasksTab({ projectId }: ProjectTasksTabProps) {
         onTaskQuickCreate={handleTaskQuickCreate}
         onTaskEdit={handleTaskEdit}
         onTaskDelete={handleTaskDelete}
+        onMoveAllTasks={handleMoveAllTasks}
         isLoading={isLoading}
         mode={mode}
         onModeChange={setMode}
